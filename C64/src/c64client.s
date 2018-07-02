@@ -478,7 +478,8 @@
 ;	* Trades aren't permitted when you're in debt.
 ;
 ;Change History (since version 0.01.99A)
-;	* 03JUL2018
+;* 03JUL2018
+;	* Disable debug keys by default
 ;	* Disable filter in tunes at end to get SFX on channel 0 working better.
 ;	* Implement Free Parking Taxes House Rule.
 ;	* Add House Rules setup menu (Setup6).
@@ -489,7 +490,7 @@
 ;	  Just to mention, I'm not sure that returning to the second page of
 ;	  some menus is the desired behaviour.  I don't know how to change this.
 ;	* Allow up to two menu pages to be stored in its stack (just in case).
-;	* 02JUL2018
+;* 02JUL2018
 ;	* Tweak some strings.
 ;	* Optimise trade data area size (only need data for tradeable deeds).
 ;	* Fixed display of # utilites on Players Stats dialog.
@@ -506,7 +507,7 @@
 ;defs
 ;-------------------------------------------------------------------------------
 	.define	DEBUG_IRQ	0
-	.define DEBUG_KEYS	1
+	.define DEBUG_KEYS	0
 
 spriteMemD	=	$0340
 spriteMemE	=	$0380
@@ -7639,7 +7640,7 @@ menuPageManage0Keys:
 	.if	DEBUG_KEYS
 		BNE	@keysT
 	.else
-		BNE	@keysExit
+		BNE	@exit
 	.endif
 		
 		JSR	gameDispSqrInfoDlg

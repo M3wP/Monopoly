@@ -475,6 +475,7 @@ NTSC/PAL-N version in the future.
 
 ## Change History (Since Version 0.01.99A)
 * 03JUL2018
+	* Disable debug keys by default
 	* Disable filter in tunes at end to get SFX on channel 0 working better.
 	* Implement Free Parking Taxes House Rule.
 	* Add House Rules setup menu (Setup6).
