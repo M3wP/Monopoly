@@ -388,10 +388,7 @@ voice is used for random number generation.  Better performance may
 be achieved when I update to version 2.74 of the GoatTracker driver? 
 Even though it is a more comfortable pace, using the stepping (not 
 jumping) mode is worse for the sound.  You can play very fast in the 
-jumping mode and cause some interesting squeaks too.  While I'm at it,
-playing sfx on channel 0 is not so good because the filter settings
-are being left in an incompatible state by the music?  Fix?  Only 
-done in a single instance.
+jumping mode and cause some interesting squeaks too.
 * The audio driver and IRQ handler is expecting a PAL machine.  You
 will get strange results on an NTSC one, I expect.  I may release an
 NTSC/PAL-N version in the future.
@@ -399,31 +396,23 @@ NTSC/PAL-N version in the future.
 ## TODO
 
 * Allow colours for players only unique in setup (disable buttons).
-Important but not until other tasks complete.
+  Important but not until other tasks complete.
 * Allow all players to confirm quiting the game - quit request 
-interrupt!  Use score value to offer a winner (by default) in this 
-case.  Important but not until other tasks complete.
-* Ensure all options/pages are displayed for all menus
-* Statistics/Overview from trade approval, must pay?  Should they work?
-Change player picker to call gameUpdateMenu instead of hackish
-menu fixing?  Still need some mode preventions?  Could improve menu 
-stack pushing?
-
+  interrupt!  Use score value to offer a winner (by default) in this 
+ case.  Important but not until other tasks complete.
+* Ensure all options/pages are displayed for all menus.
 * Add score to PStats dialog - score needed for quit.
-
 * Is rent3 SFX still a little lame?
-
 * Need to allow nominate repay on elimin. xfers.  
 * Use a TradeSel version in elimin. xfers that shows ownership 
-dynamically to show what you can afford to take on and what is going 
-to auction.  Cash will already be transferred before the xfer offer.  
-Cash cannot be altered on this dialog, not even displayed?
+  dynamically to show what you can afford to take on and what is going 
+  to auction.  Cash will already be transferred before the xfer offer.  
+  Cash cannot be altered on this dialog, not even displayed?
 * Warning if haven't reviewed repay/fee for elimin. xfer?  Don't even
-allow if haven't done so?  Default no selection???
-
+  allow if haven't done so?  Default no selection???
 * Score =
-
-		  [equity/2] + [money/4] + [#deeds] + 
+ 
+		  [equity/2] + [money/8] + [#deeds] + 
 		  [#gofree] + (foreach group [(#ingroup - 1)*2]) +
 		  
 		             50 | 100 | 150 | 200 |  for each street deed
@@ -436,62 +425,72 @@ allow if haven't done so?  Default no selection???
 		  #stations/2 * 2^#stations + #utilities		???
 
 * Clean up mouse support (auto draw buttons, remove dead data).  Need 
-a couple of new button types (one needs more data - colour).  Change
-"enb" to type.  Types:  regular enb, regular dis, regular hidden...
-colour vis, colour hidden, trd sel dialog, full screen.  This is
-needed for preventing player colour duplications.
-
+  a couple of new button types (one needs more data - colour).  Change
+  "enb" to type.  Types:  regular enb, regular dis, regular hidden...
+  colour vis, colour hidden, simple (trd sel dialog), full screen.  This 
+  is needed for preventing player colour duplications and joystick 
+  support.
 * Make more menu buttons disabled in draw (not just buzzing in keys)
 * Enable/disable Done on the management menu?  Needs regular menu 
-redraws...
-
+  redraws...
 * Mouse hot tracking - determine focused button and flash it.
 * Joystick support (step up/down menu options, fire select).  Reuse hot-
-tracking code to indicate which button is focused.  Need default 
-setting routine (screenStartButtons?), called at end of displaying 
-menus/dialogs?
+  tracking code to indicate which button is focused.  Need default 
+  setting routine (screenStartButtons?), called at end of displaying 
+  menus/dialogs?
 * First-time-run configuration of input options
-
-* House rules option before all of the house rules to get through
-them faster if you just want a standard game?  Have the remaining
-ones on one menu?
-* Allow Tax to be collected from Free Parking as an optional house rule
 * Change "all" dirty to be just board dirty and req. individual flags
 * Why does the whole screen get updated when changing the bid in an 
-auction?
-* Forward-fit driver changes to version 2.74 of GoatTracker driver and
-incorporate.
-
+  auction?
+* Back-fit GoatTracker driver changes from version 2.74.
 * Implement autosell?  Complicated.
 * Player sprites on overview dialog.  Would look pretty.  IRQ is a mess.
-
 * Properly divide game and rule routines.  How?
 * Put code into separate files as indicated
 * Fix ZPage variable use, in particular active player pointer and IRQ
 * Fix IRQ handler -- its gotten hacked to death
 * Screen double buffering?  Is it required if the dirty/update code is 
-optimised?  Would be difficult - quite a bit of rework.
+  optimised?  Would be difficult - quite a bit of rework.
 * Optimise, optimise, optimise (eg. BIT instead of LDA, AND/ORA trains).
-Self modifying code??  Need cartridge/ROM support?
+  Self modifying code??  Need cartridge/ROM support?
 * Check music/sfx - sometimes does not fire correctly at all (other than
-resource contention issue).  Perhaps fixed by 2.74?  Very rare issue.
-
+  resource contention issue).  Perhaps fixed by 2.74?  Very rare issue.
 * Implement own keyboard scan, remove dependency on Kernal
 * Add CPU player?  Should have enough memory if no longer need Kernal.  
-Will be rather difficult to do properly.
+  Will be rather difficult to do properly.
 
-
-## Currently In Testing (Needs Confirmation):
-* Selection and focus correct after close management menu even for 
-auctions etc?
+## For Testing (Needs Confirmation):
 * Player focus restored after player lose to player interrupt?
 * Money cap (32767) not exceeded on addcash?
 * Don't allow leave management when -ve hses, htls at all
 * Must pay interrupt when not enough cash and having to post bail works 
-and returns correctly?
+  and returns correctly?
 * Ensure must pay works correctly for "from all" CCCCard.
 * Used GO Free cards prevented from appearing in deck until after 
-shuffle (and while owned by a player)
+ shuffle (and while owned by a player)
 * Trade5 dialog shows and then clears correctly?
+* Statistics/Overview from trade approval, must pay.  Do they work now?
+* Trades aren't permitted when you're in debt.
+
+
+## Change History (Since Version 0.01.99A)
+* 03JUL2018
+	* Disable filter in tunes at end to get SFX on channel 0 working better.
+	* Implement Free Parking Taxes House Rule.
+	* Add House Rules setup menu (Setup6).
+	* Add statistics and enable trade option on Gaol2 menu.
+	* Add a second page to the auctions menus.
+	* Do not allow trades if player is in debt.
+	* Use menuPush for Player Selection menu instead of return hack.
+	  Just to mention, I'm not sure that returning to the second page of
+	  some menus is the desired behaviour.  I don't know how to change this.
+	* Allow up to two menu pages to be stored in its stack (just in case).
+* 02JUL2018
+	* Tweak some strings.
+	* Optimise trade data area size (only need data for tradeable deeds).
+	* Fixed display of # utilites on Players Stats dialog.
+	* Fixed display of # stations on Players Stats dialog.
+	* Fixed display of # of GO Free cards on Players Stats dialog.
+
 
 ### End of Transcript

@@ -16,8 +16,12 @@
 ;(C) 1935, 2016 HASBRO
 ;
 ;
-;You probably need to own a copy of the official board game to even be reading
-;this.  *ugh*
+;You probably need to own a copy of the official board game to even have this.
+;*ugh*
+;
+;
+;Introduction
+;-------------------------------------------------------------------------------
 ;
 ;The goal has been to make an implementation as close to the standard as 
 ;possible.  However, a strict, turn-based structure to the game is more-or-less 
@@ -34,6 +38,10 @@
 ;lacks the improvement auctions, for example.  I am adhering to the standard 
 ;rules in relation to eliminations, trades and auctions better than any other 
 ;version I know of.
+;
+;
+;Rule Changes
+;-------------------------------------------------------------------------------
 ;
 ;The game is identical to the most recent, standard rules as per my copy 
 ;(Australia, 2018) except for the following details:
@@ -120,6 +128,9 @@
 ;	  version can effectively do to a very large extent).  
 ;
 ;
+;House Rules
+;-------------------------------------------------------------------------------
+;
 ;The following house rules are available (or considered):
 ;	
 ;	* Starting money can be set low ($1000) or high ($2000).  I have
@@ -143,6 +154,9 @@
 ;	  of bills would be applied (shuffling them about through all accounts).
 ;	  So simply a total funds cap.
 ;
+;
+;Rule Observations and Deductions
+;-------------------------------------------------------------------------------
 ;
 ;The following deductions and observations are made from the rule changes that 
 ;were required for this platform and from attempting to best incorporate the 
@@ -321,6 +335,10 @@
 ;	  not seem to be permitted by the standard rules. I am not permitting 
 ;	  them on a player-by-player basis, either.  
 ;
+;
+;Further Information
+;-------------------------------------------------------------------------------
+;
 ;I have used a customised version of the GoatTracker 2.73 driver for this game.  
 ;I also used custom tools for it (I wanted the source code, not a "standardised"
 ;binary module).  I modified the driver to not touch the third voice (it is used 
@@ -334,16 +352,14 @@
 ;and time or perhaps better.  Also, I like that it potentially has a type of
 ;rhythm.
 ;
+;
+;Compilation
+;-------------------------------------------------------------------------------
+;
 ;To compile: 
 ;	ca65 -g -l c64client.lst -o c64client.o c64client.s
 ;	cl65 -t none c64client.o -Ln c64client.lbl -o c64client.prg	
 ;
-;===============================================================================
-
-
-;===============================================================================
-;C64CLIENT.S
-;===============================================================================
 ;
 ;KNOWN ISSUES:
 ;	* There seems to be an odd race condition which will, on occasion, cause
@@ -369,10 +385,7 @@
 ;	  be achieved when I update to version 2.74 of the GoatTracker driver?  
 ;	  Even though it is a more comfortable pace, using the stepping (not 
 ;	  jumping) mode is worse for the sound.  You can play very fast in the 
-;	  jumping mode and cause some interesting squeaks too.  While I'm at it,
-;	  playing sfx on channel 0 is not so good because the filter settings
-;	  are being left in an incompatible state by the music?  Fix?  Only 
-;	  done in a single instance.
+;	  jumping mode and cause some interesting squeaks too.
 ;	* The audio driver and IRQ handler is expecting a PAL machine.  You
 ;	  will get strange results on an NTSC one, I expect.  I may release an
 ;	  NTSC/PAL-N version in the future.
@@ -384,11 +397,7 @@
 ;	  interrupt!  Use score value to offer a winner (by default) in this 
 ;	  case.  Important but not until other tasks complete.
 ;
-;	* Ensure all options/pages are displayed for all menus
-;	* Statistics/Overview from trade approval, must pay?  Should they work?
-;	  Change player picker to call gameUpdateMenu instead of hackish
-;	  menu fixing?  Still need some mode preventions?  Could improve menu 
-;	  stack pushing?
+;	* Ensure all options/pages are displayed for all menus.
 ;
 ;	* Add score to PStats dialog - score needed for quit.
 ;
@@ -402,7 +411,7 @@
 ;	* Warning if haven't reviewed repay/fee for elimin. xfer?  Don't even
 ;	  allow if haven't done so?  Default no selection???
 ;
-;	* Score = [equity/2] + [money/4] + [#deeds] + 
+;	* Score = [equity/2] + [money/8] + [#deeds] + 
 ;		  [#gofree] + (foreach group [(#ingroup - 1)*2]) +
 ;		  
 ;		             50 | 100 | 150 | 200 |  for each street deed
@@ -417,8 +426,9 @@
 ;	* Clean up mouse support (auto draw buttons, remove dead data).  Need 
 ;	  a couple of new button types (one needs more data - colour).  Change
 ;	  "enb" to type.  Types:  regular enb, regular dis, regular hidden...
-;	  colour vis, colour hidden, trd sel dialog, full screen.  This is
-;	  needed for preventing player colour duplications.
+;	  colour vis, colour hidden, simple (trd sel dialog), full screen.  This 
+;	  is needed for preventing player colour duplications and joystick 
+;	  support.
 ;
 ;	* Make more menu buttons disabled in draw (not just buzzing in keys)
 ;	* Enable/disable Done on the management menu?  Needs regular menu 
@@ -431,15 +441,10 @@
 ;	  menus/dialogs?
 ;	* First-time-run configuration of input options
 ;
-;	* House rules option before all of the house rules to get through
-;	  them faster if you just want a standard game?  Have the remaining
-;	  ones on one menu?
-;	* Allow Tax to be collected from Free Parking as an optional house rule
 ;	* Change "all" dirty to be just board dirty and req. individual flags
 ;	* Why does the whole screen get updated when changing the bid in an 
 ;	  auction?
-;	* Forward-fit driver changes to version 2.74 of GoatTracker driver and
-;	  incorporate.
+;	* Back-fit GoatTracker driver changes from version 2.74.
 ;
 ;	* Implement autosell?  Complicated.
 ;	* Player sprites on overview dialog.  Would look pretty.  IRQ is a mess.
@@ -460,8 +465,6 @@
 ;	  Will be rather difficult to do properly.
 ;
 ;FOR TESTING (NEEDS CONFIRMATION):
-;	* Selection and focus correct after close management menu even for 
-;	  auctions etc?
 ;	* Player focus restored after player lose to player interrupt?
 ;	* Money cap (32767) not exceeded on addcash?
 ;	* Don't allow leave management when -ve hses, htls at all
@@ -471,8 +474,33 @@
 ;	* Used GO Free cards prevented from appearing in deck until after 
 ;	  shuffle (and while owned by a player)
 ;	* Trade5 dialog shows and then clears correctly?
+;	* Statistics/Overview from trade approval, must pay.  Do they work now?
+;	* Trades aren't permitted when you're in debt.
+;
+;Change History (since version 0.01.99A)
+;	* 03JUL2018
+;	* Disable filter in tunes at end to get SFX on channel 0 working better.
+;	* Implement Free Parking Taxes House Rule.
+;	* Add House Rules setup menu (Setup6).
+;	* Add statistics and enable trade option on Gaol2 menu.
+;	* Add a second page to the auctions menus.
+;	* Do not allow trades if player is in debt.
+;	* Use menuPush for Player Selection menu instead of return hack.
+;	  Just to mention, I'm not sure that returning to the second page of
+;	  some menus is the desired behaviour.  I don't know how to change this.
+;	* Allow up to two menu pages to be stored in its stack (just in case).
+;	* 02JUL2018
+;	* Tweak some strings.
+;	* Optimise trade data area size (only need data for tradeable deeds).
+;	* Fixed display of # utilites on Players Stats dialog.
+;	* Fixed display of # stations on Players Stats dialog.
+;	* Fixed display of # of GO Free cards on Players Stats dialog.
 ;===============================================================================
 
+
+;===============================================================================
+;C64CLIENT.S
+;===============================================================================
 
 ;-------------------------------------------------------------------------------
 ;defs
@@ -637,7 +665,10 @@ keyF8		=	$8C
 		pGF1Crd	.byte
 		fGF0Out .byte
 		fGF1Out .byte
-		bMBuy	.byte
+		fMBuy	.byte
+		
+		fFPTax	.byte
+		mFPTax	.word
 
 		gMdActn .byte
 		pRecall	.byte
@@ -1028,33 +1059,39 @@ sqr24:		.tag	SQUARE
 sqr25:		.tag	SQUARE	
 sqr26:		.tag	SQUARE	
 sqr27:		.tag	SQUARE	
+
 trade0:		.tag	TRADE
 trdprp0:		
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+		.byte	$00, $00, $00, $00
+;		.byte			    $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 trdrep0:		
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+		.byte	$00, $00, $00, $00
+;		.byte			    $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		
 trade1:		.tag	TRADE
 trdprp1:		
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+		.byte	$00, $00, $00, $00
+;		.byte			    $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 trdrep1:		
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+		.byte	$00, $00, $00, $00
+;		.byte			    $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+
 trade2:		.tag	TRADE
 trdprp2:		
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
@@ -4309,6 +4346,24 @@ prmptSalary:
 		JMP	prmptDoAddCash
 
 
+prmptFParking:
+		TXA
+		PHA
+
+		LDX	#$0F
+@loop1:
+		LDA	tokPrmptFParking, X
+		STA	game + GAME::tPrmT1, X
+
+		LDA	#$0F
+		STA	game + GAME::tPrmC1, X
+
+		DEX
+		BPL	@loop1
+		
+		JMP	prmptDoAddCash
+
+
 prmptSold:
 		TXA
 		PHA
@@ -4762,6 +4817,10 @@ menuActivePage1:
 		.word	menuPageBlank0Keys
 		.word	menuDefDraw
 		.byte	$00
+menuActivePage2:
+		.word	menuPageBlank0Keys
+		.word	menuDefDraw
+		.byte	$00
 
 menuPageBlank0:
 		.word	menuPageBlank0Keys
@@ -4782,6 +4841,11 @@ menuPagePlay1:
 menuPageAuctn0:
 		.word	menuPageAuctn0Keys
 		.word	menuPageAuctn0Draw
+		.byte	$01
+		
+menuPageAuctn1:
+		.word	menuPageAuctn1Keys
+		.word	menuPageAuctn1Draw
 		.byte	$01
 		
 menuPageManage0:
@@ -4855,6 +4919,11 @@ menuPageSetup4:
 menuPageSetup5:
 		.word	menuPageSetup5Keys
 		.word	menuPageSetup5Draw
+		.byte	$01
+		
+menuPageSetup6:
+		.word	menuPageSetup6Keys
+		.word	menuPageSetup6Draw
 		.byte	$01
 		
 ;***TODO:	This menu will need rework?
@@ -4937,8 +5006,12 @@ menuPushPage:
 
 		LDX	#$04
 @loop:
+		LDA	menuActivePage1, X
+		STA	menuActivePage2, X
+		
 		LDA	menuActivePage0, X
 		STA	menuActivePage1, X
+		
 		DEX
 		BPL	@loop
 
@@ -4955,6 +5028,13 @@ menuPopPage:
 @loop:
 		LDA	menuActivePage1, X
 		STA	menuActivePage0, X
+
+		LDA	menuActivePage2, X
+		STA	menuActivePage1, X
+		
+		LDA	menuPageBlank0, X
+		STA	menuActivePage2, X
+
 		DEX
 		BPL	@loop
 
@@ -5290,8 +5370,8 @@ menuPageSetup2Keys:
 		LDX	#$07
 		JSR	SNDBASE + 6
 		
-		LDA 	#<menuPageSetup4
-		LDY	#>menuPageSetup4
+		LDA 	#<menuPageSetup6
+		LDY	#>menuPageSetup6
 		
 		JSR	menuSetPage
 
@@ -5785,6 +5865,185 @@ menuPageSetup5Draw:
 		RTS
 
 
+menuWindowSetup6:	
+			.byte	$90, $01, $07
+			.word	     strHeaderSetup0
+			.byte	$90, $01, $08
+			.word        strDescSetup6
+			.byte	$A1, $0A, $01, $12, $30, $02, $0A
+			.word	     strOptn0Setup6
+			.byte	$A1, $14, $01, $12, $32, $02, $14
+			.word	     strOptn0MustPay0
+			
+			.byte	$21, $01, $07, $11
+			.byte	$23, $01, $08, $11
+			
+			.byte	$2F, $01, $0A, $11
+			.byte	$2F, $01, $14, $11
+			
+			.byte	$81, $02, $0A
+			.byte	$81, $02, $14
+			
+			.byte	$00
+			
+menuWindowSetup6FP:
+			.byte	$90, $04, $0B
+			.word		strText0Setup6
+			.byte	$90, $04, $0C
+			.word		strText1Setup6
+			.byte	$00
+
+
+menuPageSetup6SetTog:
+		CMP	#$00
+		BEQ	@off
+		
+		LDA	#$DA
+		STA	strText1Setup6 + 1
+		LDA	#$A0
+		STA	strText0Setup6 + 1
+		
+		RTS
+		
+@off:
+		LDA	#$DA
+		STA	strText0Setup6 + 1
+		LDA	#$A0
+		STA	strText1Setup6 + 1
+		
+		RTS
+
+
+menuPageSetup6DispFP:
+		LDA	#<menuWindowSetup6FP
+		STA	$FD
+		LDA	#>menuWindowSetup6FP
+		STA	$FE
+		
+		JSR	screenPerformList
+		
+		RTS
+		
+
+menuPageSetup6Keys:
+		CMP	#'F'
+		BNE	@keysC
+		
+		LDA	game + GAME::fFPTax
+		EOR	#$01
+		STA	game + GAME::fFPTax
+		
+		JSR	menuPageSetup6SetTog
+		JSR	menuPageSetup6DispFP
+		
+		JMP	@keysDing
+		
+@keysC:
+		CMP	#'C'
+		BNE	@keysExit
+		
+		LDA	#$00
+		STA	menuTemp0
+		
+		LDA 	#<menuPageSetup4
+		LDY	#>menuPageSetup4
+		
+		JSR	menuSetPage
+
+		LDA	#$01
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+		JMP	@keysDing
+		
+@keysExit:
+		RTS
+
+@keysDing:
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
+		RTS
+
+
+menuPageSetup6Draw:
+		JSR	screenBeginButtons
+
+		LDA	#<menuWindowSetup6
+		STA	$FD
+		LDA	#>menuWindowSetup6
+		STA	$FE
+		
+		JSR	screenPerformList
+
+		JSR	menuPageSetup6SetTog
+		JSR	menuPageSetup6DispFP
+		
+		RTS
+
+
+menuWindowPlay0:	
+			.byte	$90, $01, $07
+			.word	     	strHeaderPlay0
+
+			.byte	$A1, $0A, $01, $12, $52, $02, $0A
+			.word	     	strOptn0Play0
+			.byte	$A1, $0C, $01, $12, $4E, $02, $0C
+			.word	     	strOptn1Play0
+			.byte	$A1, $0E, $01, $12, $4D, $02, $0E
+			.word	     	strOptn2Play0
+			.byte	$A1, $10, $01, $12, $54, $02, $10
+			.word		strOptn3Play0
+			.byte	$A1, $12, $01, $12, $56, $02, $12
+			.word		strOptn4Play0
+			.byte	$A1, $14, $01, $12, $53, $02, $14
+			.word		strOptn5Play0
+			
+			.byte	$21, $01, $07, $11
+			.byte	$23, $01, $08, $11
+menuWindowPlay0Roll0:
+			.byte	$2F, $01, $0A, $11
+menuWindowPlay0Next0:
+			.byte	$2F, $01, $0C, $11
+			.byte	$2F, $01, $0E, $11
+			.byte	$2F, $01, $10, $11
+			.byte	$2F, $01, $12, $11
+			.byte	$2F, $01, $14, $11
+menuWindowPlay0Roll1:
+			.byte	$81, $02, $0A
+menuWindowPlay0Next1:
+			.byte	$81, $02, $0C
+			.byte	$81, $02, $0E
+			.byte	$81, $02, $10
+			.byte	$81, $02, $12
+			.byte	$81, $02, $14
+			.byte	$00
+			
+menuFooterGame0:
+			.byte	$A1, $16, $01, $09, keyF5, $00, $00
+			.word		strDummyDummy0
+			.byte	$A1, $16, $0A, $12, keyF7, $00, $00
+			.word		strDummyDummy0
+			.byte	$A1, $17, $01, $09, keyF3, $00, $00
+			.word		strDummyDummy0
+			.byte	$A1, $17, $0A, $12, keyF1, $00, $00
+			.word		strDummyDummy0
+			
+			.byte	$90, $01, $16
+			.word		strFtr0Game0
+			.byte	$90, $01, $17
+			.word		strFtr1Game0
+			.byte	$2F, $01, $16, $11
+			.byte	$2F, $01, $17, $11
+			.byte	$21, $01, $16, $02
+			.byte	$21, $0A, $16, $02
+			.byte	$21, $01, $17, $02
+			.byte	$21, $0A, $17, $02
+			.byte	$00
+
+
 menuPagePlay0DefKeys:
 @keys1:
 		CMP	#keyF1
@@ -5826,9 +6085,22 @@ menuPagePlay0DefKeys:
 
 		LDA	game + GAME::gMode
 		CMP	#$03
-		BMI	@trade
+		BMI	@tstFunds
 		
-		RTS
+		JMP	@keysBuzz
+		
+@tstFunds:
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDY	#PLAYER::money + 1
+		LDA	($FB), Y
+		BPL	@trade
+		
+		JMP	@keysBuzz
 
 @trade:
 		JSR	gameInitiateTrade
@@ -5854,45 +6126,13 @@ menuPagePlay0DefKeys:
 		LDA	#>gameInitiatePStats
 		STA	menuPlyrSelCallProc + 1
 
-		LDA	game + GAME::gMode
-		CMP	#$01
-		BNE	@tstplay
-
-@auctions:
-		LDA	#<menuPageAuctn0
-		STA	menuPlyrSelRetMenu
-		LDA	#>menuPageAuctn0
-		STA	menuPlyrSelRetMenu + 1
-		
-		JMP	@cont
-		
-@tstplay:
-		LDA	#$01
-		CMP 	game + GAME::bMBuy
-		BNE	@play
-		
-@mbuy:
-		LDA	#<menuPagePlay1
-		STA	menuPlyrSelRetMenu
-		LDA	#>menuPagePlay1
-		STA	menuPlyrSelRetMenu + 1
-		
-		JMP	@cont
-		
-@play:
-		LDA	#<menuPagePlay0
-		STA	menuPlyrSelRetMenu
-		LDA	#>menuPagePlay0
-		STA	menuPlyrSelRetMenu + 1
-
-@cont:
 		LDA	#$01
 		STA	menuPlyrSelAllowCur
 		
 		LDA	#<menuPagePlyrSel0
 		LDY	#>menuPagePlyrSel0
 		
-		JSR	menuSetPage
+		JSR	menuPushPage
 		
 		LDA	#$20
 		ORA	game + GAME::dirty
@@ -5920,6 +6160,14 @@ menuPagePlay0DefKeys:
 		JSR	SNDBASE + 6
 
 @keysExit:
+		RTS
+
+@keysBuzz:
+		LDA	#<SFXBUZZ
+		LDY	#>SFXBUZZ
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
 		RTS
 
 
@@ -5994,65 +6242,6 @@ menuPagePlay0Keys:
 		
 		RTS
 
-
-menuWindowPlay0:	
-			.byte	$90, $01, $07
-			.word	     	strHeaderPlay0
-
-			.byte	$A1, $0A, $01, $12, $52, $02, $0A
-			.word	     	strOptn0Play0
-			.byte	$A1, $0C, $01, $12, $4E, $02, $0C
-			.word	     	strOptn1Play0
-			.byte	$A1, $0E, $01, $12, $4D, $02, $0E
-			.word	     	strOptn2Play0
-			.byte	$A1, $10, $01, $12, $54, $02, $10
-			.word		strOptn3Play0
-			.byte	$A1, $12, $01, $12, $56, $02, $12
-			.word		strOptn4Play0
-			.byte	$A1, $14, $01, $12, $53, $02, $14
-			.word		strOptn5Play0
-			
-			.byte	$21, $01, $07, $11
-			.byte	$23, $01, $08, $11
-menuWindowPlay0Roll0:
-			.byte	$2F, $01, $0A, $11
-menuWindowPlay0Next0:
-			.byte	$2F, $01, $0C, $11
-			.byte	$2F, $01, $0E, $11
-			.byte	$2F, $01, $10, $11
-			.byte	$2F, $01, $12, $11
-			.byte	$2F, $01, $14, $11
-menuWindowPlay0Roll1:
-			.byte	$81, $02, $0A
-menuWindowPlay0Next1:
-			.byte	$81, $02, $0C
-			.byte	$81, $02, $0E
-			.byte	$81, $02, $10
-			.byte	$81, $02, $12
-			.byte	$81, $02, $14
-			.byte	$00
-			
-menuFooterGame0:
-			.byte	$A1, $16, $01, $09, keyF5, $00, $00
-			.word		strDummyDummy0
-			.byte	$A1, $16, $0A, $12, keyF7, $00, $00
-			.word		strDummyDummy0
-			.byte	$A1, $17, $01, $09, keyF3, $00, $00
-			.word		strDummyDummy0
-			.byte	$A1, $17, $0A, $12, keyF1, $00, $00
-			.word		strDummyDummy0
-			
-			.byte	$90, $01, $16
-			.word		strFtr0Game0
-			.byte	$90, $01, $17
-			.word		strFtr1Game0
-			.byte	$2F, $01, $16, $11
-			.byte	$2F, $01, $17, $11
-			.byte	$21, $01, $16, $02
-			.byte	$21, $0A, $16, $02
-			.byte	$21, $01, $17, $02
-			.byte	$21, $0A, $17, $02
-			.byte	$00
 
 menuPagePlay0Draw:
 		JSR	screenBeginButtons
@@ -6153,7 +6342,7 @@ menuPagePlay1Keys:
 
 @keysDirty:
 		LDA	#$00
-		STA	game + GAME::bMBuy
+		STA	game + GAME::fMBuy
 
 		JSR	gameUpdateMenu
 
@@ -6274,6 +6463,73 @@ menuPagePlay1Draw:
 
 		RTS
 
+
+menuPageAuctnAmt0:
+			.byte	$06, $00, $00, $00, $00, $00, $00, $00
+
+
+menuWindowAuctn0:
+			.byte	$90, $01, $07
+			.word	     	strHeaderAuctn0
+			.byte	$90, $0C, $08
+			.word        	strDescGaol1
+			
+			.byte	$90, $02, $0A
+			.word	     	strOptn1Auctn0
+			.byte	$90, $0B, $0A
+			.word		menuPageAuctnAmt0
+
+			.byte	$A1, $0B, $0E, $0F, $55, $00, $00
+			.word		strDummyDummy0
+			.byte	$A1, $0B, $0F, $10, $49, $00, $00
+			.word		strDummyDummy0
+			.byte	$A1, $0B, $10, $11, $4F, $00, $00
+			.word		strDummyDummy0
+			
+			.byte	$90, $02, $0B
+			.word	     	strOptn0Auctn0
+			
+			.byte	$A1, $0C, $0E, $0F, $4A, $00, $00
+			.word		strDummyDummy0
+			.byte	$A1, $0C, $0F, $10, $4B, $00, $00
+			.word		strDummyDummy0
+			.byte	$A1, $0C, $10, $11, $4C, $00, $00
+			.word		strDummyDummy0
+
+			.byte	$90, $02, $0C
+			.word	     	strOptn2Auctn0
+			
+			.byte	$A1, $0E, $01, $12, $42, $02, $0E
+			.word	     	strOptn3Auctn0
+			.byte	$A1, $10, $01, $12, $50, $02, $10
+			.word	     	strOptn4Auctn0
+			.byte	$A1, $12, $01, $12, $46, $02, $12
+			.word	     	strOptn5Auctn0
+			
+			.byte	$A1, $14, $01, $12, $2E, $02, $14
+			.word		strOptn2Gaol1
+			
+			.byte	$21, $01, $07, $11
+			.byte	$23, $01, $08, $11
+
+			.byte	$2F, $01, $0B, $11
+			.byte	$2F, $01, $0C, $11
+			.byte	$2F, $01, $0E, $11
+			.byte	$2F, $01, $10, $11
+			.byte	$2F, $01, $12, $11
+			.byte	$2F, $01, $14, $11
+
+			.byte	$21, $0E, $0B, $03
+			.byte	$21, $0E, $0C, $03
+			
+			.byte	$81, $02, $0E
+			.byte	$81, $02, $10
+			.byte	$81, $02, $12
+			.byte	$81, $02, $14
+			
+			.byte	$00
+		
+		
 menuPageAuctn0Inc:
 		CLC
 		ADC	game + GAME::mACurr
@@ -6349,7 +6605,8 @@ menuPageAuctn0Forf:
 		
 		RTS
 
-menuPageAuctn0Keys:
+
+menuPageAuctnDefKeys:
 		CMP	#'U'
 		BNE	@keysJ
 		
@@ -6514,67 +6771,29 @@ menuPageAuctn0Keys:
 		RTS
 
 
-menuPageAuctnAmt0:
-			.byte	$06, $00, $00, $00, $00, $00, $00, $00
-
-
-menuWindowAuctn0:
-			.byte	$90, $01, $07
-			.word	     	strHeaderAuctn0
-;			.byte	$90, $01, $08
-;			.word        	strDescSetup2
-			
-			.byte	$90, $02, $0A
-			.word	     	strOptn1Auctn0
-			.byte	$90, $0B, $0A
-			.word		menuPageAuctnAmt0
-
-			.byte	$A1, $0B, $0E, $0F, $55, $00, $00
-			.word		strDummyDummy0
-			.byte	$A1, $0B, $0F, $10, $49, $00, $00
-			.word		strDummyDummy0
-			.byte	$A1, $0B, $10, $11, $4F, $00, $00
-			.word		strDummyDummy0
-			
-			.byte	$90, $02, $0B
-			.word	     	strOptn0Auctn0
-			
-			.byte	$A1, $0C, $0E, $0F, $4A, $00, $00
-			.word		strDummyDummy0
-			.byte	$A1, $0C, $0F, $10, $4B, $00, $00
-			.word		strDummyDummy0
-			.byte	$A1, $0C, $10, $11, $4C, $00, $00
-			.word		strDummyDummy0
-
-			.byte	$90, $02, $0C
-			.word	     	strOptn2Auctn0
-			
-			.byte	$A1, $0E, $01, $12, $42, $02, $0E
-			.word	     	strOptn3Auctn0
-			.byte	$A1, $10, $01, $12, $50, $02, $10
-			.word	     	strOptn4Auctn0
-			.byte	$A1, $12, $01, $12, $46, $02, $12
-			.word	     	strOptn5Auctn0
-			
-			.byte	$21, $01, $07, $11
-			.byte	$23, $01, $08, $11
-
-			.byte	$2F, $01, $0B, $11
-			.byte	$2F, $01, $0C, $11
-			.byte	$2F, $01, $0E, $11
-			.byte	$2F, $01, $10, $11
-			.byte	$2F, $01, $12, $11
-
-			.byte	$21, $0E, $0B, $03
-			.byte	$21, $0E, $0C, $03
-			
-			.byte	$81, $02, $0E
-			.byte	$81, $02, $10
-			.byte	$81, $02, $12
-			
-			.byte	$00
+menuPageAuctn0Keys:
+		CMP	#'.'
+		BNE	@keysDefault
 		
+		LDA 	#<menuPageAuctn1
+		LDY	#>menuPageAuctn1
+		JSR	menuSetPage
+
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
 		
+		LDA	game + GAME::dirty
+		ORA	#$01
+		STA	game + GAME::dirty
+
+		RTS
+
+@keysDefault:
+		JSR	menuPageAuctnDefKeys
+
+
 menuPageAuctn0Draw:
 		JSR	screenBeginButtons
 
@@ -6602,20 +6821,83 @@ menuPageAuctn0Draw:
 		
 		RTS
 		
-menuPageGaol0Keys:
-		CMP	#'N'
-		BNE	@keysDone
+menuWindowAuctn1:	
+			.byte	$90, $01, $07
+			.word	     	strHeaderAuctn0
+			.byte	$90, $0C, $08
+			.word        	strDescGaol2
+			.byte	$A1, $0A, $01, $12, $4D, $02, $0A
+			.word	     	strOptn2Play0
+			.byte	$A1, $0C, $01, $12, $54, $02, $0C
+			.word		strOptn3Play0
+			.byte	$A1, $0E, $01, $12, $56, $02, $0E
+			.word		strOptn4Play0
+			.byte	$A1, $10, $01, $12, $53, $02, $10
+			.word		strOptn5Play0
+			.byte	$A1, $14, $01, $12, $2E, $02, $14
+			.word		strOptn2Gaol1
+			
+			.byte	$21, $01, $07, $11
+			.byte	$23, $01, $08, $11
+
+			.byte	$2F, $01, $0A, $11
+			.byte	$2F, $01, $0C, $11
+			.byte	$2F, $01, $0E, $11
+			.byte	$2F, $01, $10, $11
+			.byte	$2F, $01, $14, $11
+
+			.byte	$81, $02, $0A
+			.byte	$81, $02, $0C
+			.byte	$81, $02, $0E
+			.byte	$81, $02, $10
+			.byte	$81, $02, $14
+			.byte	$00
+			
 		
-		JSR	rulesNextTurn
+menuPageAuctn1Keys:
+		CMP	#'.'
+		BNE	@keysOther
+
+		LDA 	#<menuPageAuctn0
+		LDY	#>menuPageAuctn0
+		JSR	menuSetPage
 
 		LDA	#<SFXDING
 		LDY	#>SFXDING
 		LDX	#$07
 		JSR	SNDBASE + 6
-
-@keysDone:
+		
+		LDA	game + GAME::dirty
+		ORA	#$01
+		STA	game + GAME::dirty
 
 		RTS
+		
+@keysOther:
+		JSR	menuPageAuctnDefKeys
+		
+		RTS
+		
+		
+menuPageAuctn1Draw:
+		JSR	screenBeginButtons
+
+		LDA	#<menuWindowAuctn1
+		STA	$FD
+		LDA	#>menuWindowAuctn1
+		STA	$FE
+		
+		JSR	screenPerformList
+
+		LDA	#<menuFooterGame0
+		STA	$FD
+		LDA	#>menuFooterGame0
+		STA	$FE
+		
+		JSR	screenPerformList
+		
+		RTS
+		
 		
 menuWindowGaol0:	
 			.byte	$90, $01, $07
@@ -6634,6 +6916,22 @@ menuWindowGaol0:
 			.byte	$00
 
 
+menuPageGaol0Keys:
+		CMP	#'N'
+		BNE	@keysDone
+		
+		JSR	rulesNextTurn
+
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+
+@keysDone:
+
+		RTS
+		
+		
 menuPageGaol0Draw:
 		JSR	screenBeginButtons
 
@@ -6756,7 +7054,7 @@ menuWindowGaol1:
 			.word	     	strOptn0Gaol1
 			.byte	$A1, $10, $01, $12, $46, $02, $10
 			.word		strOptn1Gaol1
-			.byte	$A1, $12, $01, $12, $2E, $02, $12
+			.byte	$A1, $14, $01, $12, $2E, $02, $14
 			.word		strOptn2Gaol1
 			
 			.byte	$21, $01, $07, $11
@@ -6769,7 +7067,7 @@ menuWindowGaol1Post0:
 			.byte	$2F, $01, $0E, $11
 menuWindowGaol1Free0:
 			.byte	$2F, $01, $10, $11
-			.byte	$2F, $01, $12, $11
+			.byte	$2F, $01, $14, $11
 menuWindowGaol1Roll1:
 			.byte	$81, $02, $0A
 menuWindowGaol1Next1:
@@ -6778,9 +7076,10 @@ menuWindowGaol1Post1:
 			.byte	$81, $02, $0E
 menuWindowGaol1Free1:
 			.byte	$81, $02, $10
-			.byte	$81, $02, $12
+			.byte	$81, $02, $14
 			.byte	$00
 
+	
 menuPageGaol1Draw:
 		JSR	screenBeginButtons
 
@@ -6857,6 +7156,40 @@ menuPageGaol1Draw:
 		
 		RTS
 
+		
+menuWindowGaol2:	
+			.byte	$90, $01, $07
+			.word	     	strHeaderGaol1
+			.byte	$90, $0C, $08
+			.word        	strDescGaol2
+			.byte	$A1, $0A, $01, $12, $4D, $02, $0A
+			.word	     	strOptn2Play0
+			.byte	$A1, $0C, $01, $12, $54, $02, $0C
+			.word		strOptn3Play0
+			.byte	$A1, $0E, $01, $12, $56, $02, $0E
+			.word		strOptn4Play0
+			.byte	$A1, $10, $01, $12, $53, $02, $10
+			.word		strOptn5Play0
+			.byte	$A1, $14, $01, $12, $2E, $02, $14
+			.word		strOptn2Gaol1
+			
+			.byte	$21, $01, $07, $11
+			.byte	$23, $01, $08, $11
+
+			.byte	$2F, $01, $0A, $11
+			.byte	$2F, $01, $0C, $11
+			.byte	$2F, $01, $0E, $11
+			.byte	$2F, $01, $10, $11
+			.byte	$2F, $01, $14, $11
+
+			.byte	$81, $02, $0A
+			.byte	$81, $02, $0C
+			.byte	$81, $02, $0E
+			.byte	$81, $02, $10
+			.byte	$81, $02, $14
+			.byte	$00
+			
+		
 menuPageGaol2Keys:
 		CMP	#'.'
 		BNE	@keysOther
@@ -6881,35 +7214,6 @@ menuPageGaol2Keys:
 		
 		RTS
 		
-		
-menuWindowGaol2:	
-			.byte	$90, $01, $07
-			.word	     	strHeaderGaol1
-			.byte	$90, $0C, $08
-			.word        	strDescGaol2
-			.byte	$A1, $0A, $01, $12, $4D, $02, $0A
-			.word	     	strOptn2Play0
-			.byte	$A1, $0C, $01, $12, $54, $02, $0C
-			.word		strOptn3Play0
-			.byte	$A1, $0E, $01, $12, $56, $02, $0E
-			.word		strOptn4Play0
-			.byte	$A1, $12, $01, $12, $2E, $02, $12
-			.word		strOptn2Gaol1
-			
-			.byte	$21, $01, $07, $11
-			.byte	$23, $01, $08, $11
-
-			.byte	$2F, $01, $0A, $11
-			.byte	$2B, $01, $0C, $11
-			.byte	$2F, $01, $0E, $11
-			.byte	$2F, $01, $12, $11
-
-			.byte	$81, $02, $0A
-			.byte	$8C, $02, $0C
-			.byte	$81, $02, $0E
-			.byte	$81, $02, $12
-			.byte	$00
-			
 		
 menuPageGaol2Draw:
 		JSR	screenBeginButtons
@@ -7637,11 +7941,6 @@ menuPageTrade0Keys:
 		STA	menuPlyrSelCallProc
 		STA	menuPlyrSelCallProc + 1
 
-		LDA	#<menuPageTrade0
-		STA	menuPlyrSelRetMenu
-		LDA	#>menuPageTrade0
-		STA	menuPlyrSelRetMenu + 1
-		
 		LDA	#$00
 		STA	menuPlyrSelAllowCur
 		STA	menuWindowTradeCanConf
@@ -7649,7 +7948,7 @@ menuPageTrade0Keys:
 		LDA	#<menuPagePlyrSel0
 		LDY	#>menuPagePlyrSel0
 		
-		JSR	menuSetPage
+		JSR	menuPushPage
 		
 		LDA	#$20
 		ORA	game + GAME::dirty
@@ -8167,8 +8466,6 @@ menuPageTrade6Draw:
 
 
 
-menuPlyrSelRetMenu:
-		.word	$0000
 menuPlyrSelCallProc:
 		.word	$0000
 menuPlyrSelAllowCur:
@@ -8303,10 +8600,7 @@ menuPagePlyrSel0Keys:
 		RTS
 
 @done:
-		LDA	menuPlyrSelRetMenu
-		LDY	menuPlyrSelRetMenu + 1
-		
-		JSR	menuSetPage
+		JSR	menuPopPage
 
 		LDA	#$20
 		ORA	game + GAME::dirty
@@ -9187,7 +9481,7 @@ gameUpdateMenu:
 
 @tstmbuy:
 		LDA	#$01
-		CMP 	game + GAME::bMBuy
+		CMP 	game + GAME::fMBuy
 		BNE	@normal
 		
 		LDY	#PLAYER::square
@@ -16080,7 +16374,7 @@ dialogDlgPStats0Draw:
 		INC	Z:numConvVALUE
 		
 @gf1:
-		CPX	game + GAME::pGF0Crd
+		CPX	game + GAME::pGF1Crd
 		BNE	@dogf
 		
 		INC	Z:numConvVALUE
@@ -16179,9 +16473,8 @@ dialogDlgPStats0Draw:
 
 		LDY	#PLAYER::oGrp09
 		LDA	($FB), Y
-		INY
 		STA	Z:numConvVALUE
-		LDA	($FB), Y
+		LDA	#$00
 		STA	Z:numConvVALUE + 1
 		
 		JSR	numConvPRTSGN
@@ -16197,9 +16490,8 @@ dialogDlgPStats0Draw:
 		
 		LDY	#PLAYER::oGrp0A
 		LDA	($FB), Y
-		INY
 		STA	Z:numConvVALUE
-		LDA	($FB), Y
+		LDA	#$00
 		STA	Z:numConvVALUE + 1
 		
 		JSR	numConvPRTSGN
@@ -19245,7 +19537,7 @@ rulesLandOnSquare:
 		
 @none:
 		LDA	#$00
-		STA	game + GAME::bMBuy
+		STA	game + GAME::fMBuy
 		CLC
 		RTS
 
@@ -19253,7 +19545,7 @@ rulesLandOnSquare:
 		BCC 	@realexit
 		
 		LDA	#$01
-		STA	game + GAME::bMBuy
+		STA	game + GAME::fMBuy
 
 @realexit:
 		RTS
@@ -19478,7 +19770,9 @@ rulesAddCash:
 		BNE	@tax0			;Yes - check tax acc
 		
 		LDA	game + GAME::varM
-		BEQ	@done0			;No - done checking bank accs
+		BNE	@tax0
+		
+		JMP	@done0			;No - done checking bank accs
 
 @tax0:
 		LDX	#$06
@@ -19525,15 +19819,16 @@ rulesAddCash:
 		LDA	game + GAME::varN
 		STA	($AB), Y
 
-;		LDY	#PLAYER::money
-;		SEC				;***TODO:  When support free 
-;		LDA	($AD), Y		;parking taxes, calculate new
-;		SBC	game + GAME::varO	;value here
-;		STA	($AD), Y
-;		INY
-;		LDA	($AD), Y
-;		SBC	game + GAME::varP
-;		STA	($AD), Y
+		LDA	game + GAME::fFPTax
+		BEQ	@done0
+		
+		SEC
+		LDA	game + GAME::mFPTax
+		SBC	game + GAME::varO
+		STA	game + GAME::mFPTax
+		LDA	game + GAME::mFPTax + 1
+		SBC	game + GAME::varP
+		STA	game + GAME::mFPTax + 1
 
 		JMP	@done0			;Done checking tax acc
 		
@@ -19545,15 +19840,16 @@ rulesAddCash:
 		LDA	#$00
 		STA	($AB), Y
 
-;		LDY	#PLAYER::money		
-;		SEC				;***TODO:  When support free
-;		LDA	($AD), Y		;parking taxes, calculate new
-;		SBC	game + GAME::varO	;value here
-;		STA	($AD), Y
-;		INY
-;		LDA	($AD), Y
-;		SBC	game + GAME::varP
-;		STA	($AD), Y
+		LDA	game + GAME::fFPTax
+		BEQ	@done0
+		
+		SEC
+		LDA	game + GAME::mFPTax
+		SBC	game + GAME::varO
+		STA	game + GAME::mFPTax
+		LDA	game + GAME::mFPTax + 1
+		SBC	game + GAME::varP
+		STA	game + GAME::mFPTax + 1
 
 @done0:
 		LDY	#PLAYER::money + 1	;See if the player is still 
@@ -19603,6 +19899,18 @@ rulesCreditAcc:
 		CMP	#$06
 		BNE	@begin
 		
+		LDA	game + GAME::fFPTax
+		BEQ	@skipFP
+		
+		CLC
+		LDA	game + GAME::mFPTax
+		ADC	game + GAME::varM
+		STA	game + GAME::mFPTax
+		LDA	game + GAME::mFPTax + 1
+		ADC	game + GAME::varN
+		STA	game + GAME::mFPTax + 1
+		
+@skipFP:
 		RTS
 		
 @begin:
@@ -19872,7 +20180,7 @@ rulesLandCrnr:
 ;-------------------------------------------------------------------------------
 		LDA	game + GAME::varA
 		CMP	#$00
-		BNE	@test1
+		BNE	@test0
 		
 		LDA	#200
 		STA	game + GAME::varD
@@ -19885,6 +20193,36 @@ rulesLandCrnr:
 		LDA	($FB), Y
 		TAX
 		JSR	prmptSalary
+
+		LDA	#<SFXGONG
+		LDY	#>SFXGONG
+		LDX	#$00
+		JSR	SNDBASE + 6
+
+		JMP	@exit
+		
+@test0:
+		CMP	#$14
+		BNE	@test1
+		
+		LDA	game + GAME::fFPTax
+		BEQ	@exit
+		
+		LDA	game + GAME::mFPTax
+		STA	game + GAME::varD
+		LDA	game + GAME::mFPTax + 1
+		STA	game + GAME::varE
+
+		JSR	rulesAddCash
+		
+		LDA	#$00
+		STA	game + GAME::mFPTax
+		STA	game + GAME::mFPTax + 1
+		
+		LDY	#PLAYER::colour
+		LDA	($FB), Y
+		TAX
+		JSR	prmptFParking
 
 		LDA	#<SFXGONG
 		LDY	#>SFXGONG
@@ -23280,6 +23618,9 @@ tokPrmptMustSell:	;MUST SELL IMPRV
 tokPrmptSalary:		;SALARY   
 			.byte 	$51, $13, $01, $0C, $01, $12, $19, $20
 			.byte 	$20, $24, $20, $20, $20, $20, $20, $20
+tokPrmptFParking:	;FPARKING
+			.byte 	$51, $06, $10, $01, $12, $0B, $09, $0E
+			.byte 	$07, $24, $20, $20, $20, $20, $20, $20
 tokPrmptMortgage:	;MORTGAGE
 			.byte 	$51, $0D, $0F, $12, $14, $07, $01, $07
 			.byte 	$05, $24, $20, $20, $20, $20, $20, $20
@@ -23378,10 +23719,10 @@ strOptn9Setup1:		;9 - LIGHT BLUE
 			.byte 	$88, $94, $A0, $82, $8C, $95, $85
 
 
-strDescSetup2:		;SELECT START CASH
-			.byte 	$11, $93, $85, $8C, $85, $83, $94, $A0
-			.byte 	$93, $94, $81, $92, $94, $A0, $83, $81
-			.byte 	$93, $88
+strDescSetup2:		;SET START FUNDS
+			.byte $0F, $93, $85, $94, $A0, $93, $94, $81
+			.byte $92, $94, $A0, $86, $95, $8E, $84, $93
+			
 strOptn0Setup2:		;0 - 1000 LOW
 			.byte 	$0C, $B0, $A0, $AD, $A0, $B1, $B0, $B0
 			.byte 	$B0, $A0, $8C, $8F, $97
@@ -23539,8 +23880,9 @@ strOptn1Play1:		;P - PASS
 			.byte $93
 			
 			
-strHeaderAuctn0:	;AUCTION
-			.byte $07, $81, $95, $83, $94, $89, $8F, $8E
+strHeaderAuctn0:	;DEED AUCTION
+			.byte $0C, $84, $85, $85, $84, $A0, $81, $95
+			.byte $83, $94, $89, $8F, $8E
 
 strOptn0Auctn0:		;+           UIO
 			.byte $0F, $AB, $A0, $A0, $A0, $A0, $A0, $A0
@@ -24739,11 +25081,14 @@ initNew:
 		STA	game + GAME::dieDbl
 		STA	game + GAME::dieRld
 		STA	game + GAME::nDbls
-		STA	game + GAME::bMBuy
+		STA	game + GAME::fMBuy
 		STA	game + GAME::fMngmnt
 		STA	game + GAME::gMode
 		STA	game + GAME::fGF0Out
 		STA	game + GAME::fGF1Out
+		STA	game + GAME::fFPTax
+		STA	game + GAME::mFPTax
+		STA	game + GAME::mFPTax + 1
 		
 		LDA	#$FF
 		STA	game + GAME::sSelect

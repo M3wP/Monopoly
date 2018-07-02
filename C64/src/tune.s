@@ -2110,6 +2110,7 @@ mt_patttbllo:
                 .BYTE mt_patt43 .mod 256
                 .BYTE mt_patt44 .mod 256
                 .BYTE mt_patt45 .mod 256
+                .BYTE mt_patt46 .mod 256
 mt_patttblhi:
                 .BYTE mt_patt0 / 256
                 .BYTE mt_patt1 / 256
@@ -2157,6 +2158,7 @@ mt_patttblhi:
                 .BYTE mt_patt43 / 256
                 .BYTE mt_patt44 / 256
                 .BYTE mt_patt45 / 256
+                .BYTE mt_patt46 / 256
 mt_insad:
                 .BYTE $2A,$04,$11,$0F,$00,$24,$0F,$01,$2F
 mt_inssr:
@@ -2336,73 +2338,73 @@ mt_song1:
 mt_song2:
                 .BYTE $02,$FF,$00
 mt_song3:
-                .BYTE $02,$FF,$00
+                .BYTE $2E,$FF,$00
 mt_song4:
                 .BYTE $02,$FF,$00
 mt_song5:
                 .BYTE $02,$FF,$00
 mt_song6:
-                .BYTE $19,$02,$FF,$01
+                .BYTE $19,$2E,$FF,$01
 mt_song7:
                 .BYTE $02,$FF,$00
 mt_song8:
                 .BYTE $02,$FF,$00
 mt_song9:
-                .BYTE $1A,$02,$FF,$01
+                .BYTE $1A,$2E,$FF,$01
 mt_song10:
                 .BYTE $02,$FF,$00
 mt_song11:
                 .BYTE $02,$FF,$00
 mt_song12:
-                .BYTE $1B,$02,$FF,$01
+                .BYTE $1B,$2E,$FF,$01
 mt_song13:
                 .BYTE $02,$FF,$00
 mt_song14:
                 .BYTE $02,$FF,$00
 mt_song15:
-                .BYTE $1C,$02,$FF,$01
+                .BYTE $1C,$2E,$FF,$01
 mt_song16:
                 .BYTE $02,$FF,$00
 mt_song17:
                 .BYTE $02,$FF,$00
 mt_song18:
-                .BYTE $19,$02,$FF,$01
+                .BYTE $19,$2E,$FF,$01
 mt_song19:
                 .BYTE $02,$FF,$00
 mt_song20:
                 .BYTE $02,$FF,$00
 mt_song21:
-                .BYTE $1D,$02,$FF,$01
+                .BYTE $1D,$2E,$FF,$01
 mt_song22:
                 .BYTE $02,$FF,$00
 mt_song23:
                 .BYTE $02,$FF,$00
 mt_song24:
-                .BYTE $1E,$02,$FF,$01
+                .BYTE $1E,$2E,$FF,$01
 mt_song25:
                 .BYTE $1F,$02,$FF,$01
 mt_song26:
                 .BYTE $02,$FF,$00
 mt_song27:
-                .BYTE $20,$02,$FF,$01
+                .BYTE $20,$2E,$FF,$01
 mt_song28:
                 .BYTE $02,$FF,$00
 mt_song29:
                 .BYTE $02,$FF,$00
 mt_song30:
-                .BYTE $20,$02,$FF,$01
+                .BYTE $20,$2E,$FF,$01
 mt_song31:
                 .BYTE $21,$02,$FF,$01
 mt_song32:
                 .BYTE $02,$FF,$00
 mt_song33:
-                .BYTE $22,$02,$FF,$01
+                .BYTE $22,$2E,$FF,$01
 mt_song34:
                 .BYTE $02,$FF,$00
 mt_song35:
                 .BYTE $02,$FF,$00
 mt_song36:
-                .BYTE $22,$02,$FF,$01
+                .BYTE $22,$2E,$FF,$01
 mt_song37:
                 .BYTE $23,$02,$FF,$01
 mt_song38:
@@ -2414,13 +2416,13 @@ mt_song40:
 mt_song41:
                 .BYTE $02,$FF,$00
 mt_song42:
-                .BYTE $25,$02,$FF,$01
+                .BYTE $25,$2E,$FF,$01
 mt_song43:
                 .BYTE $24,$02,$FF,$01
 mt_song44:
                 .BYTE $02,$FF,$00
 mt_song45:
-                .BYTE $2C,$02,$FF,$01
+                .BYTE $2C,$2E,$FF,$01
 mt_song46:
                 .BYTE $2D,$02,$FF,$01
 mt_song47:
@@ -2623,3 +2625,5 @@ mt_patt44:
 mt_patt45:
                 .BYTE $04,$40,$95,$F9,$03,$7C,$FD,$81,$F9,$7D,$F9,$84,$F9,$78,$E6,$BE
                 .BYTE $00
+mt_patt46:
+                .BYTE $5B,$00,$50,$C2,$00
