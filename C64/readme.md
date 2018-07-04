@@ -392,14 +392,15 @@ jumping mode and cause some interesting squeaks too.
 * The audio driver and IRQ handler is expecting a PAL machine.  You
 will get strange results on an NTSC one, I expect.  I may release an
 NTSC/PAL-N version in the future.
+* Clicking too quickly with the joystick at the very start seems to
+  cause the game to think you're using the mouse.  I might be able
+  to fix this...
 
 ## TODO
 
-* Allow colours for players only unique in setup (disable buttons).
-  Important but not until other tasks complete.
 * Allow all players to confirm quiting the game - quit request 
   interrupt!  Use score value to offer a winner (by default) in this 
- case.  Important but not until other tasks complete.
+  case.  Important but not until other tasks complete.
 * Ensure all options/pages are displayed for all menus.
 * Add score to PStats dialog - score needed for quit.
 * Is rent3 SFX still a little lame?
@@ -410,6 +411,10 @@ NTSC/PAL-N version in the future.
   Cash cannot be altered on this dialog, not even displayed?
 * Warning if haven't reviewed repay/fee for elimin. xfer?  Don't even
   allow if haven't done so?  Default no selection???
+  
+* Fix order of buttons on trdsel0 dialog
+* Hide player name texts on PlyrSel0 menu as required
+
 * Score =
  
 		  [equity/2] + [money/8] + [#deeds] + 
@@ -424,26 +429,16 @@ NTSC/PAL-N version in the future.
 
 		  #stations/2 * 2^#stations + #utilities		???
 
-* Clean up mouse support (auto draw buttons, remove dead data).  Need 
-  a couple of new button types (one needs more data - colour).  Change
-  "enb" to type.  Types:  regular enb, regular dis, regular hidden...
-  colour vis, colour hidden, simple (trd sel dialog), full screen.  This 
-  is needed for preventing player colour duplications and joystick 
-  support.
-* Make more menu buttons disabled in draw (not just buzzing in keys)
+* Make more menu buttons disabled in draw (not just buzzing in keys). Trade!
 * Enable/disable Done on the management menu?  Needs regular menu 
   redraws...
-* Mouse hot tracking - determine focused button and flash it.
-* Joystick support (step up/down menu options, fire select).  Reuse hot-
-  tracking code to indicate which button is focused.  Need default 
-  setting routine (screenStartButtons?), called at end of displaying 
-  menus/dialogs?
-* First-time-run configuration of input options
-* Change "all" dirty to be just board dirty and req. individual flags
-* Why does the whole screen get updated when changing the bid in an 
-  auction?
+* Buzz for more of the failures (gaol, auction, management)
+* Don't show "doubles" on play menu when get out of gaol on doubles?
+* Backup/retrieve menu button selection going to/returning from dialogs when
+  the menu hasn't changed?
+* Allow players to input name?
+* Change "all" dirty to be just board dirty and req. individual flags?
 * Back-fit GoatTracker driver changes from version 2.74.
-* Implement autosell?  Complicated.
 * Player sprites on overview dialog.  Would look pretty.  IRQ is a mess.
 * Properly divide game and rule routines.  How?
 * Put code into separate files as indicated
@@ -456,6 +451,7 @@ NTSC/PAL-N version in the future.
 * Check music/sfx - sometimes does not fire correctly at all (other than
   resource contention issue).  Perhaps fixed by 2.74?  Very rare issue.
 * Implement own keyboard scan, remove dependency on Kernal
+* Implement autosell?  Complicated.
 * Add CPU player?  Should have enough memory if no longer need Kernal.  
   Will be rather difficult to do properly.
 
@@ -467,15 +463,35 @@ NTSC/PAL-N version in the future.
   and returns correctly?
 * Ensure must pay works correctly for "from all" CCCCard.
 * Used GO Free cards prevented from appearing in deck until after 
- shuffle (and while owned by a player)
-* Trade5 dialog shows and then clears correctly?
+  shuffle (and while owned by a player)
+* Trade5 (warn, haven't looked at approval) dialog shows and then clears 
+  correctly?
 * Statistics/Overview from trade approval, must pay.  Do they work now?
 * Trades aren't permitted when you're in debt.
+* Menu only updates update only menu (auctions)
 
 
 ## Change History (Since Version 0.01.99A)
+* 04JUL2018
+	* All button types supported for hot tracking.
+	* Fix keys for buttons on PlyrSel menu.
+	* Update some CCCCard texts.
+	* Input sensitivity control when input is joystick.
+	* Inform when 3 doubles is reason for gaol (in menu desc).
+	* Inform when have doubles on play menu (in desc).
+	* Hot track blinking.
+	* Note to self:  Got all below in with data space saved.
+	* Basic button hot tracking (still need more types support).
+	* Complex joystick movement and button selection/input translation.
+	* Detect mouse or joystick click for input config selection.
+	* Rework mouse selection.
+	* Add basic joystick driver and button selection.
+	* Fix menu only updates affecting whole screen?
+	* Allow only unique colours for each player.
+	* Added more button types and auto draw, remove redundant data 
+	  (saved about 800B of data!).
 * 03JUL2018
-	* Disable debug keys by default
+	* Disable debug keys by default.
 	* Disable filter in tunes at end to get SFX on channel 0 working better.
 	* Implement Free Parking Taxes House Rule.
 	* Add House Rules setup menu (Setup6).
