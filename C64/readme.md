@@ -401,9 +401,6 @@ NTSC/PAL-N version in the future.
 * Allow all players to confirm quiting the game - quit request 
   interrupt!  Use score value to offer a winner (by default) in this 
   case.  Important but not until other tasks complete.
-* Ensure all options/pages are displayed for all menus.
-* Add score to PStats dialog - score needed for quit.
-* Is rent3 SFX still a little lame?
 * Need to allow nominate repay on elimin. xfers.  
 * Use a TradeSel version in elimin. xfers that shows ownership 
   dynamically to show what you can afford to take on and what is going 
@@ -414,7 +411,16 @@ NTSC/PAL-N version in the future.
   
 * Fix order of buttons on trdsel0 dialog
 * Hide player name texts on PlyrSel0 menu as required
+* Make more menu buttons disabled in draw (not just buzzing in keys). Trade!
+  Auction bid
+* Buzz for more of the failures (gaol, auction, management).  Must do.
+* Don't show "doubles" on play menu when get out of gaol on doubles?  Hmm...
+* Backup/retrieve menu button selection going to/returning from dialogs when
+  the menu hasn't changed?  Would be nice...
+* Is rent3 SFX still a little lame?  Does it matter?
+* Could now instead of copy name on elimin and gameover dialogs, just refer.
 
+* Add score to PStats dialog - score needed for quit.
 * Score =
  
 		  [equity/2] + [money/8] + [#deeds] + 
@@ -428,14 +434,7 @@ NTSC/PAL-N version in the future.
 		  1 hotel |  15 |  70 | 100 | 180 | +
 
 		  #stations/2 * 2^#stations + #utilities		???
-
-* Make more menu buttons disabled in draw (not just buzzing in keys). Trade!
-* Enable/disable Done on the management menu?  Needs regular menu 
-  redraws...
-* Buzz for more of the failures (gaol, auction, management)
-* Don't show "doubles" on play menu when get out of gaol on doubles?
-* Backup/retrieve menu button selection going to/returning from dialogs when
-  the menu hasn't changed?
+* Should be able to do beta release state after above
 * Allow players to input name?
 * Change "all" dirty to be just board dirty and req. individual flags?
 * Back-fit GoatTracker driver changes from version 2.74.
@@ -469,10 +468,13 @@ NTSC/PAL-N version in the future.
 * Statistics/Overview from trade approval, must pay.  Do they work now?
 * Trades aren't permitted when you're in debt.
 * Menu only updates update only menu (auctions)
+* Ensure all options/pages are displayed for all menus.
 
 
 ## Change History (Since Version 0.01.99A)
 * 04JUL2018
+	* Fix buttons bug closing non default drawn dialogs.
+	* Optimise player name handling (some).
 	* All button types supported for hot tracking.
 	* Fix keys for buttons on PlyrSel menu.
 	* Update some CCCCard texts.

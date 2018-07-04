@@ -135,7 +135,8 @@ JSTKSENS_MED	=	18
 JSTKSENS_HIGH	=	9
 
 
-	.struct SHRTOK
+	.struct SHRTSTR
+		_COUNT	.byte
 		_0	.byte
 		_1	.byte
 		_2	.byte
@@ -327,7 +328,7 @@ JSTKSENS_HIGH	=	9
 						;Bit 0: Alive
 		nGRls	.byte
 
-		name	.tag	SHRTOK
+		name	.tag	SHRTSTR
 		
 		oGrp01	.byte			;Brown
 		oGrp02	.byte			;Light Blue
@@ -1026,8 +1027,20 @@ plrLo:
 plrHi:
 			.byte	>plr0, >plr1, >plr2
 			.byte	>plr3, >plr4, >plr5
-
-
+plrNameLo:		
+			.byte	<(plr0 + PLAYER::name)
+			.byte	<(plr1 + PLAYER::name) 
+			.byte	<(plr2 + PLAYER::name)
+			.byte	<(plr3 + PLAYER::name)
+			.byte	<(plr4 + PLAYER::name)
+			.byte	<(plr5 + PLAYER::name)
+plrNameHi:
+			.byte	>(plr0 + PLAYER::name)
+			.byte	>(plr1 + PLAYER::name) 
+			.byte	>(plr2 + PLAYER::name)
+			.byte	>(plr3 + PLAYER::name)
+			.byte	>(plr4 + PLAYER::name)
+			.byte	>(plr5 + PLAYER::name)
 
 
 ;-------------------------------------------------------------------------------
@@ -1072,15 +1085,16 @@ button9:	.tag	BUTTON
 buttonA:	.tag	BUTTON
 buttonB:	.tag	BUTTON
 buttonC:	.tag	BUTTON
+buttonD:	.tag	BUTTON
 
 buttonLo:		.byte 	<button0, <button1, <button2, <button3
 			.byte	<button4, <button5, <button6, <button7
 			.byte	<button8, <button9, <buttonA, <buttonB
-			.byte 	<buttonC
+			.byte 	<buttonC, <buttonD
 buttonHi:		.byte 	>button0, >button1, >button2, >button3
 			.byte	>button4, >button5, >button6, >button7
 			.byte	>button8, >button9, >buttonA, >buttonB
-			.byte 	>buttonC
+			.byte 	>buttonC, <buttonD
 
 
 screenBtnCnt:
@@ -1973,10 +1987,20 @@ screenFillButtonM:
 		
 		JSR	screenReadByte
 		STA	button0, X		;cKey
-		
-		LDA	#$FF
 		INX
-		STA	button0, X		;fType
+
+		LDX	screenBtnCnt
+		INX
+
+		LDA	buttonLo, X
+		STA	$50
+		LDA	buttonHi, X
+		STA	$51
+
+		LDY	#BUTTON::fType
+
+		LDA	#$FF
+		STA	($50), Y		;fType
 
 		LDA	game + GAME::varA
 		CMP	#$02
@@ -5246,15 +5270,6 @@ statsDisplay:
 		LDA	($FD), Y
 		STA	$A4
 		
-		CLC
-		LDA	#PLAYER::name - 2 		;We're cheating, this will
-							;come out in the wash
-		ADC	$FD
-		STA	$FD
-		LDA	#$00
-		ADC	$FE
-		STA	$FE
-		
 		LDY	#$00
 		
 		CPX	game + GAME::pActive
@@ -5323,14 +5338,27 @@ statsDisplay:
 		STA	($FB), Y
 		INY
 
+		LDA	#PLAYER::name + 1
+		STA	game + GAME::varM
+		STY	game + GAME::varN
+		
 		LDX	#$00
 @loopName:
+		LDY	game + GAME::varM
 		LDA	($FD), Y
+		
+		LDY	game + GAME::varN
+		AND	#$7F
 		STA	($FB), Y
-		INY
+		
+		INC	game + GAME::varN
+		INC	game + GAME::varM
+		
 		INX
 		CPX	#$08
 		BNE	@loopName
+		
+		LDY	game + GAME::varN
 		
 		LDA	#' '			;Same screen code as ASCII???
 		STA	($FB), Y
@@ -5738,8 +5766,6 @@ menuPageSetup0Keys:
 		CMP	#$06
 		BEQ	@done
 		
-		LDY	#PLAYER::status
-		
 		TAX
 		
 @loop:
@@ -5748,8 +5774,17 @@ menuPageSetup0Keys:
 		LDA	plrHi, X
 		STA	$FC
 		
+		LDY	#PLAYER::status
 		LDA	#$00
 		STA	($FB), Y
+		
+		LDA	#$A0
+		LDY	#PLAYER::name + 8
+@loopname:
+		STA	($FB), Y
+		DEY
+		CPY	#PLAYER::name
+		BNE	@loopname
 		
 		INX
 		CPX	#$06
@@ -6179,27 +6214,27 @@ menuWindowSetup4:
 			.byte	$90, $01, $08
 			.word        strDescSetup4
 			.byte	$90, $02, $0A
-			.word	     strText0PSel0
+			.word	     (plr0 + PLAYER::name)
 			.byte	$90, $0D, $0A
 			.word		strSetup4Roll0
 			.byte	$90, $02, $0B
-			.word	     strText1PSel0
+			.word	     (plr1 + PLAYER::name)
 			.byte	$90, $0D, $0B
 			.word		strSetup4Roll1
 			.byte	$90, $02, $0C
-			.word	     strText2PSel0
+			.word	     (plr2 + PLAYER::name)
 			.byte	$90, $0D, $0C
 			.word		strSetup4Roll2
 			.byte	$90, $02, $0D
-			.word	     strText3PSel0
+			.word	     plr3 + PLAYER::name
 			.byte	$90, $0D, $0D
 			.word		strSetup4Roll3
 			.byte	$90, $02, $0E
-			.word	     strText4PSel0
+			.word	     plr4 + PLAYER::name
 			.byte	$90, $0D, $0E
 			.word		strSetup4Roll4
 			.byte	$90, $02, $0F
-			.word	     strText5PSel0
+			.word	     plr5 + PLAYER::name
 			.byte	$90, $0D, $0F
 			.word		strSetup4Roll5
 			
@@ -6329,17 +6364,10 @@ menuDoSetup4Highest:
 menuPageSetup4Draw:
 		LDX	#$00
 @loop0:
-		STX	game + GAME::varA
-
 		LDA	strsSetup4RollLo, X
 		STA	$A3
 		LDA	strsSetup4RollHi, X
 		STA	$A4
-		
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
 		
 		LDA	menuTemp3, X
 		BEQ	@blank
@@ -6355,7 +6383,7 @@ menuPageSetup4Draw:
 		LDY	#$02
 		STA	($A3), Y
 
-		JMP	@name
+		JMP	@next0
 		
 @blank:
 		LDA	#$A0
@@ -6365,57 +6393,11 @@ menuPageSetup4Draw:
 		LDY	#$02
 		STA	($A3), Y
 	
-@name:
-		LDA	strsPSelText0Lo, X
-		STA	$A3
-		LDA	strsPSelText0Hi, X
-		STA	$A4
-		
-		LDX	#$07
-		LDY	#PLAYER::name + 7
-		STY	game + GAME::varB
-		
-@loop1:
-		LDY	game + GAME::varB
-		LDA	($FB), Y
-		DEC	game + GAME::varB
-		PHA
-		
-		TXA
-		TAY
-		PLA
-		ORA	#$80
-		STA	($A3), Y
-
-@next1:
-		DEX
-		BPL	@loop1
-
 @next0:
-		LDX	game + GAME::varA
-
 		INX
 		CPX	game + GAME::pCount
 		BNE	@loop0
 
-@loop2:
-		LDA	strsPSelText0Lo, X
-		STA	$A3
-		LDA	strsPSelText0Hi, X
-		STA	$A4
-		
-		LDA	#$A0
-		LDY	#$07
-@loop3:
-		STA	($A3), Y
-		
-		DEY
-		BPL	@loop3
-		
-		INX
-		CPX	#$06
-		BNE	@loop2
-		
 		LDA	menuTemp0
 		CMP	game + GAME::pCount
 		BNE	@roll
@@ -9087,13 +9069,23 @@ menuPlyrSelCallProc:
 		.word	$0000
 
 
+	.define	PLYRSEL_P	.HIBYTE(*)
 menuWindowPlyrSelPN:
+;***THIS IS VERY NAUGHTY SO THE MENU DATA CAN'T CROSS PAGE BOUNDARY
 		.byte	menuWindowPlyrSelP0 - menuWindowPlyrSel0 
 		.byte	menuWindowPlyrSelP1 - menuWindowPlyrSel0
 		.byte	menuWindowPlyrSelP2 - menuWindowPlyrSel0
 		.byte	menuWindowPlyrSelP3 - menuWindowPlyrSel0
 		.byte	menuWindowPlyrSelP4 - menuWindowPlyrSel0
 		.byte	menuWindowPlyrSelP5 - menuWindowPlyrSel0
+		
+menuWindowPlyrSelNN:
+		.byte	menuWindowPlyrSelN0 - menuWindowPlyrSel0 
+		.byte	menuWindowPlyrSelN1 - menuWindowPlyrSel0
+		.byte	menuWindowPlyrSelN2 - menuWindowPlyrSel0
+		.byte	menuWindowPlyrSelN3 - menuWindowPlyrSel0
+		.byte	menuWindowPlyrSelN4 - menuWindowPlyrSel0
+		.byte	menuWindowPlyrSelN5 - menuWindowPlyrSel0
 
 menuWindowPlyrSel0:
 			.byte	$90, $01, $07
@@ -9104,34 +9096,41 @@ menuWindowPlyrSelP0:
 			.byte	$A2, $0A, $01, $12, $31, $02, $0A
 			.word	     	strOptn0PSel0
 			.byte	$90, $06, $0A
-			.word		strText0PSel0
+menuWindowPlyrSelN0:
+			.word		plr0 + PLAYER::name
 menuWindowPlyrSelP1:
 			.byte	$A2, $0C, $01, $12, $32, $02, $0C
 			.word	     	strOptn1PSel0
 			.byte	$90, $06, $0C
-			.word		strText1PSel0
+menuWindowPlyrSelN1:
+			.word		plr1 + PLAYER::name
 menuWindowPlyrSelP2:
 			.byte	$A2, $0E, $01, $12, $33, $02, $0E
 			.word	     	strOptn2PSel0
 			.byte	$90, $06, $0E
-			.word		strText2PSel0
+menuWindowPlyrSelN2:
+			.word		plr2 + PLAYER::name
 menuWindowPlyrSelP3:
 			.byte	$A2, $10, $01, $12, $34, $02, $10
 			.word	     	strOptn3PSel0
 			.byte	$90, $06, $10
-			.word		strText3PSel0
+menuWindowPlyrSelN3:
+			.word		plr3 + PLAYER::name
 menuWindowPlyrSelP4:
 			.byte	$A2, $12, $01, $12, $35, $02, $12
 			.word	     	strOptn4PSel0
 			.byte	$90, $06, $12
-			.word		strText4PSel0
+menuWindowPlyrSelN4:
+			.word		plr4 + PLAYER::name
 menuWindowPlyrSelP5:
 			.byte	$A2, $14, $01, $12, $36, $02, $14
 			.word	     	strOptn5PSel0
 			.byte	$90, $06, $14
-			.word		strText5PSel0
+menuWindowPlyrSelN5:
+			.word		plr5 + PLAYER::name
 
 			.byte	$00
+	.assert	PLYRSEL_P = .HIBYTE(*), error, "WindowPlyrSel must be on one page!"
 			
 			
 menuPagePlyrSel0Keys:
@@ -9239,6 +9238,14 @@ menuPagePlyrSel0Draw:
 		TAY
 		LDA	#$A2
 		STA	($A3), Y
+		
+		LDA	menuWindowPlyrSelNN, X
+		TAY
+		LDA	#<strDummyDummy0
+		STA	($A3), Y
+		INY
+		LDA	#>strDummyDummy0
+		STA	($A3), Y
 
 @disp:
 		LDA	#<menuWindowPlyrSel0
@@ -9247,6 +9254,33 @@ menuPagePlyrSel0Draw:
 		STA	$FE
 		
 		JSR	screenPerformList
+		
+		LDA	menuPlyrSelAllowCur
+		BNE	@exit
+		
+		LDX	game + GAME::pActive
+		
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDY	#PLAYER::name
+		LDA	($FB), Y
+		STA	game + GAME::varA
+		INY
+		LDA	($FB), Y
+		STA	game + GAME::varB
+		
+		LDA	menuWindowPlyrSelNN, X
+		TAY
+		LDA	game + GAME::varA
+		STA	($A3), Y
+		INY
+		LDA	game + GAME::varB
+		STA	($A3), Y
+		
+@exit:
 		RTS
 
 
@@ -12348,10 +12382,14 @@ dialogDefDraw:
 ;-------------------------------------------------------------------------------
 dialogDisplay:
 ;-------------------------------------------------------------------------------
+		LDA	#$00			;Do this in the updates and 
+		STA	menuLastDrawFunc	;or restore last menu's selection
+		STA	menuLastDrawFunc + 1
+		
 		LDA	#$01
 		CMP	dialogDrawDefDraw
 		BNE	@cont
-		
+
 		JSR	dialogDefDraw
 @cont:
 		
@@ -12835,7 +12873,7 @@ dialogDlgWaitFor0Draw:
 		LDA	plrHi, X
 		STA	$FC
 		
-		LDY	#PLAYER::name + $07
+		LDY	#PLAYER::name + $08
 		
 		LDX	#$07
 @loop:
@@ -12888,7 +12926,7 @@ dialogDlgStart0Draw:
 		LDA	plrHi, X
 		STA	$FC
 		
-		LDY	#PLAYER::name + $07
+		LDY	#PLAYER::name + $08
 		
 		LDX	#$07
 @loop:
@@ -13022,18 +13060,18 @@ dialogWindowTrade7:
 			.byte	$90, $09, $09
 			.word		strText0Trade7
 			.byte	$90, $09, $0A
-dialogWindowTrade7P:
+dialogWindowTrade7N:
 			.word		strDummyDummy0
-
+			
 			.byte	$00
 
 
 dialogDlgTrade7Draw:
-		LDX	dialogTempTrade7P
-		LDA	strsPSelText1Lo, X
-		STA	dialogWindowTrade7P
-		LDA	strsPSelText1Hi, X
-		STA	dialogWindowTrade7P + 1
+		LDX	game + GAME::pActive
+		LDA	plrNameLo, X
+		STA	dialogWindowTrade7N
+		LDA	plrNameHi, X
+		STA	dialogWindowTrade7N + 1
 
 		LDA	#<dialogWindowTrade7
 		STA	$FD
@@ -13089,7 +13127,7 @@ dialogDlgElimin0Draw:
 		LDA	plrHi, X
 		STA	$FC
 		
-		LDY	#PLAYER::name + $07
+		LDY	#PLAYER::name + $08
 		
 		LDX	#$07
 @loop:
@@ -13228,7 +13266,7 @@ dialogDlgGameOver0Draw:
 		LDA	plrHi, X
 		STA	$FC
 		
-		LDY	#PLAYER::name + $07
+		LDY	#PLAYER::name + $08
 		
 		LDX	#$07
 @loop:
@@ -14500,8 +14538,6 @@ dialogWindowTrdSel2:
 							;Select button
 			.byte	$AE, $0F, $1C, $22, $53, $1C, $0F
 			.word		strOptn2TrdSel0
-			.byte	$2F, $1D, $0F, $06
-			.byte	$81, $1C, $0F
 
 			.byte	$90, $05, $07		;Cash btn lbls
 			.word		strText1TrdSel0
@@ -15200,11 +15236,9 @@ doDialogTrdSelClose:
 		LDA	game + GAME::fTrdSlM
 		STA	game + GAME::gMode
 
-		LDA	#$01
-		EOR	game + GAME::dlgVis
+		LDA	#$00
 		STA	game + GAME::dlgVis
 		LDA	#$01
-		EOR	game + GAME::pVis
 		STA	game + GAME::pVis
 		
 		JSR	gamePlayersDirty
@@ -15869,6 +15903,8 @@ dialogDlgTrdSel0Keys:
 
 
 dialogDlgTrdSel0Draw:
+		JSR	screenBeginButtons
+		
 		LDA	dialogTrdSelDoApprv
 		BEQ	@initial
 
@@ -15913,8 +15949,6 @@ dialogDlgTrdSel0Draw:
 		STA	dialogTrdSelMaxCash + 1
 		
 @disp:
-		JSR	screenBeginButtons
-
 		LDA	#<dialogWindowTrdSel0
 		STA	$FD
 		LDA	#>dialogWindowTrdSel0
@@ -15968,13 +16002,13 @@ dialogDlgTrdSel0Draw:
 		
 		JSR	screenPerformList
 		
-		JSR	screenResetSelBtn
-		
 		LDA	#$01
 		STA	ui + UI::fWntJFB
 		
 		JSR	doDialogTrdSelSetState
 
+		JSR	screenResetSelBtn
+		
 		LDA	#$00
 		STA	game + GAME::fTrdSlL
 		STA	game + GAME::sTrdSel
@@ -16799,9 +16833,9 @@ dialogDlgPStats0Draw:
 		
 		LDX	menuPlyrSelSelect
 		
-		LDA	strsPSelText1Lo, X
+		LDA	plrNameLo, X
 		STA	dialogWindowSqrInfoT0
-		LDA	strsPSelText1Hi, X
+		LDA	plrNameHi, X
 		STA	dialogWindowSqrInfoT0 + 1
 		
 		LDA	#<strDummyDummy0
@@ -24596,46 +24630,6 @@ strHeaderPSel0:		;SELECT PLAYER
 			.byte $0D, $93, $85, $8C, $85, $83, $94, $A0
 			.byte $90, $8C, $81, $99, $85, $92
 
-strText0PSel0:		;PLAYER_1
-			.byte $08, $90, $8C, $81, $99, $85, $92, $E4
-			.byte $B1
-
-strText1PSel0:		;PLAYER_2       
-			.byte $08, $90, $8C, $81, $99, $85, $92, $E4
-			.byte $B2
-
-strText2PSel0:		;PLAYER_3       
-			.byte $08, $90, $8C, $81, $99, $85, $92, $E4
-			.byte $B3
-
-strText3PSel0:		;PLAYER_4       
-			.byte $08, $90, $8C, $81, $99, $85, $92, $E4
-			.byte $B4
-
-strText4PSel0:		;PLAYER_5       
-			.byte $08, $90, $8C, $81, $99, $85, $92, $E4
-			.byte $B5
-
-strText5PSel0:		;PLAYER_6       
-			.byte $08, $90, $8C, $81, $99, $85, $92, $E4
-			.byte $B6
-
-
-strsPSelText0Lo:
-		.byte	<(strText0PSel0 + 1), <(strText1PSel0 + 1) 
-		.byte	<(strText2PSel0 + 1), <(strText3PSel0 + 1)
-		.byte	<(strText4PSel0 + 1), <(strText5PSel0 + 1)
-strsPSelText0Hi:
-		.byte	>(strText0PSel0 + 1), >(strText1PSel0 + 1)
-		.byte	>(strText2PSel0 + 1), >(strText3PSel0 + 1)
-		.byte	>(strText4PSel0 + 1), >(strText5PSel0 + 1)
-strsPSelText1Lo:
-		.byte	<strText0PSel0, <strText1PSel0, <strText2PSel0
-		.byte	<strText3PSel0, <strText4PSel0, <strText5PSel0
-strsPSelText1Hi:
-		.byte	>strText0PSel0, >strText1PSel0, >strText2PSel0
-		.byte	>strText3PSel0, >strText4PSel0, >strText5PSel0
-
 
 strOptn0PSel0:		;1 -
 			.byte $03, $B1, $A0, $AD
@@ -25493,7 +25487,8 @@ initMouse:
 initPlayers:
 ;-------------------------------------------------------------------------------
 		LDA	#'1'			;ASCII same as screen code
-		STA	plrDefName + 7
+		ORA	#$80
+		STA	plrDefName + 8
 
 		LDX	#$00
 		
@@ -25543,10 +25538,10 @@ initPlayers:
 		STA	($FB), Y
 		INY
 		INX
-		CPX	#$08
+		CPX	#$09
 		BNE	@loopName
 		
-		INC	plrDefName + 7
+		INC	plrDefName + 8
 		
 		LDY	#PLAYER::oGrp01
 		LDX	#$09
@@ -25784,7 +25779,7 @@ brdMiniMap:
 ;			.byte	%11111111, %11111111, %11111111
 			
 plrDefName:
-			.byte 	$10, $0C, $01, $19, $05, $12, $64, $30
+			.byte 	$08, $90, $8C, $81, $99, $85, $92, $E4, $B0
 
 heap0:
 			.byte	$00
