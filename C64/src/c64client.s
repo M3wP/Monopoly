@@ -31,7 +31,7 @@
 ;defs
 ;-------------------------------------------------------------------------------
 	.define	DEBUG_IRQ	0
-	.define DEBUG_KEYS	0
+	.define DEBUG_KEYS	1
 
 spriteMemD	=	$0340
 spriteMemE	=	$0380
@@ -202,6 +202,7 @@ JSTKSENS_HIGH	=	9
 						;    0:	All screen dirty***FIXME
 		qVis	.byte
 		pCount	.byte
+		pFirst	.byte
 		pActive	.byte
 		pLast	.byte
 		dlgVis	.byte
@@ -272,6 +273,9 @@ JSTKSENS_HIGH	=	9
 		fTrdTyp .byte			;type (regular, elimin)
 		fTrdInt .byte			;interactive
 		
+		gMdQuit .byte			
+		pQuitCP	.byte
+		
 		gMode	.byte			;0:  Normal (Play)
 						;1:  Auction
 						;2:  Interrupt (Trade Approve)
@@ -281,6 +285,7 @@ JSTKSENS_HIGH	=	9
 						;6:  Player stepping (f/e)
 						;7:  Trade selection (f/e)
 						;8:  Trade stepping (f/e)
+						;9:  Quit request
 		
 		tPrmT0	.tag	TOKEN
 		tPrmT1	.tag	TOKEN
@@ -422,6 +427,7 @@ JSTKSENS_HIGH	=	9
 		colour	.byte
 		count	.byte
 		pImprv	.byte
+		aScrTab .word
 		mDeed1	.word			;***FIXME: Should be "card"?
 		mDeed2	.word
 		mDeed3	.word
@@ -5839,6 +5845,21 @@ menuPageJump0:
 		.word	menuPageJump0Draw
 		.byte	$01
 
+menuPageQuit0:
+		.word	menuPageQuit0Keys
+		.word	menuPageQuit0Draw
+		.byte	$01
+
+menuPageQuit1:
+		.word	menuPageQuit1Keys
+		.word	menuPageQuit1Draw
+		.byte	$01
+
+menuPageQuit2:
+		.word	menuPageQuit2Keys
+		.word	menuPageQuit2Draw
+		.byte	$01
+
 
 ;-------------------------------------------------------------------------------
 menuDefDraw:
@@ -6608,7 +6629,10 @@ menuDoSetup4Highest:
 		INX
 		CPX	game + GAME::pCount
 		BNE	@loop
-		
+
+		LDA	menuTemp0 + 1
+		STA	game + GAME::pFirst
+
 		LDA 	#<dialogDlgStart0
 		LDY	#>dialogDlgStart0
 		
@@ -7218,12 +7242,19 @@ menuPagePlay0DefKeys:
 ;-------------------------------------------------------------------------------
 menuPagePlay0Keys:
 ;-------------------------------------------------------------------------------
-;		CMP	#'Q'			;???Quit the game and start a
-;		BNE	keys1			;new one instead of exiting to 
-;						;BASIC???
-;		LDA	#$01	
-;		STA	game + GAME::term	;Don't exit to BASIC.  Not
-;		JMP 	keysExit		;necessary.
+		CMP	#'Q'			
+		BNE	@keysN			
+						
+		LDA	#<menuPageQuit0
+		LDY	#>menuPageQuit1
+		
+		JSR	menuSetPage
+		
+		LDA	#$08
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+		JMP	@keysDing
 		
 @keysN:
 		CMP	#'N'
@@ -7747,7 +7778,7 @@ menuPageAuctnDefKeys:
 		LDA	game + GAME::mAuctn
 		LDY	game + GAME::mAuctn + 1
 		
-;		D, E < A, Y -> SEC / CLC
+;		D, E < A, Y -> SEC | CLC
 		JSR	gameAmountIsLess	;If trying to bid less...
 		BCC	@keysUpdate
 
@@ -9779,6 +9810,9 @@ menuPageJump0Keys:
 		STA	game + GAME::fStpSig
 		STA	game + GAME::gMode
 
+		LDA	#$00
+		STA	game + GAME::kWai
+		
 		LDA	game + GAME::sStpDst	;dest square
 		LDX	#$00			;if passed go
 		LDY	game + GAME::fPayDbl	;if we do something special
@@ -9805,10 +9839,571 @@ menuPageJump0Draw:
 		RTS
 
 
+menuWindowQuit0:	
+			.byte	$90, $01, $07
+			.word	     strHeaderQuit0
+;			.byte	$90, $01, $08
+;			.word        strDescSetup3
+			.byte	$90, $02, $0A
+			.word	     strText0Quit0
+			.byte	$90, $02, $0B
+			.word	     strText1Quit0
+			
+			.byte	$A1, $0D, $01, $12, $4E, $02, $0D
+			.word	     strOptn1Setup3
+			.byte	$A1, $0F, $01, $12, $59, $02, $0F
+			.word	     strOptn0Setup3
+			
+			.byte	$00
+
+menuPageQuit0Keys:
+		CMP	#'N'
+		BNE	@tstY
+		
+		JMP	@update
+
+@tstY:
+		CMP	#'Y'
+		
+		LDA	#<menuPageQuit1
+		LDY	#>menuPageQuit1
+
+		JSR	menuSetPage
+
+		LDA	#$08
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+
+		JMP	@ding
+
+@update:
+		JSR	gameUpdateMenu
+		
+@ding:
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+
+		RTS
+		
+
+menuPageQuit0Draw:
+		JSR	screenBeginButtons
+
+		LDA	#<menuWindowQuit0
+		STA	$FD
+		LDA	#>menuWindowQuit0
+		STA	$FE
+		
+		JSR	screenPerformList
+
+		RTS
+
+
+menuWindowQuit1:	
+			.byte	$90, $01, $07
+			.word	     strHeaderQuit0
+			.byte	$90, $01, $08
+			.word        strDescQuit1
+			.byte	$90, $02, $0A
+			.word	     strText0Quit1
+			
+			.byte	$A1, $0D, $01, $12, $59, $02, $0D
+			.word	     strOptn0Setup3
+			.byte	$A1, $0F, $01, $12, $4E, $02, $0F
+			.word	     strOptn1Setup3
+			
+			.byte	$00
+
+menuPageQuit1Keys:
+		CMP	#'N'
+		BNE	@tstY
+		
+		JMP	@update
+
+@tstY:
+		CMP	#'Y'
+		
+		LDA	game + GAME::gMode
+		STA	game + GAME::gMdQuit
+		
+		LDA	game + GAME::pActive
+		STA	game + GAME::pQuitCP
+
+		JSR	rulesDoNextPlyr
+		
+		LDA	#$09
+		STA	game + GAME::gMode
+		
+@update:
+		JSR	gameUpdateMenu
+		
+		LDA	#$01
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+@ding:
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+
+		RTS
+		
+
+menuPageQuit1Draw:
+		JSR	screenBeginButtons
+
+		LDA	#<menuWindowQuit1
+		STA	$FD
+		LDA	#>menuWindowQuit1
+		STA	$FE
+		
+		JSR	screenPerformList
+
+		RTS
+
+
+menuWindowQuit2:	
+			.byte	$90, $01, $07
+			.word	     strHeaderQuit2
+;			.byte	$90, $01, $08
+;			.word        strDescQuit1
+			.byte	$90, $02, $0A
+			.word	     strText0Quit0
+			.byte	$90, $02, $0B
+			.word	     strText1Quit0
+			
+			.byte	$A1, $0D, $01, $12, $4E, $02, $0D
+			.word	     strOptn1Setup3
+			.byte	$A1, $0F, $01, $12, $59, $02, $0F
+			.word	     strOptn0Setup3
+			
+			.byte	$00
+
+menuPageQuit2Keys:
+		CMP	#'N'
+		BNE	@tstY
+		
+		LDA	game + GAME::gMdQuit
+		STA	game + GAME::gMode
+		
+		LDA	game + GAME::pQuitCP
+		STA	game + GAME::pActive
+		
+		JMP	@update
+
+@tstY:
+		CMP	#'Y'
+		
+		JSR	rulesDoNextPlyr
+		
+		LDA	game + GAME::pQuitCP
+		CMP	game + GAME::pActive
+		BNE	@update
+		
+		JSR	gamePerformQuit
+		
+		JMP	@ding
+		
+		
+@update:
+		JSR	gameUpdateMenu
+		
+		LDA	#$01
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+@ding:
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
+		RTS
+		
+
+menuPageQuit2Draw:
+		JSR	screenBeginButtons
+
+		LDA	#<menuWindowQuit2
+		STA	$FD
+		LDA	#>menuWindowQuit2
+		STA	$FE
+		
+		JSR	screenPerformList
+
+		RTS
+
 
 ;===============================================================================
 ;FOR GAME.S
 ;===============================================================================
+
+
+
+gamePerformQuit:
+		LDX	game + GAME::pFirst
+		STX	game + GAME::varF
+		STX	game + GAME::varG
+		
+		LDA	#$00
+		STA	game + GAME::varH
+		STA	game + GAME::varI
+		
+		JMP	@update
+		
+@loop:		
+		
+		LDY	#PLAYER::status
+		LDA	($FB), Y
+		AND	#$01
+		BEQ	@next
+		
+		JSR	gameCalcPlayerScore
+		
+		LDA	game + GAME::varH
+		STA	game + GAME::varD
+		LDA	game + GAME::varI
+		STA	game + GAME::varE
+	
+;		D, E < (O, P) -> SEC | CLC
+		JSR	gameAmountIsLessDirect
+		BCC	@next
+		
+@found:
+		LDA	game + GAME::varG
+		STA	game + GAME::varF
+		
+		LDA	game + GAME::varO
+		STA	game + GAME::varH
+		LDA	game + GAME::varP
+		STA	game + GAME::varI
+	
+@next:
+		INC	game + GAME::varG
+		LDX	game + GAME::varG
+		
+		CPX	#$06
+		BNE	@tstloop
+		
+@wrap:		
+		LDX	#$00
+		STX	game + GAME::varG
+		
+@tstloop:
+		CPX	game + GAME::pFirst
+		BEQ	@finish
+
+@update:
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+	
+		JMP	@loop
+
+@finish:
+		LDA	game + GAME::varF
+		STA	game + GAME::pActive
+		STA	game + GAME::pLast
+		
+		LDA	#$05
+		STA	game + GAME::gMode
+		
+		JSR	gameUpdateMenu
+		
+		LDA	#musTuneGameOver
+		JSR	SNDBASE + 0
+
+		RTS
+
+
+doGameAddScoreElement:
+		CLC
+		LDA	game + GAME::varO
+		ADC	game + GAME::varM
+		STA	game + GAME::varO
+		LDA	game + GAME::varP
+		ADC	game + GAME::varN
+		STA	game + GAME::varP
+		
+		RTS
+
+
+doGameScoreEquity:
+		LDY	#PLAYER::equity
+		LDA	($FB), Y
+		STA	game + GAME::varD
+		INY
+		LDA	($FB), Y
+		STA	game + GAME::varE
+		LSR
+		STA	game + GAME::varE
+		LDA	game + GAME::varD
+		ROR
+		STA	game + GAME::varD
+
+		LDY	#PLAYER::money
+		LDA	($FB), Y
+		STA	game + GAME::varM
+		INY
+		LDA	($FB), Y
+		STA	game + GAME::varN
+		
+		LDX	#$02
+@xDiv8Loop:
+		ASL
+		ROR	game + GAME::varN
+		ROR	game + GAME::varM
+		
+		LDA	game + GAME::varN
+		
+		DEX
+		BPL	@xDiv8Loop
+		
+		CLC
+		LDA	game + GAME::varM
+		ADC	game + GAME::varD
+		STA	game + GAME::varM
+		LDA	game + GAME::varN
+		ADC	game + GAME::varE
+		STA	game + GAME::varN
+		
+		RTS
+
+doGameScoreCntDeeds:
+		LDA	#$00
+		STA	game + GAME::varM
+		STA	game + GAME::varN
+		
+		LDY	#PLAYER::oGrp01
+		LDX	#$00
+@loop:
+		LDA	($FB), Y
+		CLC
+		ADC	game + GAME::varM
+		STA	game + GAME::varM
+		
+		INY
+		INX
+		
+		CPX	#$0A
+		BNE	@loop
+		
+		RTS
+		
+		
+doGameScoreCntGOFree:
+		LDA	#$00
+		STA	game + GAME::varM
+		STA	game + GAME::varN
+		
+		LDA	game + GAME::varA
+		CMP	game + GAME::pGF0Crd
+		BNE	@tst1
+		
+		INC	game + GAME::varM
+		
+@tst1:
+		CMP	game + GAME::pGF1Crd
+		BNE	@exit
+		
+		INC	game + GAME::varM
+		
+@exit:
+		RTS
+
+
+doGameScoreCntGroups:
+		LDA	#$00
+		STA	game + GAME::varM
+		STA	game + GAME::varN
+		
+		LDY	#PLAYER::oGrp01
+		LDX	#$00
+@loop:
+		LDA	($FB), Y
+		BEQ	@next
+				
+		TYA
+		PHA
+		
+		TAY
+		DEY
+		TYA
+		ASL
+
+		CLC
+		ADC	game + GAME::varM
+		STA	game + GAME::varM
+		
+		PLA
+		TAY
+
+@next:
+		INY
+		INX
+		
+		CPX	#$0A
+		BNE	@loop
+		
+		RTS
+		
+		
+doGameScoreImprvBonus:
+		LDA	#$00
+		STA	game + GAME::varM
+		STA	game + GAME::varN
+		
+		LDX	#$00
+		STX	game + GAME::varB
+		
+@loop:
+		LDA	sqr00, X
+		INX
+		CMP	game + GAME::varA
+		BNE	@next
+
+		TXA
+		PHA
+
+		LDA	game + GAME::varB
+		JSR	gameGetCardPtrForSquare
+		
+		PLA
+		TAX
+		
+		LDY	#GROUP::pImprv
+		LDA	($FD), Y
+		BEQ	@next
+
+		LDY	#$00
+
+		LDA	sqr00, X
+		AND	#$08
+		BEQ	@tsths
+		
+		LDY	#$04
+		JMP	@calc
+		
+@tsths:
+		LDA	sqr00, X
+		AND	#$07
+		BEQ	@next
+		
+		TAY
+		DEY
+		
+@calc:
+		TYA
+		PHA
+
+		LDY	#GROUP::aScrTab
+		LDA	($FD), Y
+		STA	$A3
+		INY
+		LDA	($FD), Y
+		STA	$A4
+		
+		PLA
+		TAY
+		
+		LDA	($A3), Y
+		
+		CLC
+		ADC	game + GAME::varM
+		STA	game + GAME::varM
+		LDA	#$00
+		ADC	game + GAME::varN
+		STA	game + GAME::varN
+
+
+@next:
+		INC	game + GAME::varB
+
+		INX
+		CPX	#$50
+		BNE	@loop
+
+
+		RTS
+
+
+doGameScoreStationBonus:
+		LDA	#$00
+		STA	game + GAME::varM
+		STA	game + GAME::varN
+		
+		LDY	#PLAYER::oGrp09
+		LDA	($FB), Y
+		
+		TAX
+		BEQ	@exit
+		
+		DEX
+		LDA	#$01
+		
+@loop:
+		ASL
+		DEX
+		BPL	@loop
+
+		STA	game + GAME::varM
+		
+@exit:
+		RTS
+
+
+doGameScoreUtilityBonus:
+		LDA	#$00
+		STA	game + GAME::varN
+		
+		LDY	#PLAYER::oGrp0A
+		LDA	($FB), Y
+		
+		STA	game + GAME::varM
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
+gameCalcPlayerScore:
+;-------------------------------------------------------------------------------
+		STX	game + GAME::varA
+		
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+
+		LDA	#$00
+		STA	game + GAME::varO
+		STA	game + GAME::varP
+		
+		JSR	doGameScoreEquity
+		JSR	doGameAddScoreElement
+		
+		JSR	doGameScoreCntDeeds
+		JSR	doGameAddScoreElement
+		
+		JSR	doGameScoreCntGOFree
+		JSR	doGameAddScoreElement
+		
+		JSR	doGameScoreCntGroups
+		JSR	doGameAddScoreElement
+		
+		JSR	doGameScoreImprvBonus
+		JSR	doGameAddScoreElement
+		
+		JSR	doGameScoreStationBonus
+		JSR	doGameAddScoreElement
+		
+		JSR	doGameScoreUtilityBonus
+		JSR	doGameAddScoreElement
+		
+		RTS
 
 
 ;-------------------------------------------------------------------------------
@@ -9822,7 +10417,7 @@ gameDispSqrInfoDlg:
 		LDY	#>dialogDlgSqrInfo0
 		
 		JSR	dialogSetDialog
-		
+
 		LDA	#<$DB3B
 		STA	game + GAME::aWai
 		LDA	#>$DB3B
@@ -9936,6 +10531,9 @@ gamePerfStepping:
 		STA	game + GAME::fStpSig
 		STA	game + GAME::gMode
 
+		LDA	#$00
+		STA	game + GAME::kWai
+		
 		LDA	game + GAME::sStpDst	;dest square
 		LDX	#$00			;if passed go
 		LDY	game + GAME::fPayDbl	;if we do something special
@@ -9946,7 +10544,7 @@ gamePerfStepping:
 		STA	game + GAME::dirty
 		
 		JSR	gameUpdateMenu
-
+		
 		RTS
 
 
@@ -10013,13 +10611,6 @@ gameGetCardPtrForSquare:
 		STA	$FD
 		LDA	rulesGrpHi, X
 		STA	$FE
-
-
-;***FIXME: 	Is this required?  I don't think so.
-		LDY	#GROUP::count
-		LDA	($FD), Y
-		STA	game + GAME::varG	;prop count in group  ???
-
 
 		LDA	game + GAME::varC	;group index
 		ASL
@@ -10335,10 +10926,19 @@ gameUpdateMenu:
 
 @tstauction:
 		CMP	#$01
-		BNE	@tstlosing
+		BNE	@tstquit
 		
 		LDA 	#<menuPageAuctn0
 		LDY	#>menuPageAuctn0
+		
+		JMP	@update
+		
+@tstquit:
+		CMP	#$09
+		BNE	@tstlosing
+
+		LDA 	#<menuPageQuit2
+		LDY	#>menuPageQuit2
 		
 		JMP	@update
 		
@@ -11309,6 +11909,7 @@ gamePerfTradeStep:
 		LDA	#$00
 		STA	game + GAME::iTrdStp
 		STA	game + GAME::fTrdPhs
+		STA	game + GAME::kWai
 		
 		JSR	gamePerfTradeDeselect
 		
@@ -11593,6 +12194,14 @@ gamePerfTradeIntrpt:
 		
 		JSR	gameUpdateMenu
 
+		LDA	#<$DA18
+		STA	game + GAME::aWai
+		LDA	#>$DA18
+		STA	game + GAME::aWai + 1
+
+		LDA	#$01
+		STA	game + GAME::kWai
+
 		RTS
 		
 		
@@ -11701,6 +12310,7 @@ gamePerfTradeFullTerm:
 
 		LDA	#$00
 		STA	game + GAME::fStpSig
+		STA	game + GAME::kWai
 		
 		JSR	rulesFocusOnActive
 		JSR	gamePlayersDirty
@@ -11734,6 +12344,7 @@ gamePerfTradeFullTerm:
 
 		LDA	#$00
 		STA	game + GAME::fStpSig
+		STA	game + GAME::kWai
 		
 		JSR	rulesFocusOnActive
 		JSR	gamePlayersDirty
@@ -11910,7 +12521,8 @@ gameAmountIsLess:
 ;-------------------------------------------------------------------------------
 		STA	game + GAME::varO
 		STY	game + GAME::varP
-
+		
+gameAmountIsLessDirect:
                 SEC
 		LDA	game + GAME::varD
 		SBC	game + GAME::varO
@@ -12147,15 +12759,15 @@ gameDecMoney100:
 		LDA	plrHi, X
 		STA	$FC
 		
-		LDA	#<2000
+		LDA	#<100
 		STA	game + GAME::varD
-		LDA	#>2000
+		LDA	#>100
 		STA	game + GAME::varE
 		
 		LDX	game + GAME::pActive
 		JSR	rulesSubCash
 		
-		JSR	gameUpdateMenu
+;		JSR	gameUpdateMenu
 		
 		LDA	#$02
 		ORA	game + GAME::dirty
@@ -13299,7 +13911,7 @@ dialogDlgStart0Keys:
 		
 
 dialogDlgStart0Draw:
-		LDX	menuTemp0 + 1
+		LDX	game + GAME::pFirst
 		LDA	plrLo, X
 		STA	$FB
 		LDA	plrHi, X
@@ -17420,9 +18032,25 @@ dialogDlgPStats0Draw:
 		DEX
 		BPL	@loop8
 
-
-;***TODO:	Calc player score
-
+		LDX	menuPlyrSelSelect
+		JSR	gameCalcPlayerScore
+		
+		LDA	game + GAME::varO
+		STA	Z:numConvVALUE
+		LDA	game + GAME::varP
+		STA	Z:numConvVALUE + 1
+		
+		JSR	numConvPRTSGN
+		
+		LDX	#$05
+@loop9:
+		LDA	heap0, X
+		ORA	#$80
+		STA	dialogStrPStats9 + 1, X
+		
+		DEX
+		BPL	@loop9
+		
 
 @disp:
 		LDA	#<dialogWindowSqrInfo0
@@ -18828,10 +19456,21 @@ boardQ3VSqr23:
 ;FOR RULES.S
 ;==============================================================================
 
+rulesScore0:	
+			.byte	1, 2, 5, 7, 15
+rulesScore1:
+			.byte	5, 15, 30, 40, 70
+rulesScore2:
+			.byte	10, 20, 50, 70, 100
+rulesScore3:
+			.byte	20, 35, 80, 110, 180
+
+
 rulesGrp0:
 			.byte	$03
 			.byte	$04
 			.byte	$00
+			.word	$0000
 			.word	rulesCrdCrnr0
 			.word	rulesCrdCrnr1
 			.word	rulesCrdCrnr2
@@ -18840,6 +19479,7 @@ rulesGrp1:
 			.byte	$09
 			.byte	$02
 			.byte	50
+			.word	rulesScore0
 			.word	rulesCrdBrown0
 			.word	rulesCrdBrown1
 			.word	$0000
@@ -18848,6 +19488,7 @@ rulesGrp2:
 			.byte	$0E
 			.byte	$03
 			.byte	50
+			.word	rulesScore0
 			.word	rulesCrdLBlue0
 			.word	rulesCrdLBlue1
 			.word	rulesCrdLBlue2
@@ -18856,6 +19497,7 @@ rulesGrp3:
 			.byte	$04
 			.byte	$03
 			.byte	100
+			.word	rulesScore1
 			.word	rulesCrdPrple0
 			.word	rulesCrdPrple1
 			.word	rulesCrdPrple2
@@ -18864,6 +19506,7 @@ rulesGrp4:
 			.byte	$08
 			.byte	$03
 			.byte	100
+			.word	rulesScore1
 			.word	rulesCrdOrnge0
 			.word	rulesCrdOrnge1
 			.word	rulesCrdOrnge2
@@ -18872,6 +19515,7 @@ rulesGrp5:
 			.byte	$02
 			.byte	$03
 			.byte	150
+			.word	rulesScore2
 			.word	rulesCrdRed0
 			.word	rulesCrdRed1
 			.word	rulesCrdRed2
@@ -18880,6 +19524,7 @@ rulesGrp6:
 			.byte	$07
 			.byte	$03
 			.byte	150
+			.word	rulesScore2
 			.word	rulesCrdYellw0
 			.word	rulesCrdYellw1
 			.word	rulesCrdYellw2
@@ -18888,6 +19533,7 @@ rulesGrp7:
 			.byte	$05
 			.byte	$03
 			.byte	200
+			.word	rulesScore3
 			.word	rulesCrdGreen0
 			.word	rulesCrdGreen1
 			.word	rulesCrdGreen2
@@ -18896,6 +19542,7 @@ rulesGrp8:
 			.byte	$06
 			.byte	$02
 			.byte	200
+			.word	rulesScore3
 			.word	rulesCrdBlue0
 			.word	rulesCrdBlue1
 			.word	$0000
@@ -18904,6 +19551,7 @@ rulesGrp9:
 			.byte	$01
 			.byte	$04
 			.byte	$00
+			.word 	$0000
 			.word	rulesCrdStn0
 			.word	rulesCrdStn1
 			.word	rulesCrdStn2
@@ -18912,6 +19560,7 @@ rulesGrpA:
 			.byte	$01
 			.byte	$02
 			.byte	$00
+			.word	$0000
 			.word	rulesCrdUtil0
 			.word	rulesCrdUtil1
 			.word	$0000
@@ -18920,6 +19569,7 @@ rulesGrpB:
 			.byte	$03
 			.byte	$01
 			.byte	$00
+			.word	$0000
 			.word	rulesCrdChest0
 			.word	$0000
 			.word	$0000
@@ -18928,6 +19578,7 @@ rulesGrpC:
 			.byte	$03
 			.byte	$01
 			.byte	$00
+			.word	$0000
 			.word	rulesCrdChnce0
 			.word	$0000
 			.word	$0000
@@ -18936,6 +19587,7 @@ rulesGrpD:
 			.byte	$03
 			.byte	$02
 			.byte	$00
+			.word	$0000
 			.word	rulesCrdTax0
 			.word	rulesCrdTax1
 			.word	$0000
@@ -19786,8 +20438,8 @@ rulesChanceStrs4:
 			.word	strText5CCCCard0
 rulesChanceStrs5:
 			.word	strDesc0Chance5
-			.word	strDesc1Chance5
-			.word 	strDesc2Chance5
+			.word	strDummyDummy0
+			.word 	strDesc1Chance5
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$00
@@ -19842,8 +20494,8 @@ rulesChanceStrsB:
 			.word	strDummyDummy0
 rulesChanceStrsC:
 			.word	strDesc0ChanceC
-			.word	strDesc1ChanceC
-			.word 	strDesc2ChanceC
+			.word	strDummyDummy0
+			.word 	strDesc1ChanceC
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$00
@@ -19859,15 +20511,15 @@ rulesChanceStrsD:
 rulesChanceStrsE:
 			.word	strDesc0ChanceE
 			.word	strDesc1ChanceE
-			.word 	strDesc2ChanceE
+			.word 	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 rulesChanceStrsF:
 			.word	strDesc0ChanceF
-			.word	strDesc1ChanceF
-			.word 	strDummyDummy0
+			.word	strDummyDummy0
+			.word 	strDesc1ChanceF
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$00
@@ -20290,6 +20942,14 @@ rulesInitStepping:
 		STA	game + GAME::gMode
 		
 		JSR	gameUpdateMenu
+		
+		LDA	#<$DA18
+		STA	game + GAME::aWai
+		LDA	#>$DA18
+		STA	game + GAME::aWai + 1
+
+		LDA	#$01
+		STA	game + GAME::kWai
 		
 		RTS
 
@@ -25046,6 +25706,33 @@ strText0GameOver0:	;PLAYER_1 WINS!
 			.byte $B1, $A0, $97, $89, $8E, $93, $A1
 
 
+strHeaderQuit0:		;QUIT INITIATION
+			.byte $0F, $91, $95, $89, $94, $A0, $89, $8E
+			.byte $89, $94, $89, $81, $94, $89, $8F, $8E
+
+strText0Quit0:		;DO YOU WISH TO
+			.byte $0E, $84, $8F, $A0, $99, $8F, $95, $A0
+			.byte $97, $89, $93, $88, $A0, $94, $8F
+
+strText1Quit0:		;QUIT THE GAME?
+			.byte $0E, $91, $95, $89, $94, $A0, $94, $88
+			.byte $85, $A0, $87, $81, $8D, $85, $BF
+			
+
+strDescQuit1:		;CONFIRM REQUEST
+			.byte $0F, $83, $8F, $8E, $86, $89, $92, $8D
+			.byte $A0, $92, $85, $91, $95, $85, $93, $94
+			
+strText0Quit1:		;ARE YOU SURE?
+			.byte $0D, $81, $92, $85, $A0, $99, $8F, $95
+			.byte $A0, $93, $95, $92, $85, $BF
+			
+
+strHeaderQuit2:		;QUIT REQUESTED
+			.byte $0E, $91, $95, $89, $94, $A0, $92, $85
+			.byte $91, $95, $85, $93, $94, $85, $84
+
+
 strHeaderCCCCard0:	;COMMUNITY CHEST
 			.byte $0F, $83, $8F, $8D, $8D, $95, $8E, $89
 			.byte $94, $99, $A0, $83, $88, $85, $93, $94
@@ -25197,16 +25884,16 @@ strDesc1Chance4:	;CHAIRMAN OF THE BOARD.
 			.byte $16, $83, $88, $81, $89, $92, $8D, $81
 			.byte $8E, $A0, $8F, $86, $A0, $94, $88, $85
 			.byte $A0, $82, $8F, $81, $92, $84, $AE
-strDesc0Chance5:	;ADVANCE TO
-			.byte $0A, $81, $84, $96, $81, $8E, $83, $85
-			.byte $A0, $94, $8F
-strDesc1Chance5:	;PALL MALL.
-			.byte $0A, $90, $81, $8C, $8C, $A0, $8D, $81
-			.byte $8C, $8C, $AE
-strDesc2Chance5:	;YOU MAY COLLECT SALARY.
-			.byte $17, $99, $8F, $95, $A0, $8D, $81, $99
-			.byte $A0, $83, $8F, $8C, $8C, $85, $83, $94
-			.byte $A0, $93, $81, $8C, $81, $92, $99, $AE
+strDesc0Chance5:	;ADVANCE TO:
+			.byte $0B, $81, $84, $96, $81, $8E, $83, $85
+			.byte $A0, $94, $8F, $BA
+strDesc1Chance5:	;  PALL MALL.
+			.byte $0C, $A0, $A0, $90, $81, $8C, $8C, $A0
+			.byte $8D, $81, $8C, $8C, $AE
+;strDesc2Chance5:	;YOU MAY COLLECT SALARY.
+;			.byte $17, $99, $8F, $95, $A0, $8D, $81, $99
+;			.byte $A0, $83, $8F, $8C, $8C, $85, $83, $94
+;			.byte $A0, $93, $81, $8C, $81, $92, $99, $AE
 strDesc0Chance6	=	strDesc0ChestF
 strDesc1Chance6	=	strDesc1ChestF
 strDesc2Chance6	=	strDesc2ChestF
@@ -25236,11 +25923,11 @@ strDesc2ChanceB:	;IF OWNED, PAY 10* DICE.
 			.byte $84, $AC, $A0, $90, $81, $99, $A0, $B1
 			.byte $B0, $AA, $A0, $84, $89, $83, $85, $AE
 strDesc0ChanceC =	strDesc0Chance5
-strDesc1ChanceC:	;TRAFALGAR SQUARE.
-			.byte $11, $94, $92, $81, $86, $81, $8C, $87
-			.byte $81, $92, $A0, $93, $91, $95, $81, $92
-			.byte $85, $AE
-strDesc2ChanceC = 	strDesc2Chance5
+strDesc1ChanceC:	;  TRAFALGAR SQUARE.
+			.byte $13, $A0, $A0, $94, $92, $81, $86, $81
+			.byte $8C, $87, $81, $92, $A0, $93, $91, $95
+			.byte $81, $92, $85, $AE
+;strDesc2ChanceC = 	strDesc2Chance5
 strDesc0ChanceD:	;YOUR BUILDING LOAN
 			.byte $12, $99, $8F, $95, $92, $A0, $82, $95
 			.byte $89, $8C, $84, $89, $8E, $87, $A0, $8C
@@ -25255,11 +25942,11 @@ strDesc1ChanceE:	;KINGS CROSS STATION.
 			.byte $14, $8B, $89, $8E, $87, $93, $A0, $83
 			.byte $92, $8F, $93, $93, $A0, $93, $94, $81
 			.byte $94, $89, $8F, $8E, $AE
-strDesc2ChanceE = 	strDesc2Chance5
+;strDesc2ChanceE = 	strDesc2Chance5
 strDesc0ChanceF =	strDesc0Chance5
-strDesc1ChanceF:	;MAYFAIR.
-			.byte $08, $8D, $81, $99, $86, $81, $89, $92
-			.byte $AE
+strDesc1ChanceF:	;  MAYFAIR.
+			.byte $0A, $A0, $A0, $8D, $81, $99, $86, $81
+			.byte $89, $92, $AE
 
 
 strTitle0Brown0:	;OLD KENT ROAD

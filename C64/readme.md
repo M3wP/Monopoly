@@ -336,7 +336,20 @@ in some games, especially when no trade arrangements can be made.  I
 permit all players to agree to abandon the current game and a winner 
 is declared, by default, based on the score.  Resignations actually do
 not seem to be permitted by the standard rules. I am not permitting 
-them on a player-by-player basis, either.  
+them on a player-by-player basis, either.  Its is calculated by:
+ 
+		  [equity/2] + [money/8] + [#deeds] + 
+		  [#gofree] + (foreach group [(#ingroup - 1)*2]) +
+		  
+		             50 | 100 | 150 | 200 |  for each street deed
+		  1 house |   1 |   5 |  10 |  20 |
+		  2 house |   2 |  15 |  20 |  35 |
+		  3 house |   5 |  30 |  50 |  80 |
+		  4 house |   7 |  40 |  70 | 110 |
+		  1 hotel |  15 |  70 | 100 | 180 | +
+
+		  #stations/2 * 2^#stations + #utilities		???
+
 
 
 ## Further Details
@@ -400,36 +413,22 @@ NTSC/PAL-N version in the future.
 
 ## TODO
 
-* Allow all players to confirm quiting the game - quit request 
-  interrupt!  Use score value to offer a winner (by default) in this 
-  case.  Important but not until other tasks complete.
-
+* Rework play0 menu (put stats and quit on another page).
 * Fix order of buttons on trdsel0 dialog - select, repay, accept, dismiss, money
 * Buzz for more of the failures (gaol, auction, management).  Must do.
 * Backup/retrieve menu button selection going to/returning from dialogs when
   the menu hasn't changed?  Would be nice...
-* Is rent3 SFX still a little lame?  Does it matter?
 * Could now instead of copy name on elimin and gameover dialogs, just refer.
+* Statistics/Overview from trade approval, must pay.  They should work now.
 
-* Add score to PStats dialog - score needed for quit.
-* Score =
- 
-		  [equity/2] + [money/8] + [#deeds] + 
-		  [#gofree] + (foreach group [(#ingroup - 1)*2]) +
-		  
-		             50 | 100 | 150 | 200 |  for each street deed
-		  1 house |   1 |   5 |  10 |  20 |
-		  2 house |   2 |  15 |  20 |  35 |
-		  3 house |   5 |  30 |  50 |  80 |
-		  4 house |   7 |  40 |  70 | 110 |
-		  1 hotel |  15 |  70 | 100 | 180 | +
-
-		  #stations/2 * 2^#stations + #utilities		???
 * Should be able to do beta release state after above
+* Implement autosell?  Complicated.
 * Allow players to input name?
 * Change "all" dirty to be just board dirty and req. individual flags?
 * Back-fit GoatTracker driver changes from version 2.74.
 * Player sprites on overview dialog.  Would look pretty.  IRQ is a mess.
+* Is rent3 SFX still a little lame?  Does it matter?  Are the sounds okay on 
+  Android (where the emulation is terrible)?
 * Properly divide game and rule routines.  How?
 * Put code into separate files as indicated
 * Fix ZPage variable use, in particular active player pointer and IRQ
@@ -441,7 +440,6 @@ NTSC/PAL-N version in the future.
 * Check music/sfx - sometimes does not fire correctly at all (other than
   resource contention issue).  Perhaps fixed by 2.74?  Very rare issue.
 * Implement own keyboard scan, remove dependency on Kernal
-* Implement autosell?  Complicated.
 * Add CPU player?  Should have enough memory if no longer need Kernal.  
   Will be rather difficult to do properly.
 
@@ -452,23 +450,23 @@ NTSC/PAL-N version in the future.
 * Must pay interrupt when not enough cash and having to post bail works 
   and returns correctly?
 * Ensure must pay works correctly for "from all" CCCCard.
+* Must pay works from trade/elimination?
 * Used GO Free cards prevented from appearing in deck until after 
   shuffle (and while owned by a player)
-* Trade5 (warn, haven't looked at approval) dialog shows and then clears 
-  correctly?
-* Statistics/Overview from trade approval, must pay.  Do they work now?
-* Trades aren't permitted when you're in debt.
-* Menu only updates update only menu (auctions)
 * Ensure all options/pages are displayed for all menus.
 
 
 ## Change History (Since Version 0.01.99A)
+* 06JUL2018
+	* Add menus and funtionality to initiate/confirm game quit.
+	* Add player score to PStats dialog.
+	* Calculate player score.
 * 05JUL2018
 	* Rework eliminations.  *Phew!*  The extra layers of interface and
 	  processing makes this an overall increase to the executable size
 	  which I was hoping to keep smaller than it is.
 	* Navigate single cell buttons (money) more intuitively with
-	  joystick. (this was a surprisingly large change).
+	  joystick (this was a surprisingly large change).
 * 04JUL2018
 	* Disable bid (and don't perform) when have insufficient money.
 	* Disable all trade buttons when have negative money.
