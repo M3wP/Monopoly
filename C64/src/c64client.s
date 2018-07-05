@@ -8,16 +8,14 @@
 ;(C) 2018 DANIEL ENGLAND
 ;ALL RIGHTS RESERVED
 ;
-;RELEASED UNDER THE TERMS OF THE GPL VERSION 3 OR GREATER
-;SEE INCLUDED DOCUMENTATION
-;
-;
 ;MONOPOLY IS THE PROPERTY OF HASBRO INC.
 ;(C) 1935, 2016 HASBRO
 ;
 ;
 ;You probably need to own a copy of the official board game to even have this.
 ;*ugh*
+;
+;I feel this is how the game should be played...
 ;
 ;
 ;Please see readme.md for further information.
@@ -178,6 +176,7 @@ JSTKSENS_HIGH	=	9
 		fWntJFB	.byte
 		
 		iSelBtn .byte
+		fSelSgl .byte
 		cHotDly .byte
 		fHotSta	.byte
 		
@@ -238,14 +237,6 @@ JSTKSENS_HIGH	=	9
 		cntHs	.byte
 		cntHt	.byte
 
-		gMdIntr	.byte			;Back up game mode for elimin. 
-		pIntrpt .byte			;Back up player for elimin.
-		
-;***TODO:	These two should no longer be required when have new
-;		elimination menu and dialog
-		fIntrpt .byte			;Elmin. interrupt flags
-		iTrdPrp .byte			;Index of this deed for elmin.
-		
 		fMngmnt	.byte
 		sMngBak .byte
 		
@@ -269,6 +260,9 @@ JSTKSENS_HIGH	=	9
 		pMPyLst	.byte			;Last player to check in mpay
 		pMPyCur	.byte			;Current player checked in mpay
 		
+		gMdElim	.byte			;Back up game mode for elimin. 
+		pElimin .byte			;Back up player for elimin.
+		
 		gMdTrdI .byte			;Back up gmode for trade intrpt
 		pTrdICP	.byte			;Back up player for trade intrpt
 		
@@ -282,7 +276,7 @@ JSTKSENS_HIGH	=	9
 						;1:  Auction
 						;2:  Interrupt (Trade Approve)
 						;3:  Interrupt (Must Pay)
-						;4:  Interrupt (Elimination)
+						;4:  Interrupt (Elimin Xfer)
 						;5:  Game Over
 						;6:  Player stepping (f/e)
 						;7:  Trade selection (f/e)
@@ -1099,6 +1093,10 @@ buttonHi:		.byte 	>button0, >button1, >button2, >button3
 
 screenBtnCnt:
 			.byte	$00
+screenBtnSglSeen:
+			.byte	$00
+screenBtnSglStart:
+			.byte	$00
 
 screenRowsLo:
 			.byte	<$0400, <$0428, <$0450, <$0478, <$04A0
@@ -1194,6 +1192,7 @@ screenResetSelBtn:
 @joystick:
 		LDA	#$00
 		STA	ui + UI::iSelBtn
+		STA	ui + UI::fSelSgl
 		
 		CMP	screenBtnCnt
 		BNE	@findbest
@@ -1201,6 +1200,8 @@ screenResetSelBtn:
 @invalid:
 		LDA	#$FF
 		STA	ui + UI::iSelBtn
+		LDA	#$00
+		STA	ui + UI::fSelSgl
 		
 		RTS
 		
@@ -1209,7 +1210,7 @@ screenResetSelBtn:
 @loop0:
 		TYA
 		PHA
-		
+
 		JSR	screenTestSelBtn
 		BNE	@found
 		
@@ -1232,6 +1233,22 @@ screenResetSelBtn:
 		
 		LDA	#$FF
 		STA	ui + UI::fBtUpd1
+
+		LDX	ui + UI::iSelBtn
+		LDA	buttonLo, X
+		STA	$44
+		LDA	buttonHi, X
+		STA	$45
+
+		LDY	#BUTTON::fType
+		LDA	($44), Y
+		CMP	#$04
+		BNE	@exit
+		
+		LDA	#$01
+		STA	ui + UI::fSelSgl
+
+@exit:
 		RTS
 		
 
@@ -1607,6 +1624,10 @@ screenDrawButton:
 ;-------------------------------------------------------------------------------
 screenPerformList:
 ;-------------------------------------------------------------------------------
+		LDA	#$00
+		STA	screenBtnSglSeen
+
+@start:
 		JSR	screenReadByte
 		
 		CMP	#$00
@@ -1624,70 +1645,70 @@ screenPerformList:
 		BNE	@2
 
 		JSR	screenFillRectM
-		JMP	screenPerformList
+		JMP	@start
 
 @2:
 		CMP	#$02
 		BNE	@3
 
 		JSR	screenFillColHM
-		JMP	screenPerformList
+		JMP	@start
 		
 @3:
 		CMP	#$03
 		BNE	@4
 
 		JSR	screenFillColVM
-		JMP	screenPerformList
+		JMP	@start
 		
 @4:
 		CMP	#$04
 		BNE	@5
 
 		JSR	screenFillLineHM
-		JMP	screenPerformList
+		JMP	@start
 
 @5:
 		CMP	#$05
 		BNE	@6
 
 		JSR	screenFillLineVM
-		JMP	screenPerformList
+		JMP	@start
 
 @6:
 		CMP	#$06
 		BNE	@7
 
 		JSR	screenFillPointsM
-		JMP	screenPerformList
+		JMP	@start
 		
 @7:
 		CMP	#$07
 		BNE	@8
 
 		JSR	screenFillBrushM
-		JMP	screenPerformList
+		JMP	@start
 
 @8:
 		CMP	#$08
 		BNE	@9
 
 		JSR	screenFillPtClrM
-		JMP	screenPerformList
+		JMP	@start
 		
 @9:
 		CMP	#$09
 		BNE	@A
 
 		JSR	screenFillTextM
-		JMP	screenPerformList
+		JMP	@start
 		
 @A:
 		CMP	#$0A
 		BNE	@exit
 		
 		JSR	screenFillButtonM
-		JMP	screenPerformList
+		JMP	@start
 		
 @exit:		
 		RTS
@@ -1940,6 +1961,8 @@ screenFillButtonM:
 						;0 = regular disabled 
 						;1 = regular enabled
 						;2 = regular hidden
+						;3 = footer
+						;4 = single
 						;C = colour visible
 						;D = colour hidden
 						;E = Simple (trd sel dialog)
@@ -1947,6 +1970,19 @@ screenFillButtonM:
 
 		STA	game + GAME::varA
 
+		CMP	#$04
+		BNE	@begin
+		
+		LDA	screenBtnSglSeen
+		BNE	@begin
+		
+		LDA	#$01
+		STA	screenBtnSglSeen
+		
+		LDA	screenBtnCnt
+		STA	screenBtnSglStart
+		
+@begin:
 		JSR 	screenReadByte
 		INX
 		STA	button0, X		;pY
@@ -3399,7 +3435,179 @@ handleHotBlink:
 		STA	ui + UI::fHotSta
 		
 		RTS
+
+
+doHandleJstkSinglesUp:
+		LDA	$34
+		CMP	screenBtnSglStart
+		BPL	@chkleft
 		
+@frombottom:
+		TAX				;***FIXME What is faster?
+		DEX
+		DEX
+		DEX
+		TXA
+		STA	ui + UI::iSelBtn
+		JSR	handleJoystickUpdateUI
+		
+		LDA	#$01
+		RTS
+		
+@chkleft:
+		LDX	screenBtnSglStart
+		INX
+		INX
+		INX
+		STX	$4F
+		CMP	$4F
+		BPL	@frombottom
+		
+		LDA	screenBtnSglStart
+		STA	ui + UI::iSelBtn
+		
+		LDA	#$00
+		STA	ui + UI::fSelSgl
+		RTS
+		
+		
+doHandleJstkSinglesDown:
+		LDA	$34
+		LDX	screenBtnSglStart
+		INX
+		INX
+		INX
+		STX	$4F
+		CMP	$4F
+		BPL	@frombottom
+		
+@fromtop:
+		TAX				;***FIXME What is faster?
+		INX
+		INX
+		INX
+		TXA
+		STA	ui + UI::iSelBtn
+		JSR	handleJoystickUpdateUI
+		
+		LDA	#$01
+		RTS
+		
+@frombottom:
+		CLC
+		LDA	screenBtnSglStart
+		ADC	#$05
+		STA	ui + UI::iSelBtn
+		
+		LDA	#$00
+		STA	ui + UI::fSelSgl
+		RTS
+
+
+doHandleJstkSinglesLeft:
+		LDA	$34
+		LDX	screenBtnSglStart
+		STX	$4F
+		CMP	$4F
+		BNE	@tst1
+		
+		LDA	#$02
+		JMP	@update
+
+@tst1:
+		INC	$4F
+		CMP	$4F
+		BNE	@tst2
+		
+		LDA	#$00
+		JMP	@update
+
+@tst2:
+		INC	$4F
+		CMP	$4F
+		BNE	@tst3
+		
+		LDA	#$01
+		JMP	@update
+
+@tst3:
+		INC	$4F
+		CMP	$4F
+		BNE	@tst4
+		
+		LDA	#$05
+		JMP	@update
+		
+@tst4:
+		INC	$4F
+		CMP	$4F
+		BNE	@5
+		
+		LDA	#$03
+		JMP	@update
+		
+@5:
+		LDA	#$04
+		
+@update:
+		CLC
+		ADC	screenBtnSglStart
+		STA	ui + UI::iSelBtn
+		RTS
+
+
+
+doHandleJstkSinglesRight:
+		LDA	$34
+		LDX	screenBtnSglStart
+		STX	$4F
+		CMP	$4F
+		BNE	@tst1
+		
+		LDA	#$01
+		JMP	@update
+
+@tst1:
+		INC	$4F
+		CMP	$4F
+		BNE	@tst2
+		
+		LDA	#$02
+		JMP	@update
+
+@tst2:
+		INC	$4F
+		CMP	$4F
+		BNE	@tst3
+		
+		LDA	#$00
+		JMP	@update
+
+@tst3:
+		INC	$4F
+		CMP	$4F
+		BNE	@tst4
+		
+		LDA	#$04
+		JMP	@update
+		
+@tst4:
+		INC	$4F
+		CMP	$4F
+		BNE	@5
+		
+		LDA	#$05
+		JMP	@update
+		
+@5:
+		LDA	#$03
+		
+@update:
+		CLC
+		ADC	screenBtnSglStart
+		STA	ui + UI::iSelBtn
+		RTS
+
 
 ;-------------------------------------------------------------------------------
 handleJoystick:
@@ -3444,6 +3652,14 @@ handleJoystick:
 		LDA	JoyUp
 		BEQ	@tstJoyDown
 		
+		LDA	ui + UI::fSelSgl
+		BEQ	@loopUp
+
+		JSR	doHandleJstkSinglesUp
+		BEQ	@loopUp
+		
+		RTS
+
 @loopUp:
 		DEC	ui + UI::iSelBtn
 		LDA	ui + UI::iSelBtn
@@ -3473,7 +3689,15 @@ handleJoystick:
 @tstJoyDown:
 		LDA	JoyDown
 		BEQ	@tstJoyLeft
+
+		LDA	ui + UI::fSelSgl
+		BEQ	@loopDown
+
+		JSR	doHandleJstkSinglesDown
+		BEQ	@loopDown
 		
+		RTS
+
 @loopDown:
 		INC	ui + UI::iSelBtn
 		LDA	ui + UI::iSelBtn
@@ -3498,11 +3722,18 @@ handleJoystick:
 		JMP	@updateUI
 		
 @tstJoyLeft:
-		LDA	ui + UI::fWntJFB
-		BEQ	@tstClick
-		
 		LDA	JoyLeft
 		BEQ	@tstJoyRight
+
+		LDA	ui + UI::fSelSgl
+		BEQ	@joyLeft
+
+		JSR	doHandleJstkSinglesLeft
+		JMP	@updateUI
+
+@joyLeft:
+		LDA	ui + UI::fWntJFB
+		BEQ	@tstClick
 		
 		LDA	#$46
 		JSR	doInjectKey
@@ -3511,6 +3742,16 @@ handleJoystick:
 		
 @tstJoyRight:
 		LDA	JoyRight
+		BEQ	@tstClick
+
+		LDA	ui + UI::fSelSgl
+		BEQ	@joyRight
+
+		JSR	doHandleJstkSinglesRight
+		JMP	@updateUI
+
+@joyRight:
+		LDA	ui + UI::fWntJFB
 		BEQ	@tstClick
 
 		LDA	#$42
@@ -3536,10 +3777,12 @@ handleJoystick:
 		LDA	($32), Y
 		
 		JSR	doInjectKey
-		
+
+@exit:
 		RTS
 
 @updateUI:
+handleJoystickUpdateUI:
 		LDA	#<SFXDING
 		LDY	#>SFXDING
 		LDX	#$07
@@ -3566,8 +3809,23 @@ handleJoystick:
 		LDA	#$01
 		STA	ui + UI::fBtSta1
 
-@exit:
+		LDX	ui + UI::iSelBtn
 
+		LDA	buttonLo, X
+		STA	$44
+		LDA	buttonHi, X
+		STA	$45
+		
+		LDY	#BUTTON::fType
+		
+		LDA	($44), Y
+		CMP	#$04
+		BNE	@exit
+		
+		LDA	#$01
+		STA	ui + UI::fSelSgl
+
+@exit:
 		RTS
 
 ;-------------------------------------------------------------------------------
@@ -5497,6 +5755,11 @@ menuPageTrade6:
 		.word	menuPageTrade6Draw
 		.byte	$01
 		
+menuPageElimin0:
+		.word	menuPageElimin0Keys
+		.word	menuPageElimin0Draw
+		.byte	$01
+		
 menuPagePlyrSel0:
 		.word	menuPagePlyrSel0Keys
 		.word	menuPagePlyrSel0Draw
@@ -5565,12 +5828,6 @@ menuPageSetup8:
 		.word	menuPageSetup8Draw
 		.byte	$01
 		
-		
-;***TODO:	This menu will need rework?
-menuPageIntrpt0:
-		.word	menuPageIntrpt0Keys
-		.word	menuPageIntrpt0Draw
-		.byte	$01
 		
 menuPageMustPay0:
 		.word	menuPageMustPay0Keys
@@ -6808,6 +7065,7 @@ menuWindowPlay0NextB:
 			.word	     	strOptn1Play0
 			.byte	$A1, $0E, $01, $12, $4D, $02, $0E
 			.word	     	strOptn2Play0
+menuWindowPlay0Trd:
 			.byte	$A1, $10, $01, $12, $54, $02, $10
 			.word		strOptn3Play0
 			.byte	$A1, $12, $01, $12, $56, $02, $12
@@ -7030,12 +7288,9 @@ menuPagePlay0Keys:
 
 
 menuPagePlay0Draw:
-		LDA	game + GAME::dieA
+		LDA	game + GAME::dieDbl
 		BEQ	@nodesc
 		
-		CMP	game + GAME::dieB
-		BNE	@nodesc
-			
 		LDA	#<strDescPlay0
 		STA	menuWindowPlay0D
 		LDA	#>strDescPlay0
@@ -7066,11 +7321,18 @@ menuPagePlay0Draw:
 		LDA	#$A0
 		STA	menuWindowPlay0RollB
 		STA	menuWindowPlay0NextB
+		STA	menuWindowPlay0Trd
 		
 		LDY	#PLAYER::money + 1
 		
 		LDA	($FB), Y
-		BMI	@cont
+		BPL	@cantrade
+		
+		JMP	@cont
+		
+@cantrade:
+		LDA	#$A1
+		STA	menuWindowPlay0Trd
 		
 		LDA	game + GAME::cntHs
 		BMI	@cont
@@ -7116,6 +7378,7 @@ menuWindowPlay1BuyB:
 			.word	     	strOptn1Play1
 			.byte	$A1, $0E, $01, $12, $4D, $02, $0E
 			.word	     	strOptn2Play0
+menuWindowPlay1Trd:
 			.byte	$A1, $10, $01, $12, $54, $02, $10
 			.word		strOptn3Play0
 			.byte	$A1, $12, $01, $12, $56, $02, $12
@@ -7197,7 +7460,17 @@ menuPagePlay1Draw:
 		STA	$FB
 		LDA	plrHi, X
 		STA	$FC
+
+		LDA	#$A0
+		STA	menuWindowPlay1Trd
 		
+		LDY	#PLAYER::money + 1
+		BMI	@cont
+
+		LDA	#$A1
+		STA	menuWindowPlay1Trd
+
+@cont:
 		LDY	#PLAYER::square
 		LDA	($FB), Y
 
@@ -7275,7 +7548,8 @@ menuWindowAuctn0:
 			.word		strDummyDummy0
 			.byte	$90, $02, $0C
 			.word	     	strOptn2Auctn0
-			
+
+menuWindowAuctn0Bid:
 			.byte	$A1, $0E, $01, $12, $42, $02, $0E
 			.word	     	strOptn3Auctn0
 			.byte	$A1, $10, $01, $12, $50, $02, $10
@@ -7420,6 +7694,16 @@ menuPageAuctnDefKeys:
 		CMP	#'B'
 		BNE	@keysP
 		
+		LDA	game + GAME::mACurr
+		LDY	game + GAME::mACurr + 1
+		
+;		So, if money less than A, Y - set carry else clear
+		JSR	gamePlayerHasFunds
+		BCC	@beginbid
+		
+		JMP	@keysBuzz
+		
+@beginbid:
 		LDA	game + GAME::pWAuctn	;Has there been a bid?
 		CMP	#$FF
 		BEQ	@dobid			;no, so bid
@@ -7554,6 +7838,23 @@ menuPageAuctn0Keys:
 
 
 menuPageAuctn0Draw:
+		LDA	game + GAME::mACurr
+		LDY	game + GAME::mACurr + 1
+		
+;		So, if money less than A, Y - set carry else clear
+		JSR	gamePlayerHasFunds
+		BCC	@havefunds
+		
+		LDA	#$A0
+		STA	menuWindowAuctn0Bid
+		
+		JMP	@beginbid
+		
+@havefunds:
+		LDA	#$A1
+		STA	menuWindowAuctn0Bid
+
+@beginbid:
 		JSR	screenBeginButtons
 
 		LDA	game + GAME::mACurr
@@ -7587,6 +7888,7 @@ menuWindowAuctn1:
 			.word        	strDescGaol2
 			.byte	$A1, $0A, $01, $12, $4D, $02, $0A
 			.word	     	strOptn2Play0
+menuWindowAuctn1Trd:
 			.byte	$A1, $0C, $01, $12, $54, $02, $0C
 			.word		strOptn3Play0
 			.byte	$A1, $0E, $01, $12, $56, $02, $0E
@@ -7625,6 +7927,22 @@ menuPageAuctn1Keys:
 		
 		
 menuPageAuctn1Draw:
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+
+		LDA	#$A0
+		STA	menuWindowAuctn1Trd
+		
+		LDY	#PLAYER::money + 1
+		BMI	@cont
+
+		LDA	#$A1
+		STA	menuWindowAuctn1Trd
+
+@cont:
 		JSR	screenBeginButtons
 
 		LDA	#<menuWindowAuctn1
@@ -7894,6 +8212,7 @@ menuWindowGaol2:
 			.word        	strDescGaol2
 			.byte	$A1, $0A, $01, $12, $4D, $02, $0A
 			.word	     	strOptn2Play0
+menuWindowGaol2Trd:
 			.byte	$A1, $0C, $01, $12, $54, $02, $0C
 			.word		strOptn3Play0
 			.byte	$A1, $0E, $01, $12, $56, $02, $0E
@@ -7932,6 +8251,22 @@ menuPageGaol2Keys:
 		
 		
 menuPageGaol2Draw:
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+
+		LDA	#$A0
+		STA	menuWindowGaol2Trd
+		
+		LDY	#PLAYER::money + 1
+		BMI	@cont
+
+		LDA	#$A1
+		STA	menuWindowGaol2Trd
+
+@cont:
 		JSR	screenBeginButtons
 
 		LDA	#<menuWindowGaol2
@@ -8008,131 +8343,6 @@ menuPageGaol3Draw:
 		
 		RTS
 	
-
-;***TODO:	This menu will require rework?
-menuWindowIntrpt0:
-			.byte	$90, $01, $07
-			.word	     	strHeaderIntrpt0
-			.byte	$90, $01, $08
-			.word        	strDescIntrpt0
-			.byte	$90, $01, $0A
-			.word	     	strText0Intrpt0
-			.byte	$90, $01, $0B
-			.word	     	strText1Intrpt0
-			.byte	$90, $01, $0D
-			.word		strText2Intrpt0
-			.byte	$A1, $0F, $01, $12, $41, $02, $0F
-			.word	     	strOptn0Intrpt0
-			.byte	$A1, $11, $01, $12, $42, $02, $11
-			.word		strOptn1Intrpt0
-	
-			.byte	$00
-
-
-menuPageIntrpt0Keys:
-		CMP	#'A'
-		BNE	@keyB
-
-		LDX	game + GAME::sSelect
-		JSR	gameGetCardPtrForSquare
-		
-		LDY	#DEED::mFee
-		LDA	($FD), Y
-		STA	game + GAME::varD
-		INY
-		LDA	($FD), Y
-		STA	game + GAME::varE
-
-		LDY	#DEED::mValue
-		CLC
-		LDA	($FD), Y
-		ADC	game + GAME::varD
-		STA	game + GAME::varD
-		STA	game + GAME::varH
-		INY
-		LDA	($FD), Y
-		ADC	game + GAME::varE
-		STA	game + GAME::varE
-		STA	game + GAME::varI
-
-		LDA	game + GAME::varD
-		LDY	game + GAME::varE
-		
-;		So, if money less than A, Y - set carry else clear
-		JSR	gamePlayerHasFunds
-		BCS	@buzz
-
-		JSR	rulesAcceptMortgage
-		JSR	gameUpdateMenu
-		JMP	@done
-		
-@keyB:
-		CMP	#'B'
-		BNE	@keysM
-		
-		LDX	game + GAME::sSelect
-		JSR	gameGetCardPtrForSquare
-		
-		LDY	#DEED::mFee
-		LDA	($FD), Y
-		STA	game + GAME::varD
-		INY
-		LDA	($FD), Y
-		STA	game + GAME::varE
-
-		LDA	game + GAME::varD
-		LDY	game + GAME::varE
-		
-;		So, if money less than A, Y - set carry else clear
-		JSR	gamePlayerHasFunds
-		BCS	@buzz
-		
-		JSR	rulesAcceptFee
-		JSR	gameUpdateMenu
-		JMP	@done
-		
-@keysM:
-		CMP	#'M'
-		BNE	@keysV
-		
-		JSR	gameToggleManage
-		JMP	@done
-@keysV:
-		CMP	#'V'
-		BNE	@exit
-		
-		JSR	gameToggleDialog
-
-@done:
-		LDA	#<SFXDING
-		LDY	#>SFXDING
-		LDX	#$07
-		JSR	SNDBASE + 6
-		
-@exit:
-		RTS
-
-@buzz:
-		LDA	#<SFXBUZZ
-		LDY	#>SFXBUZZ
-		LDX	#$07
-		JSR	SNDBASE + 6
-
-		RTS
-		
-
-menuPageIntrpt0Draw:
-		JSR	screenBeginButtons
-
-		LDA	#<menuWindowIntrpt0
-		STA	$FD
-		LDA	#>menuWindowIntrpt0
-		STA	$FE
-		
-		JSR	screenPerformList
-
-		RTS
-
 
 menuWindowMustPay0:	
 			.byte	$90, $01, $07
@@ -8604,6 +8814,7 @@ menuPageTrade0Keys:
 		BNE	@keysO
 		
 		LDA	#$00
+		STA	dialogTrdSelDoElimin
 		STA	dialogTrdSelDoApprv
 		
 		LDA	#$01
@@ -8623,6 +8834,7 @@ menuPageTrade0Keys:
 		STA	menuWindowTradeCanConf
 		
 		LDA	#$00
+		STA	dialogTrdSelDoElimin
 		STA	dialogTrdSelDoApprv
 		STA	dialogTrdSelDoRepay
 		
@@ -8960,6 +9172,7 @@ menuPageTrade1Keys:
 		STA	dialogTrdSelDoApprv
 	
 		LDA	#$00
+		STA	dialogTrdSelDoElimin
 		STA	dialogTrdSelDoRepay
 		
 		LDA	#$00
@@ -8970,6 +9183,9 @@ menuPageTrade1Keys:
 @keysO:	
 		CMP	#'O'
 		BNE	@keysX
+		
+		LDA	#$00
+		STA	dialogTrdSelDoElimin
 		
 		LDA	#$01
 		STA	dialogTrdSelDoApprv
@@ -8986,7 +9202,7 @@ menuPageTrade1Keys:
 
 		LDA	#$00
 		STA	game + GAME::fTrdTyp
-		JSr	gamePerfTradeFullTerm
+		JSR	gamePerfTradeFullTerm
 
 		JMP	@keysDing
 		
@@ -9028,15 +9244,23 @@ menuWindowTrade6:
 			.byte	$90, $02, $0B
 			.word		strText1Trade6
 
-			.byte	$AF, $0D, $01, $12, $20, $03, $0D
+			.byte	$AF, $0D, $01, $12, $20, $02, $0D
 			.word	     	strDesc7Titles0
 
 			.byte	$00
 
 
 menuPageTrade6Keys:
-		LDA	#<SFXNUDGE
-		LDY	#>SFXNUDGE
+		LDA	game + GAME::fTrdTyp
+		BEQ	@proc
+		
+		LDA	game + GAME::fTrdStg
+		CMP	#$02
+		BEQ	@exit
+
+@proc:
+		LDA	#<SFXDING
+		LDY	#>SFXDING
 		LDX	#$07
 		JSR	SNDBASE + 6
 		
@@ -9045,6 +9269,7 @@ menuPageTrade6Keys:
 		
 		JSR	gamePerfTradeFullCont
 
+@exit:
 		RTS
 		
 
@@ -9057,6 +9282,226 @@ menuPageTrade6Draw:
 		STA	$FE
 		
 		JSR	screenPerformList
+		RTS
+
+
+menuElimin0HaveOffer:
+		.byte	$00
+
+
+menuElimin0RemWlthRecalc:
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDY	#PLAYER::money
+		LDA	($FB), Y
+		STA	menuTrade0RemWealth
+		INY
+		LDA	($FB), Y
+		STA	menuTrade0RemWealth + 1
+		LDA	#$00
+		STA	menuTrade0RemWealth + 2
+		
+		LDY	#PLAYER::equity
+		CLC
+		LDA	($FB), Y
+		ADC	menuTrade0RemWealth
+		STA	menuTrade0RemWealth
+		INY
+		LDA	($FB), Y
+		ADC	menuTrade0RemWealth + 1
+		STA	menuTrade0RemWealth + 1
+		LDA	#$00
+		ADC	menuTrade0RemWealth + 2
+		STA	menuTrade0RemWealth + 2
+
+		RTS
+
+
+menuWindowElimin0:
+			.byte	$90, $01, $07
+			.word	     strHeaderElimin0
+
+			.byte	$A1, $0A, $01, $12, $50, $02, $0A
+			.word	     strOptn0Trade0
+			.byte	$A1, $0E, $01, $12, $4F, $02, $0E
+			.word	     strOptn2Trade0
+			.byte	$A1, $10, $01, $12, $43, $02, $10
+			.word	     strOptn3Trade0
+
+			.byte	$00
+		
+		
+menuPageElimin0SetAuctn:
+		LDY	#TRADE::player
+		LDA	trade1, Y
+		STA	game + GAME::varA
+		
+		LDY	#TRADE::cntDeed
+		LDA	trade1, Y
+		STA	game + GAME::varC
+		
+		LDX	#$00
+		STX	game + GAME::varB
+@loop:
+		LDA	sqr00, X
+		CMP	game + GAME::varA
+		
+		BNE	@next
+		
+		LDA	game + GAME::varC
+		BEQ	@notfound
+
+		LDY	#$00
+@loop0:
+		LDA	trdprp1, Y
+		
+		CMP	game + GAME::varB
+		BEQ	@found
+		
+		INY
+		CPY	game + GAME::varC
+		BNE	@loop0
+		
+@notfound:
+		LDA	#$00
+		STA	sqr00 + 1, X
+		LDA	#$FF
+		STA	sqr00, X
+
+		LDY	#TRADE::cntDeed
+		LDA	trade0, Y
+		TAY
+
+		LDA	game + GAME::varB
+		STA	trdprp0, Y
+		
+		INY
+		TYA
+		LDY	#TRADE::cntDeed
+		STA	trade0, Y
+
+		JMP	@next
+
+@found:
+
+
+@next:
+		INC	game + GAME::varB
+		INX
+		INX
+		CPX	#$50
+		BNE	@loop
+		
+		RTS
+			
+			
+menuPageElimin0Keys:
+		CMP	#'P'
+		BNE	@keysO
+
+		LDY	#TRADE::player
+		LDA	trade0, Y
+		STA	dialogTempTrade7P
+		
+		LDA 	#<dialogDlgTrade7
+		LDY	#>dialogDlgTrade7
+		
+		JSR	dialogSetDialog
+		JSR	dialogDispDefDialog
+
+		JMP	@keysDing
+
+@keysO:	
+		CMP	#'O'
+		BNE	@keysC
+		
+		LDA	#$01
+		STA	menuElimin0HaveOffer
+		
+		LDA	#$00
+		STA	dialogTrdSelDoApprv
+		STA	dialogTrdSelDoRepay
+		
+		LDA	#$01
+		STA	dialogTrdSelDoElimin
+		JSR	gameInitTrdSelector
+		
+		JMP	@keysDing
+		
+@keysC:
+		CMP	#'C'
+		BNE	@keysExit
+		
+		LDA	menuElimin0HaveOffer
+		BNE	@tstproc
+
+		LDA 	#<dialogDlgElimin1
+		LDY	#>dialogDlgElimin1
+		
+		JSR	dialogSetDialog
+		JSR	dialogDispDefDialog
+
+		JSR	gamePlayersDirty
+		RTS
+
+@tstproc:
+		LDA	menuTrade0RemWealth + 2
+		BPL	@proc
+		
+		LDA 	#<dialogDlgTrade2
+		LDY	#>dialogDlgTrade2
+		
+		JSR	gameInitTrdFail0
+		JMP	@keysBuzz
+		
+@proc:
+		JSR 	menuPageElimin0SetAuctn
+		
+		LDA	#$01
+		STA	game + GAME::fTrdTyp
+		
+;***FIXME:	Do I need to change game + GAME::pActive?
+		
+		LDA	game + GAME::fDoJump
+		BEQ	@stepping
+
+		JSR	gamePerfTradeFull
+		JMP	@keysDing
+		
+@stepping:
+		JSR	gamePerfTradeIntrpt
+		
+@keysDing:
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
+@keysExit:
+		RTS
+		
+@keysBuzz:
+		LDA	#<SFXBUZZ
+		LDY	#>SFXBUZZ
+		LDX	#$07
+		JSR	SNDBASE + 6
+		RTS
+
+
+menuPageElimin0Draw:
+		JSR	screenBeginButtons
+
+		LDA	#<menuWindowElimin0
+		STA	$FD
+		LDA	#>menuWindowElimin0
+		STA	$FE
+		
+		JSR	screenPerformList
+		
 		RTS
 
 
@@ -9295,7 +9740,7 @@ menuWindowJump0:
 			.byte	$90, $02, $0B
 			.word		strText1Jump0
 
-			.byte	$AF, $0D, $01, $12, $20, $03, $0D
+			.byte	$AF, $0D, $01, $12, $20, $02, $0D
 			.word	     	strDesc7Titles0
 
 			.byte	$00
@@ -9594,20 +10039,6 @@ gameGetCardPtrForSquare:
 		
 
 ;-------------------------------------------------------------------------------
-gamePlyrSwitchBankDlg:
-;***TODO:	Probably won't need this after rework or at least, this will
-;		need to be reworked as well.
-;-------------------------------------------------------------------------------
-		LDA 	#<dialogDlgIntrpt1
-		LDY	#>dialogDlgIntrpt1
-		
-		JSR	dialogSetDialog
-		JSR	dialogDispDefDialog
-		
-		RTS
-		
-	
-;-------------------------------------------------------------------------------
 gameContinueAfterPost:
 ;-------------------------------------------------------------------------------
 		LDY	#PLAYER::status
@@ -9795,109 +10226,6 @@ gameRestoreFromMustPay:
 		
 
 ;-------------------------------------------------------------------------------
-gamePerfEliminStep:
-;-------------------------------------------------------------------------------
-		TAX					;Next prop to X
-
-		LDA	game + GAME::fIntrpt		;Get interrupt state
-		BEQ	@doplayer0			;Lost to other player
-		
-		CMP	#$01				;Lost to Bank and 
-		BEQ	@doauction			;auctioning?
-
-		LDX 	game + GAME::iTrdPrp 		;Switching to bank after 
-		JMP	@doauction1			;player
-
-@doplayer0:
-		LDA	trdprp0, X
-		PHA
-
-		JSR	gameGetCardPtrForSquare
-
-		LDY	#DEED::mFee			;I'm assuming it is a deed
-		LDA	($FD), Y
-		STA	game + GAME::varD
-		INY
-		LDA	($FD), Y
-		STA	game + GAME::varE
-		
-		LDA	game + GAME::varD
-		LDY	game + GAME::varE
-		
-;		So, if wealth less than A, Y - set carry else clear
-		JSR	gamePlayerHasWealth
-		
-		BCC	@doplyrelimin01
-		
-;		Need to reset mortgage state from this point on and switch to 
-;		auction
-		PLA					;fix stack
-		
-		TXA					;remember current index
-		PHA
-
-		LDA	#$02
-		STA	game + GAME::fIntrpt		;switch to loss to bank (auctions)
-		
-@switchlp0:						;reset rest squares imprv state
-		LDA	trdprp0, X
-		ASL
-		TAY
-		LDA	#$00
-		STA	sqr00 + 1, Y
-
-		INX
-		CPX	trade0 + TRADE::cntDeed
-		BNE	@switchlp0
-
-		PLA					;recall curr index
-		TAX
-		
-		STX 	game + GAME::iTrdPrp
-		JSR	gamePlyrSwitchBankDlg
-		
-		RTS
-		
-@doplyrelimin01:
-		LDA	#<menuPageIntrpt0
-		LDY	#>menuPageIntrpt0
-		JSR	menuSetPage
-		
-		PLA
-		PHA
-		JSR	gameSelect
-
-		PLA
-		LDX	#$00
-		JSR	rulesCalcQForSquare
-		
-		CMP	game + GAME::qVis
-		BEQ	@peliminskipv
-		
-		STA	game + GAME::qVis
-
-		JSR	gamePlayersDirty
-		
-@peliminskipv:
-		LDA	#$01
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty
-
-		RTS
-
-@doauction:
-		INC	game + GAME::iTrdPrp
-		
-@doauction1:
-		LDA	trdprp0, X
-		STA	game + GAME::sAuctn
-		LDX	#$01
-		JSR	gameStartAuction		
-
-		RTS
-
-
-;-------------------------------------------------------------------------------
 gamePerfGameOver:
 ;-------------------------------------------------------------------------------
 		LDA 	#<dialogDlgGameOver0
@@ -9967,35 +10295,19 @@ gameUpdateMenu:
 
 @tstGameOver:
 		CMP	#$05
-		BNE	@tstelimin0
+		BNE	@tstelimin
 
 		JSR	gamePerfGameOver		;game mode 5 
 		RTS
 
-@tstelimin0:
+@tstelimin:
 		CMP	#$04				;Elimin. interrupt?
-		BEQ	@tstelimin0proc
+		BNE	@tstmustpay
 		
-		JMP	@tstmustpay
-		
-@tstelimin0proc:
-		LDA	game + GAME::iTrdPrp
-		CMP	trade0 + TRADE::cntDeed
-		BNE	@doelimin0
-		
-		LDA	game + GAME::gMdIntr		;Elimin. over, resume
-		STA	game + GAME::gMode
-		LDA	game + GAME::pIntrpt
-		STA	game + GAME::pActive
-		
-		JSR	rulesFocusOnActive
-				
-		JMP	@tstlosing
-		
-@doelimin0:
-		JSR	gamePerfEliminStep		;Game mode 4 
-		
-		RTS
+		LDA	#<menuPageElimin0			;game mode 4
+		LDY	#>menuPageElimin0
+
+		JMP	@update
 		
 @tstmustpay:
 		CMP	#$03
@@ -10809,6 +11121,7 @@ gameInitTrdIntrpt:
 		RTS
 		
 @initiate:
+gameInitTrdIntrptDirect:
 		LDA	game + GAME::pActive
 		STA	game + GAME::pTrdICP
 		
@@ -10864,10 +11177,16 @@ gameApproveTrade:
 		LDA	game + GAME::fDoJump
 		BEQ	@stepping
 
+		LDA	#$00
+		STA	game + GAME::fTrdTyp
+		
 		JSR	gamePerfTradeFull
 		RTS
 		
 @stepping:
+		LDA	#$00
+		STA	game + GAME::fTrdTyp
+		
 		JSR	gamePerfTradeIntrpt
 
 		RTS
@@ -10972,16 +11291,30 @@ gamePerfTradeStep:
 		STA	game + GAME::fTrdPhs
 		
 		LDA	game + GAME::fTrdTyp
-		BNE	@stage0term
+		BNE	@stage0elimin
 		
 		LDA	#$01
 		STA	game + GAME::fTrdStg
 		
 		RTS
 		
+@stage0elimin:
+		LDY	#TRADE::cntDeed
+		LDA	trade0, Y
+		BEQ	@stage0term
+		
+		LDA	#$02
+		STA	game + GAME::fTrdStg
+		
+		LDA	#$00
+		STA	game + GAME::iTrdStp
+		STA	game + GAME::fTrdPhs
+		
+		JSR	gamePerfTradeDeselect
+		
+		RTS
+		
 @stage0term:
-;***TODO:	This should actually switch to auction stage
-;		- else stage $FF
 		LDA	#$FF
 		STA	game + GAME::fTrdStg
 		
@@ -11088,8 +11421,34 @@ gamePerfTradeStep:
 
 ;		check if doing stage 2 - auction 
 @tststage2:
-;***TODO:	auction stepping for elimin. xfer.
+		LDY	#TRADE::cntDeed
+		LDA	trade0, Y
+		CMP	game + GAME::iTrdStp
+		BEQ	@stage2done	
 
+		LDY	game + GAME::iTrdStp
+		LDA	trdprp0, Y
+		STA	game + GAME::sAuctn
+
+		INC	game + GAME::iTrdStp
+
+		LDY	#TRADE::player
+		LDA	trade0, Y
+		STA	game + GAME::pActive
+		LDA	#$FF
+		STA	game + GAME::pLast
+
+		JSR	rulesDoNextPlyr
+
+		LDX	#$01
+		JSR	gameStartAuction
+		
+		RTS
+
+@stage2done:
+		LDA	#$FF
+		STA	game + GAME::fTrdStg
+		
 		RTS
 
 
@@ -11103,6 +11462,8 @@ gamePerfTradeFocus:
 		
 		LDA	game + GAME::fTrdInt
 		BEQ	@exit
+		
+		JSR	gamePerfTradeDeselect
 		
 		LDA	game + GAME::varA
 		JSR	gameSelect
@@ -11133,8 +11494,8 @@ gamePerfTradeFocus:
 ;-------------------------------------------------------------------------------
 gamePerfTradeDeselect:
 ;-------------------------------------------------------------------------------
-		LDA	game + GAME::fTrdInt
-		BEQ	@exit
+;		LDA	game + GAME::fTrdInt
+;		BEQ	@exit
 		
 		LDA	game + GAME::sSelect
 		CMP	#$FF
@@ -11205,7 +11566,7 @@ gamePerfTradeIntrpt:
 		STA	game + GAME::fTrdStg
 		STA	game + GAME::iTrdStp 
 		STA	game + GAME::fTrdPhs
-		STA	game + GAME::fTrdTyp
+;		STA	game + GAME::fTrdTyp
 		
 		LDA	#$01
 		STA	game + GAME::fTrdInt		
@@ -11296,7 +11657,7 @@ gamePerfTradeFull:
 		STA	game + GAME::fTrdStg
 		STA	game + GAME::iTrdStp 
 		STA	game + GAME::fTrdPhs
-		STA	game + GAME::fTrdTyp
+;		STA	game + GAME::fTrdTyp
 		STA	game + GAME::fTrdInt
 
 		JSR	gamePerfTradeMoney
@@ -11305,18 +11666,31 @@ gamePerfTradeFullCont:
 
 @loop:
 		JSR	gamePerfTradeStep
-		
+
 		LDA	game + GAME::fTrdStg
+		
+		CMP	#$02
+		BNE	@tstnext
+	
+		LDA	#$01
+		STA	game + GAME::fTrdInt
+		
+;***FIXME:	What else do I need to do to go back to interactive?
+;***TODO:	Go back to interactive stepping for auctions??
+		
+		RTS
+
+@tstnext:
 		CMP	#$FF
 		BNE	@loop
 	
 gamePerfTradeFullTerm:	
 		JSR	gamePerfTradeDeselect
 		
-;		Pop player and mode from trade 
 		LDA	game + GAME::fTrdTyp
 		BNE	@endelimin
 
+;		Pop player and mode from trade 
 		LDA	game + GAME::pTrdICP
 		STA	game + GAME::pActive
 		LDA	#$FF
@@ -11349,15 +11723,13 @@ gamePerfTradeFullTerm:
 		RTS
 
 @endelimin:
-		LDA	game + GAME::pIntrpt
-		
-;***TODO:	Set elimin. player not active status here?
+		LDA	game + GAME::pElimin
 		
 		STA	game + GAME::pActive
 		LDA	#$FF
 		STA	game + GAME::pLast
 		
-		LDA	game + GAME::gMdIntr
+		LDA	game + GAME::gMdElim
 		STA	game + GAME::gMode
 
 		LDA	#$00
@@ -11372,14 +11744,21 @@ gamePerfTradeFullTerm:
 		
 		JSR	gamePerfTradeChkAllMPay	
 		
-		JSR	gameUpdateMenu
+		LDA	game + GAME::gMode
+		CMP	#$03
+		BEQ	@complete
+		
+		JSR	rulesDoNextPlyr
+		JMP	@complete
+		
 		
 @alreadympay:
 		LDA	game + GAME::pActive	;Check them all again
 		STA	game + GAME::pMstPyI
 
 		STA	game + GAME::pMPyLst
-		
+
+@complete:
 		JSR	gameUpdateMenu
 		
 		RTS
@@ -11768,13 +12147,15 @@ gameDecMoney100:
 		LDA	plrHi, X
 		STA	$FC
 		
-		LDA	#100
+		LDA	#<2000
 		STA	game + GAME::varD
-		LDA	#$00
+		LDA	#>2000
 		STA	game + GAME::varE
 		
 		LDX	game + GAME::pActive
 		JSR	rulesSubCash
+		
+		JSR	gameUpdateMenu
 		
 		LDA	#$02
 		ORA	game + GAME::dirty
@@ -12259,6 +12640,11 @@ dialogDlgElimin0:
 		.word	dialogDlgElimin0Draw
 		.byte	$01
 	
+dialogDlgElimin1:
+		.word	dialogDefKeys
+		.word	dialogDlgElimin1Draw
+		.byte	$01
+		
 dialogDlgGameOver0:
 		.word	dialogDlgGameOver0Keys
 		.word	dialogDlgGameOver0Draw
@@ -12309,13 +12695,6 @@ dialogDlgTrade7:
 		.word	dialogDlgTrade7Draw
 		.byte	$01
 		
-
-;***TODO:	This dialog will no longer be required after xfer rework.
-dialogDlgIntrpt1:
-		.word	dialogDlgIntrpt1Keys
-		.word	dialogDlgIntrpt1Draw
-		.byte	$00
-
 
 ;-------------------------------------------------------------------------------
 dialogSetDialog:
@@ -13121,6 +13500,9 @@ dialogDlgElimin0Keys:
 		RTS
 		
 dialogDlgElimin0Draw:
+;***TODO:	Make this message more informative - did they lose
+;		to another player (which) or to the bank.
+
 		LDX	dialogTempElimin0P
 		LDA	plrLo, X
 		STA	$FB
@@ -13149,85 +13531,28 @@ dialogDlgElimin0Draw:
 		RTS
 
 
-;***TODO:	This dialog will no longer be required so reuse it for
-;		one of the warning dialogs?
-
-dialogWindowIntrpt1:		
-			.byte	$13, $08, $05, $18, $0C
-			.byte	$46, $07, $04, $19
-			.byte	$47, $08, $11, $18
-			.byte	$56, $07, $05, $0D
-			.byte	$57, $20, $05, $0D
-			.byte	$6A, $20, $04, $07, $11, $FF
-			
-			.byte	$2B, $07, $04, $19
-			.byte	$2B, $08, $11, $18
-			.byte	$3B, $07, $05, $0D
-			.byte	$3B, $20, $05, $0D
-			
+dialogWindowElimin1:
 			.byte	$90, $09, $06
-			.word		strHeaderIntrpt1
+			.word		strHeaderElimin1
+			.byte	$90, $09, $07
+			.word		strDescElimin1
 			
 			.byte	$90, $09, $09
-			.word		strText0Intrpt1
+			.word		strText0Elimin1
 			.byte	$90, $09, $0A
-dialogWindowIntrpt1T0:			
-			.word		strDummyDummy0
-			.byte	$90, $09, $0B
-dialogWindowIntrpt1T1:			
-			.word		strDummyDummy0
-			.byte	$90, $09, $0C
-			.word		strText1Intrpt1
-			.byte	$90, $09, $0D
-			.word		strText2Intrpt1
-			
-			.byte 	$AF, $0F, $0B, $1E, $20, $0D, $0F
-			.word		strDesc7Titles0
+			.word		strText1Elimin1
 
-			.byte	$21, $08, $06, $18
-			.byte	$23, $08, $07, $18
-			.byte	$21, $08, $0F, $18
-			
 			.byte	$00
 
 
-dialogDlgIntrpt1Keys:
-		JSR	dialogDefKeys
-		
-		JSR	gameUpdateMenu
-		
-		RTS
-
-
-dialogDlgIntrpt1Draw:
-		LDX	game + GAME::iTrdPrp
-		LDA	trdprp0, X
-		JSR	gameGetCardPtrForSquare
-
-		LDY	#CARD::sTitle0
-		LDA	($FD), Y
-		STA	dialogWindowIntrpt1T0
-		INY
-		LDA	($FD), Y
-		STA	dialogWindowIntrpt1T0 + 1
-		INY
-		
-		LDA	($FD), Y
-		STA	dialogWindowIntrpt1T1
-		INY
-		LDA	($FD), Y
-		STA	dialogWindowIntrpt1T1 + 1
-		
-		JSR	screenBeginButtons
-		
-		LDA	#<dialogWindowIntrpt1
+dialogDlgElimin1Draw:
+		LDA	#<dialogWindowElimin1
 		STA	$FD
-		LDA	#>dialogWindowIntrpt1
+		LDA	#>dialogWindowElimin1
 		STA	$FE
 		
 		JSR	screenPerformList
 		
-		JSR	screenResetSelBtn
 		RTS
 
 
@@ -14481,6 +14806,8 @@ dialogWindowTrdSel0:
 			.byte	$90, $05, $0A		;Rem wealth lbls
 			.word		strText4TrdSel0	
 
+
+;***TODO:		Move these into another display data
 							;Cash btns
 			.byte	$A4, $07, $08, $09, $55, $08, $07
 			.word		strDummyDummy0
@@ -14509,7 +14836,9 @@ dialogWindowTrdSel0:
 			.word		strOptn3TrdSel0
 			.byte	$AE, $13, $1C, $23, $44, $1C, $13
 			.word		strOptn4TrdSel0
-			
+
+
+;***TODO:		Move these into other display data
 			.byte	$2C, $05, $05, $06	;Cash lbl + $ 
 			.byte	$2F, $05, $06, $06	
 			
@@ -14539,6 +14868,7 @@ dialogWindowTrdSel2:
 			.byte	$AE, $0F, $1C, $22, $53, $1C, $0F
 			.word		strOptn2TrdSel0
 
+;***TODO:		Move these into other display data
 			.byte	$90, $05, $07		;Cash btn lbls
 			.word		strText1TrdSel0
 			.byte	$90, $05, $08
@@ -14605,6 +14935,8 @@ dialogBakupTrdSelRep:
 			.byte	$E7, $E7, $E7, $E7, $E7, $E7, $E7, $F7
 			.byte	$F7, $F7, $F7, $F7, $F7, $F7, $F7, $F7
 
+dialogTrdSelDoElimin:
+		.byte	$00
 dialogTrdSelDoApprv:
 		.byte	$00
 dialogTrdSelDoRepay:
@@ -14806,7 +15138,10 @@ doDialogTrdSelTstRfndFee:
 		
 		LDA	dialogTrdSelDoRepay	;Is wanting?  Check fees
 		BNE	@wanted	
-		
+
+		LDA	dialogTrdSelDoElimin	;Is elimination, Check fees
+		BNE	@wanted
+
 		LDA	trdrep2, X
 		AND	#$80
 		BEQ	@rfndequity
@@ -15095,10 +15430,14 @@ doDialogTrdSelToggle:
 		LDA	game + GAME::varO	;Get the mortgage info 
 		LDX	game + GAME::sTrdSel	;Store in trade repay info
 		STA	trdrep2, X
-		
+	
+		LDA	dialogTrdSelDoElimin
+		BNE	@repay
+
 		LDA	dialogTrdSelDoRepay	;Is offering?  Check for sub
 		BEQ	@dooffer		;equity
 		
+@repay:
 		LDA	game + GAME::varO	;Need to LDA again for flags
 		AND	#$80			;Is mrtg? 
 		BNE	@dowantfee
@@ -15735,9 +16074,13 @@ dialogDlgTrdSel0Keys:
 		JMP	@keysExit
 		
 @keysR:
+		LDX	dialogTrdSelDoElimin
+		BNE	@tstR
+
 		LDX	dialogTrdSelDoRepay
 		BEQ	@keysD
 		
+@tstR:
 		CMP	#'R'
 		BNE	@keysD
 
@@ -15974,9 +16317,13 @@ dialogDlgTrdSel0Draw:
 		JSR	screenPerformList
 
 @skipRepay:
+		LDA	dialogTrdSelDoElimin
+		BNE	@doRepay
+
 		LDA	dialogTrdSelDoApprv
 		BNE	@approv
 		
+@doRepay:
 		LDA	#<dialogWindowTrdSel2
 		STA	$FD
 		LDA	#>dialogWindowTrdSel2
@@ -23098,79 +23445,6 @@ rulesBuyTitleDeed:
 
 
 ;-------------------------------------------------------------------------------
-rulesAcceptMortgage:
-;-------------------------------------------------------------------------------
-		LDX	game + GAME::iTrdPrp
-		LDA	trdprp0, X
-		PHA
-		TAX
-		LDY	#$01
-		JSR	rulesBuyTitleDeed
-
-		JSR 	rulesToggleMrtg
-
-		PLA
-		JSR	gameDeselect
-
-		INC	game + GAME::iTrdPrp
-		
-		RTS
-
-
-;-------------------------------------------------------------------------------
-rulesAcceptFee:
-;-------------------------------------------------------------------------------
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
-		LDX	game + GAME::iTrdPrp
-		LDA	trdprp0, X
-		PHA
-		TAX
-		LDY	#$01
-		JSR	rulesBuyTitleDeed
-
-		PLA
-		PHA
-
-		JSR	gameGetCardPtrForSquare
-
-		LDY	#DEED::mFee
-		LDA	($FD), Y
-		STA	game + GAME::varD
-		INY
-		LDA	($FD), Y
-		STA	game + GAME::varE
-
-		LDX	game + GAME::pActive
-		JSR	rulesSubCash		
-
-		LDY	#PLAYER::colour
-		LDA	($FB), Y
-		TAX
-		JSR	prmptRepay
-		
-		PLA
-		JSR	gameDeselect
-		
-		INC	game + GAME::iTrdPrp
-		
-		LDA	#<SFXRENT1
-		LDY	#>SFXRENT1
-		LDX	#$07
-		JSR	SNDBASE + 6
-
-		LDA	#$01
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty
-		
-		RTS
-		
-		
-;-------------------------------------------------------------------------------
 rulesDoPlayerElimin:		
 ;-------------------------------------------------------------------------------
 		LDA	($FB), Y		;Set player not alive
@@ -23258,74 +23532,143 @@ rulesDoGameOver:
 		STA	game + GAME::dirty		
 
 		RTS
+
+
+rulesInitTradeData:
+		LDX	#.SIZEOF(TRADE) - 1	
+		LDA	#$00
+@loop0:
+		STA 	trade0, X
+		STA 	trade1, X
+		
+		DEX
+		BPL	@loop0
+		
+		LDX	#$27
+@loop1:
+		STA	trdprp0, X
+		STA	trdrep0, X
+		STA	trdprp1, X
+		STA	trdrep1, X
+
+		DEX
+		BPL	@loop1
+
+		RTS
 		
 
 ;-------------------------------------------------------------------------------
-rulesProcElimin:
+rulesInitEliminToPlyr:
 ;-------------------------------------------------------------------------------
-		STA	trade0 + TRADE::player
+		LDX	game + GAME::pActive
+		STX	game + GAME::pElimin
+		LDX	game + GAME::gMode
+		STX	game + GAME::gMdElim
+		
+		STA	game + GAME::pActive
+		
+		JSR	menuElimin0RemWlthRecalc
+		
 		LDA	#$00
-		STA	trade0 + TRADE::money
-		STA	trade0 + TRADE::money + 1
-		STA	trade0 + TRADE::gofree
+		STA	menuElimin0HaveOffer
+		
+		JSR	rulesInitTradeData
 
-		LDX	#$00			;Return deeds to bank for auction
-		STX	game + GAME::varA
-		LDY	#$00
+		LDX	#$00
 @loop:
 		LDA	sqr00, X
-		CMP	game + GAME::pActive
-		BNE	@next0
+		CMP	game + GAME::pElimin
 		
-		LDA	#$FF			;Clear owner
-		STA	sqr00, X
-		INX
+		BNE	@next
 		
-		LDA	sqr00, X		;Return houses
-		AND	#$07
+		LDA	#$80
+		STA	sqr00 + 1, X
 		
-		CLC
-		ADC	game + GAME::cntHs
-		STA	game + GAME::cntHs
-		
-		LDA	sqr00, X		;Return hotel
-		AND	#$08
-		BEQ	@setf
-		
-		INC	game + GAME::cntHt
-		
-@setf:
-		LDA	game + GAME::varB
-		STA	sqr00, X
-		INX
-		
-		LDA	game + GAME::varA
-		STA	trdprp0, Y
-		
-		INY
-		JMP	@next1
-		
-@next0:
+@next:
 		INX
 		INX
-		
-@next1:
-		INC	game + GAME::varA
-
 		CPX	#$50
-		BNE	@loop		
-		
-		TYA
-		STA	trade0 + TRADE::cntDeed
-		
-		RTS
+		BNE	@loop
 
+		LDX	#TRADE::player
+		LDA	game + GAME::pElimin
+		STA	trade1, X
+		LDA	game + GAME::pActive
+		STA	trade0, X
+
+		LDA	#$04
+		STA	game + GAME::gMode
+		RTS
+		
+
+;-------------------------------------------------------------------------------
+rulesInitEliminToBank:
+;-------------------------------------------------------------------------------
+		LDX	game + GAME::pActive
+		STX	game + GAME::pElimin
+		STX	game + GAME::varA
+
+		JSR	menuElimin0RemWlthRecalc
+
+		LDX	#TRADE::player
+		LDA	#$FF
+		STA	trade1, X
+		LDA	game + GAME::pActive
+		STA	trade0, X
+
+		LDA	game + GAME::pElimin
+		STA	game + GAME::pActive
+
+		LDA	#$00
+		STA	menuElimin0HaveOffer
+
+		JSR	rulesInitTradeData
+
+		LDX	#$00
+		STX	game + GAME::varB
+@loop:
+		LDA	sqr00, X
+		CMP	game + GAME::varA
+		
+		BNE	@next
+		
+		LDA	#$00
+		STA	sqr00 + 1, X
+		
+		LDA	#$FF
+		STA	sqr00, X
+		
+		LDY	#TRADE::cntDeed
+		LDA	trade0, Y
+		TAY
+		LDA	game + GAME::varB
+		STA	trdprp0, Y
+		INY
+		TYA
+		LDY	#TRADE::cntDeed
+		STA	trade0, Y
+		
+@next:
+		INC	game + GAME::varB
+		INX
+		INX
+		CPX	#$50
+		BNE	@loop
+
+		JSR	rulesDoNextPlyr
+		
+		LDA	#$01
+		STA	game + GAME::fTrdTyp
+		
+;***FIXME:	Do I need to change game + GAME::pActive?
+
+		JSR	gamePerfTradeIntrpt
+		RTS
+		
 
 ;-------------------------------------------------------------------------------
 rulesDoPlyrLostPlyr:
 ;-------------------------------------------------------------------------------
-;***TODO:	Rework for new eliminations!!!
-
 		TXA
 
 		LDX	#$80
@@ -23344,32 +23687,7 @@ rulesDoPlyrLostPlyr:
 		STA	game + GAME::pGF1Crd
 
 @sqrs:
-		PHA
-
-		JSR	rulesProcElimin
-		
-		JSR	rulesDoNextPlyr
-		
-		LDA	trade0 + TRADE::cntDeed
-		BEQ	@cont
-		
-		LDA	game + GAME::pActive
-		STA	game + GAME::pIntrpt
-		LDA	#$00
-		STA	game + GAME::fIntrpt
-		STA	game + GAME::iTrdPrp
-
-		PLA
-		STA	game + GAME::pActive
-
-		LDA	game + GAME::gMode
-		STA	game + GAME::gMdIntr
-
-		LDA	#$04
-		STA	game + GAME::gMode
-
-		JSR	gameUpdateMenu
-		RTS
+		JSR	rulesInitEliminToPlyr
 
 @cont:
 		JSR	gameUpdateMenu
@@ -23391,8 +23709,6 @@ rulesDoPlyrLostPlyr:
 ;-------------------------------------------------------------------------------
 rulesDoPlyrLostBank:
 ;-------------------------------------------------------------------------------
-;***TODO:	Rework for new eliminations!!!
-
 		LDA	#$00
 		STA	game + GAME::varB
 
@@ -23411,28 +23727,7 @@ rulesDoPlyrLostBank:
 		STA	game + GAME::pGF1Crd
 		
 @sqrs:
-		JSR	rulesProcElimin
-		
-		JSR	rulesDoNextPlyr
-		
-		LDA	trade0 + TRADE::cntDeed
-		BEQ	@cont
-		
-		LDA	game + GAME::pActive
-		STA	game + GAME::pIntrpt
-		LDA	#$01
-		STA	game + GAME::fIntrpt
-		LDA	#$00
-		STA	game + GAME::iTrdPrp
-
-		LDA	game + GAME::gMode
-		STA	game + GAME::gMdIntr
-
-		LDA	#$04
-		STA	game + GAME::gMode
-		
-		JSR	gameUpdateMenu
-		RTS
+		JSR	rulesInitEliminToBank
 
 @cont:
 		JSR	gameUpdateMenu
@@ -23519,10 +23814,7 @@ rulesNextTurn:
 		RTS
 		
 @intrpt:
-		LDA	game + GAME::pIntrpt		;Safeguard, drop out of
-		STA	game + GAME::pActive		;interrupt
-		LDA	game + GAME::gMdIntr
-		STA	game + GAME::gMode
+		RTS
 
 @normal:
 		LDX	game + GAME::pActive
@@ -24686,58 +24978,6 @@ strText1Jump0:		;THE DESTINATION
 			.byte $94, $89, $8E, $81, $94, $89, $8F, $8E
 
 
-
-
-
-;***TODO:	These strings won't be required after rework, remove.
-strHeaderIntrpt0:	;GAME INTERRUPTED
-			.byte $10, $87, $81, $8D, $85, $A0, $89, $8E
-			.byte $94, $85, $92, $92, $95, $90, $94, $85
-			.byte $84
-strDescIntrpt0:		;PLAYER ELIMINATED
-			.byte $11, $90, $8C, $81, $99, $85, $92, $A0
-			.byte $85, $8C, $89, $8D, $89, $8E, $81, $94
-			.byte $85, $84
-
-strText0Intrpt0:	;YOU MAY TAKE THE
-			.byte $10, $99, $8F, $95, $A0, $8D, $81, $99
-			.byte $A0, $94, $81, $8B, $85, $A0, $94, $88
-			.byte $85
-strText1Intrpt0:	;SELECTED DEED
-			.byte $0D, $93, $85, $8C, $85, $83, $94, $85
-			.byte $84, $A0, $84, $85, $85, $84
-strText2Intrpt0:	;DO YOU WISH TO:
-			.byte $0F, $84, $8F, $A0, $99, $8F, $95, $A0
-			.byte $97, $89, $93, $88, $A0, $94, $8F, $BA
-
-strOptn0Intrpt0:	;A - UNMORTGAGE
-			.byte $0E, $81, $A0, $AD, $A0, $95, $8E, $8D
-			.byte $8F, $92, $94, $87, $81, $87, $85
-strOptn1Intrpt0:	;B - PAY FEE
-			.byte $0B, $82, $A0, $AD, $A0, $90, $81, $99
-			.byte $A0, $86, $85, $85
-
-
-;***TODO:	These strings won't be required after rework, remove.
-strHeaderIntrpt1:	;TRANSFERRING DEEDS
-			.byte $12, $94, $92, $81, $8E, $93, $86, $85
-			.byte $92, $92, $89, $8E, $87, $A0, $84, $85
-			.byte $85, $84, $93
-			
-strText0Intrpt1:	;YOU CAN'T PAY THE FEE:
-			.byte $16, $99, $8F, $95, $A0, $83, $81, $8E
-			.byte $A7, $94, $A0, $90, $81, $99, $A0, $94
-			.byte $88, $85, $A0, $86, $85, $85, $BA
-strText1Intrpt1:	;THE REMAINING DEEDS
-			.byte $13, $94, $88, $85, $A0, $92, $85, $8D
-			.byte $81, $89, $8E, $89, $8E, $87, $A0, $84
-			.byte $85, $85, $84, $93
-strText2Intrpt1:	;WILL BE AUCTIONED.
-			.byte $12, $97, $89, $8C, $8C, $A0, $82, $85
-			.byte $A0, $81, $95, $83, $94, $89, $8F, $8E
-			.byte $85, $84, $AE		
-			
-
 strText0PStats0:	;MONEY......$
 			.byte $0C, $8D, $8F, $8E, $85, $99, $AE, $AE
 			.byte $AE, $AE, $AE, $AE, $A4
@@ -24770,8 +25010,6 @@ strText9PStats0:	;SCORE......*
 			.byte $AE, $AE, $AE, $AE, $AA
 
 
-;***TODO:	Make this message more informative - did they lose
-;		to another player (which) or to the bank.
 strHeaderElimin0:	;PLAYER ELIMINATED
 			.byte $11, $90, $8C, $81, $99, $85, $92, $A0
 			.byte $85, $8C, $89, $8D, $89, $8E, $81, $94
@@ -24781,6 +25019,22 @@ strText0Elimin0:	;PLAYER_1 ELIMINATED!
 			.byte $14, $90, $8C, $81, $99, $85, $92, $E4
 			.byte $B1, $A0, $85, $8C, $89, $8D, $89, $8E
 			.byte $81, $94, $85, $84, $A1
+			
+strHeaderElimin1:	;ERROR!
+			.byte $06, $85, $92, $92, $8F, $92, $A1
+
+strDescElimin1:		;CANNOT CONFIRM
+			.byte $0E, $83, $81, $8E, $8E, $8F, $94, $A0
+			.byte $83, $8F, $8E, $86, $89, $92, $8D
+			
+strText0Elimin1:	;YOU MUST REVIEW THE
+			.byte $13, $99, $8F, $95, $A0, $8D, $95, $93
+			.byte $94, $A0, $92, $85, $96, $89, $85, $97
+			.byte $A0, $94, $88, $85
+strText1Elimin1:	;ELIMINATION OFFER.
+			.byte $12, $85, $8C, $89, $8D, $89, $8E, $81
+			.byte $94, $89, $8F, $8E, $A0, $8F, $86, $86
+			.byte $85, $92, $AE
 			
 
 strHeaderGameOver0:	;GAME OVER

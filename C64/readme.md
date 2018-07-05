@@ -11,10 +11,6 @@ BY DANIEL ENGLAND FOR ECCLESTIAL SOLUTIONS
 (C) 2018 DANIEL ENGLAND
 ALL RIGHTS RESERVED
 
-RELEASED UNDER THE TERMS OF THE GPL VERSION 3 OR GREATER
-
-SEE INCLUDED DOCUMENTATION
-
 
 MONOPOLY IS THE PROPERTY OF HASBRO INC.
 
@@ -24,6 +20,10 @@ MONOPOLY IS THE PROPERTY OF HASBRO INC.
 
 You probably need to own a copy of the official board game to even be reading
 this.  *ugh*
+
+
+I feel this is how the game should be played...
+
 
 ## Introduction
 
@@ -65,6 +65,20 @@ than the original C64 one) that doesn't simply always charge rent.
 below).  I discuss the trade implementation issues thoroughly in the 
 deductions/observations section.  Overall, I think this is a fair 
 interpretation given the platform/structure restrictions.
+* As for the most strange case, trade initiation is not permitted 
+when receiving deeds from an elimination.  Ordinarily, a player
+is eliminated when it is their turn so this does not happen. 
+However, if I was to always allow trading when it was your turn then 
+it could happen that due to the Community Chest card that requires 
+other players to pay you and you are receiving deeds from an elimination, 
+you could trade.  This is an extraordinarily rare, corner-case (it is only 
+$10) and it seems  better, in the interests of fairness, all player's best 
+interests and providing a standard mechanism, that it is not allowed.  Again, 
+trades in the standard rules can be at "any time" but there is no 
+mention of them in the standard rules pertaining to the transfer (they
+only state simple possible actions) nor which action might have 
+priority when paying and dissolving equity.  This rule brings a degree of
+simplicity to the mechanisms.
 * House/Hotel (improvement) and mortgage management can always be 
 done in the player's turn.  It can can also be done when offered a 
 trade or receiving a defeated player's deeds for example, when a 
@@ -233,18 +247,6 @@ or other action cannot be initiated that would prevent this.  The
 standard rules state that rent and other expenses "must be paid" when 
 declared or incurred (always in this version).  Debts must be 
 recovered in some priority to other actions.
-* To cover the most strange case, trade initiation is not permitted 
-when receiving deeds from an elimination.  If I was to always allow 
-trading when it was your turn and you are receiving deeds from an 
-elimination, then it could only happen due to the Community Chest 
-card that requires other players to pay you.  This is an 
-extraordinarily rare, corner-case (it is only $10) and it seems 
-better, in the interests of fairness, all player's best interests 
-and providing a standard mechanism, that it is not allowed.  Again, 
-trades in the standard rules can be at "any time" but there is no 
-mention of them in the standard rules pertaining to the transfer (they
-only state simple possible actions) nor which action might have 
-priority when paying and dissolving equity.
 * A certainty is that trades must not be permitted if they would cause 
 a losing state.  The menus will not allow a trade that would cause the 
 player to lose due to a catastrophic reduction of wealth and know 
@@ -273,9 +275,9 @@ sufficient wealth to commit to the exchange.
 the player is in debt nor can players utilise more equity than they 
 currently have (before the trade is executed) in order to accommodate 
 a trade agreement.  Mandating this is supported by the fact that the
-term "immediately" is used where there are details so one can assume 
-that all deeds are transferred and all payments made in a single 
-transaction.  Recall that debt repayments must be a priority to other 
+term "immediately" is used where there are details in the standard rules
+so one can assume that all deeds are transferred and all payments made in 
+a single transaction.  Recall that debt repayments must be a priority to other 
 actions and the only described mechanism for this in the standard 
 rules is dissolving equity.  There would be an impact of the mortgage 
 and dissolving process of the player in recovering debt that would 
@@ -401,20 +403,9 @@ NTSC/PAL-N version in the future.
 * Allow all players to confirm quiting the game - quit request 
   interrupt!  Use score value to offer a winner (by default) in this 
   case.  Important but not until other tasks complete.
-* Need to allow nominate repay on elimin. xfers.  
-* Use a TradeSel version in elimin. xfers that shows ownership 
-  dynamically to show what you can afford to take on and what is going 
-  to auction.  Cash will already be transferred before the xfer offer.  
-  Cash cannot be altered on this dialog, not even displayed?
-* Warning if haven't reviewed repay/fee for elimin. xfer?  Don't even
-  allow if haven't done so?  Default no selection???
-  
-* Fix order of buttons on trdsel0 dialog
-* Hide player name texts on PlyrSel0 menu as required
-* Make more menu buttons disabled in draw (not just buzzing in keys). Trade!
-  Auction bid
+
+* Fix order of buttons on trdsel0 dialog - select, repay, accept, dismiss, money
 * Buzz for more of the failures (gaol, auction, management).  Must do.
-* Don't show "doubles" on play menu when get out of gaol on doubles?  Hmm...
 * Backup/retrieve menu button selection going to/returning from dialogs when
   the menu hasn't changed?  Would be nice...
 * Is rent3 SFX still a little lame?  Does it matter?
@@ -472,7 +463,16 @@ NTSC/PAL-N version in the future.
 
 
 ## Change History (Since Version 0.01.99A)
+* 05JUL2018
+	* Rework eliminations.  *Phew!*  The extra layers of interface and
+	  processing makes this an overall increase to the executable size
+	  which I was hoping to keep smaller than it is.
+	* Navigate single cell buttons (money) more intuitively with
+	  joystick. (this was a surprisingly large change).
 * 04JUL2018
+	* Disable bid (and don't perform) when have insufficient money.
+	* Disable all trade buttons when have negative money.
+	* Fix show "doubles" on play menu.
 	* Fix buttons bug closing non default drawn dialogs.
 	* Optimise player name handling (some).
 	* All button types supported for hot tracking.
