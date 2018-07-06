@@ -413,8 +413,8 @@ NTSC/PAL-N version in the future.
 
 ## TODO
 
-* Rework play0 menu (put stats and quit on another page).
-* Fix order of buttons on trdsel0 dialog - select, repay, accept, dismiss, money
+* Fix order of buttons on trdsel0 dialog - f, b, select, repay, accept, dismiss, 
+  money
 * Buzz for more of the failures (gaol, auction, management).  Must do.
 * Backup/retrieve menu button selection going to/returning from dialogs when
   the menu hasn't changed?  Would be nice...
@@ -436,10 +436,13 @@ NTSC/PAL-N version in the future.
 * Screen double buffering?  Is it required if the dirty/update code is 
   optimised?  Would be difficult - quite a bit of rework.
 * Optimise, optimise, optimise (eg. BIT instead of LDA, AND/ORA trains).
-  Self modifying code??  Need cartridge/ROM support?
+  Self modifying code??  Need cartridge/ROM support?  Already modify many data 
+  items.
 * Check music/sfx - sometimes does not fire correctly at all (other than
   resource contention issue).  Perhaps fixed by 2.74?  Very rare issue.
 * Implement own keyboard scan, remove dependency on Kernal
+* Load strings into high RAM (Kernal space) saving 4KB in program area?  Need to
+  build it somehow...
 * Add CPU player?  Should have enough memory if no longer need Kernal.  
   Will be rather difficult to do properly.
 
@@ -458,6 +461,16 @@ NTSC/PAL-N version in the future.
 
 ## Change History (Since Version 0.01.99A)
 * 06JUL2018
+	* Buzz when fail attempting to mortgage, construct or sell.
+	* Change order of button on setup3 and setup5 menus to better 
+	  reflect the usual selections and minimise movements.
+	* Fix bug in menuDisplay affecting button selection.
+	* Add game options, input config options to play menu.
+	* Add another play menu (Play2) for statistics and quit.
+	* Rework some setup menus (now use some tricks!).
+	* Better order to setup menus, new labels.
+	* Whoops, immediate mode in initMem.
+	* Clear up "property" naming issues (streets/deeds/improvements).
 	* Add menus and funtionality to initiate/confirm game quit.
 	* Add player score to PStats dialog.
 	* Calculate player score.

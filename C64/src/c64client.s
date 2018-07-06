@@ -31,7 +31,7 @@
 ;defs
 ;-------------------------------------------------------------------------------
 	.define	DEBUG_IRQ	0
-	.define DEBUG_KEYS	1
+	.define DEBUG_KEYS	0
 
 spriteMemD	=	$0340
 spriteMemE	=	$0380
@@ -353,7 +353,7 @@ JSTKSENS_HIGH	=	9
 	.struct	SQUARE				;Currently must be 2 bytes
 		owner	.byte			;#$FF = none
 		imprv	.byte			;Bit 7:	Mortgage flag
-						;    6: All properties flag
+						;    6: All group flag
 						;    5:	Select flag
 						;    4: Unused
 						;    3: Hotel flag
@@ -626,14 +626,14 @@ sqr26:		.tag	SQUARE
 sqr27:		.tag	SQUARE	
 
 trade0:		.tag	TRADE
-trdprp0:		
+trddeeds0:		
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00
 ;		.byte			    $00, $00, $00, $00
 ;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-trdrep0:		
+trdrepay0:		
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
@@ -642,14 +642,14 @@ trdrep0:
 ;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		
 trade1:		.tag	TRADE
-trdprp1:		
+trddeeds1:		
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00
 ;		.byte			    $00, $00, $00, $00
 ;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-trdrep1:		
+trdrepay1:		
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
@@ -658,7 +658,7 @@ trdrep1:
 ;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 
 trade2:		.tag	TRADE
-trdprp2:		
+trddeeds2:		
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
@@ -666,7 +666,7 @@ trdprp2:
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00		;Need an extra two bytes to 
 						;"unpack" the gofree cards.
-trdrep2:		
+trdrepay2:		
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
@@ -777,7 +777,7 @@ initMem:
 ;	Bank out BASIC (keep Kernal and IO).  First, make sure that the IO port
 ;	is set to output on those lines.
 		LDA	$00
-		ORA	$07
+		ORA	#$07
 		STA	$00
 		
 ;	Now, exclude BASIC from the memory map (and include Kernal and IO)
@@ -5731,6 +5731,11 @@ menuPagePlay1:
 		.word	menuPagePlay1Draw
 		.byte	$01
 		
+menuPagePlay2:
+		.word	menuPagePlay2Keys
+		.word	menuPagePlay2Draw
+		.byte	$01
+		
 menuPageAuctn0:
 		.word	menuPageAuctn0Keys
 		.word	menuPageAuctn0Draw
@@ -5891,9 +5896,6 @@ menuDisplay:
 		LDA	#$00
 		STA	ui + UI::fWntJFB
 		
-		LDA	menuActivePage0 + MENUPAGE::fDraw
-		LDA	menuActivePage0 + MENUPAGE::fDraw + 1
-
 		JMP	(menuActivePage0 + MENUPAGE::fDraw)
 		
 @farreturn:
@@ -5908,15 +5910,15 @@ menuDisplay:
 @tstreset:
 		LDA	ui + UI::iSelBtn
 		CMP	#$FF
-		BEQ	@reset
+		BEQ	@havedraw
 		
 		JSR	screenTestSelBtn
 ;		CMP	#$00
-		BEQ	@reset
+		BEQ	@havedraw
 		
 		LDA	game + GAME::pActive
 		CMP	game + GAME::pLast
-		BNE	@reset
+		BNE	@havedraw
 
 		LDA	menuActivePage0 + MENUPAGE::fDraw
 		CMP	menuLastDrawFunc
@@ -6027,9 +6029,13 @@ menuPageSetup0Keys:
 		SEC
 		SBC	#'0'
 		PHA
-				
-		LDA 	#<menuPageSetup3
-		LDY	#>menuPageSetup3
+			
+		LDA	#$00
+		STA	menuTemp0
+		JSR	menuPageSetup1EnbAll
+
+		LDA 	#<menuPageSetup1
+		LDY	#>menuPageSetup1
 		
 		JSR	menuSetPage
 
@@ -6395,7 +6401,7 @@ menuPageSetup2Draw:
 		
 menuWindowSetup3:	
 			.byte	$90, $01, $07
-			.word	     strHeaderSetup0
+			.word	     strHeaderSetup3
 			.byte	$90, $01, $08
 			.word        strDescSetup3
 			.byte	$90, $02, $0A
@@ -6403,10 +6409,10 @@ menuWindowSetup3:
 			.byte	$90, $02, $0B
 			.word	     strText1Setup3
 			
-			.byte	$A1, $0D, $01, $12, $59, $02, $0D
-			.word	     strOptn0Setup3
-			.byte	$A1, $0F, $01, $12, $4E, $02, $0F
+			.byte	$A1, $0D, $01, $12, $4E, $02, $0D
 			.word	     strOptn1Setup3
+			.byte	$A1, $0F, $01, $12, $59, $02, $0F
+			.word	     strOptn0Setup3
 			
 			.byte	$00
 
@@ -6449,7 +6455,7 @@ menuPageSetup3Keys:
 		
 		JSR	menuSetPage
 
-		LDA	#$01
+		LDA	#$08
 		ORA	game + GAME::dirty
 		STA	game + GAME::dirty
 		
@@ -6717,7 +6723,7 @@ menuPageSetup4Draw:
 
 menuWindowSetup5:	
 			.byte	$90, $01, $07
-			.word	     strHeaderSetup0
+			.word	     strHeaderSetup3
 			.byte	$90, $01, $08
 			.word        strDescSetup5
 			.byte	$90, $02, $0A
@@ -6725,10 +6731,10 @@ menuWindowSetup5:
 			.byte	$90, $02, $0B
 			.word	     strText1Setup5
 			
-			.byte	$A1, $0D, $01, $12, $59, $02, $0D
-			.word	     strOptn0Setup3
-			.byte	$A1, $0F, $01, $12, $4E, $02, $0F
+			.byte	$A1, $0D, $01, $12, $4E, $02, $0D
 			.word	     strOptn1Setup3
+			.byte	$A1, $0F, $01, $12, $59, $02, $0F
+			.word	     strOptn0Setup3
 			
 			.byte	$00
 
@@ -6763,14 +6769,13 @@ menuPageSetup5Keys:
 		LDA	#$00
 		STA	menuTemp0
 		
-		JSR	menuPageSetup1EnbAll
+;		LDA 	#<menuPageSetup0
+;		LDY	#>menuPageSetup0
+;		JSR	menuSetPage
 
-		LDA 	#<menuPageSetup1
-		LDY	#>menuPageSetup1
-		
-		JSR	menuSetPage
+		JSR	menuPopPage
 
-		LDA	#$01
+		LDA	#$08
 		ORA	game + GAME::dirty
 		STA	game + GAME::dirty
 		
@@ -6934,7 +6939,7 @@ menuPageSetup7Keys:
 		LDA	#$FF
 		STA	ui + UI::iSelBtn
 		
-		JMP	@done	
+		JMP	@nojoy	
 		
 @tstM:
 		CMP	#'M'
@@ -6943,7 +6948,7 @@ menuPageSetup7Keys:
 @doMse:	
 		JSR	initMouse
 		
-		JMP	@done
+		JMP	@nojoy
 		
 @tstJ:
 		CMP	#'J'
@@ -6955,24 +6960,30 @@ menuPageSetup7Keys:
 		LDA	#$00
 		STA	ui + UI::fMseEnb
 		
-		JMP	@done
-
-@done:
-		LDA	ui + UI::fJskEnb
-		BEQ	@nojoy
-	
+		LDA 	#<menuPageSetup0
+		LDY	#>menuPageSetup0
+		JSR	menuSetPage
+		
+		LDA 	#<menuPageSetup3
+		LDY	#>menuPageSetup3
+		JSR	menuPushPage		
+		
 		LDA 	#<menuPageSetup8
 		LDY	#>menuPageSetup8
+		JSR	menuPushPage		
 		
 		JMP	@cont
 		
 @nojoy:
 		LDA 	#<menuPageSetup0
 		LDY	#>menuPageSetup0
+		JSR	menuSetPage
+
+		LDA 	#<menuPageSetup3
+		LDY	#>menuPageSetup3
+		JSR	menuPushPage
 		
 @cont:
-		JSR	menuSetPage
-		
 		LDA	#$01
 		ORA	game + GAME::dirty
 		STA	game + GAME::dirty
@@ -7044,11 +7055,13 @@ menuPageSetup8Keys:
 @update:
 		STA	ui + UI::cJskSns
 		
-		LDA 	#<menuPageSetup0
-		LDY	#>menuPageSetup0
-		JSR	menuSetPage
+;		LDA 	#<menuPageSetup3
+;		LDY	#>menuPageSetup3
+;		JSR	menuSetPage
+
+		JSR	menuPopPage
 		
-		LDA	#$01
+		LDA	#$08
 		ORA	game + GAME::dirty
 		STA	game + GAME::dirty
 		
@@ -7080,6 +7093,8 @@ menuWindowPlay0:
 			.byte	$90, $01, $08
 menuWindowPlay0D:	
 			.word		strDummyDummy0
+			.byte	$90, $0C, $08
+			.word        	strDescGaol1
 
 menuWindowPlay0RollB:
 			.byte	$A1, $0A, $01, $12, $52, $02, $0A
@@ -7094,8 +7109,8 @@ menuWindowPlay0Trd:
 			.word		strOptn3Play0
 			.byte	$A1, $12, $01, $12, $56, $02, $12
 			.word		strOptn4Play0
-			.byte	$A1, $14, $01, $12, $53, $02, $14
-			.word		strOptn5Play0
+			.byte	$A1, $14, $01, $12, $2E, $02, $14
+			.word		strOptn2Gaol1
 			
 			.byte	$00
 			
@@ -7239,9 +7254,7 @@ menuPagePlay0DefKeys:
 		RTS
 
 
-;-------------------------------------------------------------------------------
-menuPagePlay0Keys:
-;-------------------------------------------------------------------------------
+menuPagePlay0StdKeys:
 		CMP	#'Q'			
 		BNE	@keysN			
 						
@@ -7255,7 +7268,6 @@ menuPagePlay0Keys:
 		STA	game + GAME::dirty
 		
 		JMP	@keysDing
-		
 @keysN:
 		CMP	#'N'
 		BNE	@keysR
@@ -7269,11 +7281,7 @@ menuPagePlay0Keys:
 		
 @keysR:
 		CMP	#'R'
-	.if	DEBUG_KEYS
-		BNE	@keysL
-	.else
-		BNE	@keysOther
-	.endif
+		BNE	@keysO
 		
 		LDX	menuWindowPlay0RollB
 		CPX	#$A1
@@ -7282,6 +7290,47 @@ menuPagePlay0Keys:
 		JSR	gameRollDice
 		JMP	@keysExit
 		
+@keysO:
+		CMP	#'O'
+		BNE	@keysC
+
+		LDA	#<menuPagePlay0
+		LDY	#>menuPagePlay0
+		JSR	menuSetPage
+		
+		LDA	#<menuPageSetup3
+		LDY	#>menuPageSetup3
+		JSR	menuPushPage
+		
+		LDA	#$08
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+		JMP	@keysDing
+
+@keysC:
+		CMP	#'C'
+	.if	DEBUG_KEYS
+		BNE	@keysL
+	.else
+		BNE	@keysOther
+	.endif
+
+		LDA	#<menuPagePlay0
+		LDY	#>menuPagePlay0
+		JSR	menuSetPage
+		
+		LDA	#<menuPageSetup8
+		LDY	#>menuPageSetup8
+		JSR	menuPushPage
+		
+		LDA	#$08
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+		JMP	@keysDing
+
+
 	.if	DEBUG_KEYS
 @keysL:
 		CMP	#'L'
@@ -7317,6 +7366,36 @@ menuPagePlay0Keys:
 		
 		RTS
 
+
+;-------------------------------------------------------------------------------
+menuPagePlay0Keys:
+;-------------------------------------------------------------------------------
+		CMP	#'.'
+		BNE	@keysStd
+		
+		LDA	#<menuPagePlay2
+		LDY	#>menuPagePlay2
+		
+		JSR	menuSetPage
+		
+		LDA	#$08
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+		JMP	@keysDing
+		
+@keysStd:
+		JSR	menuPagePlay0StdKeys
+	
+		RTS
+
+@keysDing:
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
+		RTS
 
 menuPagePlay0Draw:
 		LDA	game + GAME::dieDbl
@@ -7543,6 +7622,92 @@ menuPagePlay1Draw:
 
 		RTS
 
+
+
+menuWindowPlay2:	
+			.byte	$90, $01, $07
+			.word	     	strHeaderPlay0
+			.byte	$90, $01, $08
+menuWindowPlay2D:	
+			.word		strDummyDummy0
+			.byte	$90, $0C, $08
+			.word        	strDescGaol2
+
+			.byte	$A1, $0A, $01, $12, $53, $02, $0A
+			.word	     	strOptn5Play0
+			.byte	$A1, $0C, $01, $12, $4F, $02, $0C
+			.word	     	strOptn6Play0
+			.byte	$A1, $0E, $01, $12, $43, $02, $0E
+			.word	     	strOptn7Play0
+			.byte	$A1, $10, $01, $12, $51, $02, $10
+			.word		strOptn8Play0
+
+			.byte	$A1, $14, $01, $12, $2E, $02, $14
+			.word		strOptn2Gaol1
+			
+			.byte	$00
+			
+			
+;-------------------------------------------------------------------------------
+menuPagePlay2Keys:
+;-------------------------------------------------------------------------------
+		CMP	#'.'
+		BNE	@keysStd
+		
+		LDA	#<menuPagePlay0
+		LDY	#>menuPagePlay0
+		
+		JSR	menuSetPage
+		
+		LDA	#$08
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+		JMP	@keysDing
+		
+@keysStd:
+		JSR	menuPagePlay0StdKeys
+	
+		RTS
+
+@keysDing:
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
+		RTS
+
+
+menuPagePlay2Draw:
+		LDA	game + GAME::dieDbl
+		BEQ	@nodesc
+		
+		LDA	#<strDescPlay0
+		STA	menuWindowPlay2D
+		LDA	#>strDescPlay0
+		STA	menuWindowPlay2D + 1
+		
+		JMP	@begin
+
+@nodesc:
+		LDA	#<strDummyDummy0
+		STA	menuWindowPlay2D
+		LDA	#>strDummyDummy0
+		STA	menuWindowPlay2D + 1
+		
+@begin:
+		JSR	screenBeginButtons
+
+		LDA	#<menuWindowPlay2
+		STA	$FD
+		LDA	#>menuWindowPlay2
+		STA	$FE
+
+		JSR	screenPerformList
+		
+		RTS
+		
 
 menuPageAuctnAmt0:
 			.byte	$06, $00, $00, $00, $00, $00, $00, $00
@@ -8761,13 +8926,13 @@ menuTrade0RWealthRecalc:
 		DEX
 		
 @loop:
-		LDA	trdrep1, X
+		LDA	trdrepay1, X
 		AND	#$80
 		BNE	@next
 
 		STX	game + GAME::varA
 
-		LDA	trdprp1, X
+		LDA	trddeeds1, X
 		JSR	gameGetCardPtrForSquare
 		
 		LDY	#DEED::mValue
@@ -8923,8 +9088,8 @@ menuPageTrade0Draw:
 		
 		LDX	#$27
 @loop1:
-		STA	trdprp0, X
-		STA	trdrep0, X
+		STA	trddeeds0, X
+		STA	trdrepay0, X
 
 		DEX
 		BPL	@loop1
@@ -9055,10 +9220,10 @@ menuTrade1RWealthRecalc:
 @loop:
 		STX	game + GAME::varA
 		
-		LDA	trdprp1, X
+		LDA	trddeeds1, X
 		JSR	gameGetCardPtrForSquare
 		
-		LDA	trdrep1, X
+		LDA	trdrepay1, X
 		AND	#$80
 		BEQ	@equity
 
@@ -9125,14 +9290,14 @@ menuTrade1RWealthRecalc:
 @loop1:
 		STX	game + GAME::varA
 		
-		LDA	trdprp1, X
+		LDA	trddeeds1, X
 		JSR	gameGetCardPtrForSquare
 		
-		LDA	trdrep1, X
+		LDA	trdrepay1, X
 		AND	#$80
 		BEQ	@next1
 
-		LDA	trdprp1, X
+		LDA	trddeeds1, X
 		JSR	gameGetCardPtrForSquare
 
 		LDY	#DEED::mValue		;Lose equity if not mrtg
@@ -9388,7 +9553,7 @@ menuPageElimin0SetAuctn:
 
 		LDY	#$00
 @loop0:
-		LDA	trdprp1, Y
+		LDA	trddeeds1, Y
 		
 		CMP	game + GAME::varB
 		BEQ	@found
@@ -9408,7 +9573,7 @@ menuPageElimin0SetAuctn:
 		TAY
 
 		LDA	game + GAME::varB
-		STA	trdprp0, Y
+		STA	trddeeds0, Y
 		
 		INY
 		TYA
@@ -11497,11 +11662,11 @@ gameInitiateTrade:
 		
 		LDX	#$27
 @loop1:
-		STA	trdprp0, X
-		STA	trdrep0, X
+		STA	trddeeds0, X
+		STA	trdrepay0, X
 		
-		STA	trdprp1, X
-		STA	trdrep1, X
+		STA	trddeeds1, X
+		STA	trdrepay1, X
 		
 		DEX
 		BPL	@loop1
@@ -11542,14 +11707,14 @@ gamePrepTradePtrs:
 		LDA	#>trade0
 		STA	$A4
 
-		LDA	#<trdprp0
+		LDA	#<trddeeds0
 		STA	$A5
-		LDA	#>trdprp0
+		LDA	#>trddeeds0
 		STA	$A6
 
-		LDA	#<trdrep0
+		LDA	#<trdrepay0
 		STA	$A7
-		LDA	#>trdrep0
+		LDA	#>trdrepay0
 		STA	$A8
 		
 		RTS
@@ -11560,14 +11725,14 @@ gamePrepTradePtrs:
 		LDA	#>trade1
 		STA	$A4
 		
-		LDA	#<trdprp1
+		LDA	#<trddeeds1
 		STA	$A5
-		LDA	#>trdprp1
+		LDA	#>trddeeds1
 		STA	$A6
 
-		LDA	#<trdrep1
+		LDA	#<trdrepay1
 		STA	$A7
-		LDA	#>trdrep1
+		LDA	#>trdrepay1
 		STA	$A8
 		
 		RTS
@@ -11591,7 +11756,7 @@ gameUnpackTrdData:
 		LDX	#$29			;Init deeds in exp. area
 		LDA	#$00			;because they will be randomly
 @loop1:						;populated in actual populate.
-		STA	trdprp2, X
+		STA	trddeeds2, X
 		
 		DEX
 		BPL	@loop1
@@ -11599,7 +11764,7 @@ gameUnpackTrdData:
 		LDX	#$27			;Init repay data, too
 		LDA	#$00
 @loop1a:
-		STA	trdrep2, X
+		STA	trdrepay2, X
 		
 		DEX
 		BPL	@loop1a
@@ -11616,10 +11781,10 @@ gameUnpackTrdData:
 		LDA	($A5), Y
 		TAX
 		LDA	#$01
-		STA	trdprp2, X
+		STA	trddeeds2, X
 		
 		LDA	($A7), Y
-		STA	trdrep2, X
+		STA	trdrepay2, X
 		
 		INY
 		CPY	game + GAME::varA
@@ -11635,7 +11800,7 @@ gameUnpackTrdData:
 		
 		LDA	#$01
 		LDX	#$28
-		STA	trdprp2, X
+		STA	trddeeds2, X
 		
 @gofree2:
 		LDA	($A3), Y
@@ -11645,7 +11810,7 @@ gameUnpackTrdData:
 		
 		LDA	#$01
 		LDX	#$29
-		STA	trdprp2, X
+		STA	trddeeds2, X
 	
 @exit:
 		PLA
@@ -11820,10 +11985,10 @@ gamePerfTradeStep:
 		
 ;			- phase 0 - transfer deed
 		LDX	game + GAME::iTrdStp 
-		LDA	trdprp1, X
+		LDA	trddeeds1, X
 		JSR	gamePerfTradeFocus
 		
-		LDA	trdprp1, X
+		LDA	trddeeds1, X
 		TAX
 		JSR	rulesTradeTitleDeed
 		
@@ -11831,7 +11996,7 @@ gamePerfTradeStep:
 
 ;				- if mrtg, go to phase 1
 		LDX	game + GAME::iTrdStp 
-		LDA	trdrep1, X
+		LDA	trdrepay1, X
 		AND	#$80
 		BNE	@stage0tophase1
 		
@@ -11851,16 +12016,16 @@ gamePerfTradeStep:
 		
 ;			- phase 1 - fee/repay deed
 		LDX	game + GAME::iTrdStp 
-		LDA	trdrep1, X
+		LDA	trdrepay1, X
 		AND	#$01
 		BNE	@stage0ph1repay
 
 		LDX	game + GAME::iTrdStp 
 
-		LDA	trdprp1, X
+		LDA	trddeeds1, X
 		JSR	gamePerfTradeFocus
 
-		LDA	trdprp1, X
+		LDA	trddeeds1, X
 		JSR	rulesMortgageFeeImmed
 
 ;		JSR	gamePerfTradeDeselect
@@ -11869,10 +12034,10 @@ gamePerfTradeStep:
 		
 @stage0ph1repay:
 		LDX	game + GAME::iTrdStp 
-		LDA	trdprp1, X
+		LDA	trddeeds1, X
 		JSR	gamePerfTradeFocus
 
-		LDA	trdprp1, X
+		LDA	trddeeds1, X
 		JSR	rulesUnmortgageImmed
 		
 ;		JSR	gamePerfTradeDeselect
@@ -11945,10 +12110,10 @@ gamePerfTradeStep:
 		
 ;			- phase 0 - transfer deed
 		LDX	game + GAME::iTrdStp 
-		LDA	trdprp0, X
+		LDA	trddeeds0, X
 		JSR	gamePerfTradeFocus
 
-		LDA	trdprp0, X
+		LDA	trddeeds0, X
 		TAX
 		JSR	rulesTradeTitleDeed
 		
@@ -11956,7 +12121,7 @@ gamePerfTradeStep:
 
 ;				- if mrtg, go to phase 1
 		LDX	game + GAME::iTrdStp 
-		LDA	trdrep0, X
+		LDA	trdrepay0, X
 		AND	#$80
 		BNE	@stage1tophase1
 		
@@ -11976,15 +12141,15 @@ gamePerfTradeStep:
 		
 ;			- phase 1 - fee/repay deed
 		LDX	game + GAME::iTrdStp 
-		LDA	trdrep0, X
+		LDA	trdrepay0, X
 		AND	#$01
 		BNE	@stage1ph1repay
 
 		LDX	game + GAME::iTrdStp 
-		LDA	trdprp0, X
+		LDA	trddeeds0, X
 		JSR	gamePerfTradeFocus
 
-		LDA	trdprp0, X
+		LDA	trddeeds0, X
 		JSR	rulesMortgageFeeImmed
 		
 ;		JSR	gamePerfTradeDeselect
@@ -11993,10 +12158,10 @@ gamePerfTradeStep:
 		
 @stage1ph1repay:
 		LDX	game + GAME::iTrdStp 
-		LDA	trdprp0, X
+		LDA	trddeeds0, X
 		JSR	gamePerfTradeFocus
 
-		LDA	trdprp0, X
+		LDA	trddeeds0, X
 		JSR	rulesUnmortgageImmed
 		
 ;		JSR	gamePerfTradeDeselect
@@ -12028,7 +12193,7 @@ gamePerfTradeStep:
 		BEQ	@stage2done	
 
 		LDY	game + GAME::iTrdStp
-		LDA	trdprp0, Y
+		LDA	trddeeds0, Y
 		STA	game + GAME::sAuctn
 
 		INC	game + GAME::iTrdStp
@@ -15754,7 +15919,7 @@ doDialogTrdSelTstRfndFee:
 		LDA	dialogTrdSelDoElimin	;Is elimination, Check fees
 		BNE	@wanted
 
-		LDA	trdrep2, X
+		LDA	trdrepay2, X
 		AND	#$80
 		BEQ	@rfndequity
 		
@@ -15770,7 +15935,7 @@ doDialogTrdSelTstRfndFee:
 		RTS
 
 @wanted:
-		LDA	trdrep2, X
+		LDA	trdrepay2, X
 		AND	#$80
 		BNE	@rfndfee
 		
@@ -15859,13 +16024,13 @@ doDialogTrdSelTogRepay:
 		LDA	#$02			;Default to buzz
 		STA	game + GAME::varP
 		
-		LDA	trdprp2, X		;Is selected?
+		LDA	trddeeds2, X		;Is selected?
 		BNE	@begin0			;Yes, test mortgaged
 		
 		JMP	@doSound		;No, quit
 
 @begin0:						
-		LDA	trdrep2, X		;Is mortgaged?
+		LDA	trdrepay2, X		;Is mortgaged?
 		AND	#$80
 		BNE	@begin1			;Yes, begin	
 		
@@ -15875,31 +16040,31 @@ doDialogTrdSelTogRepay:
 		LDA	#$00			;Default to just fee
 		STA	game + GAME::varP
 		
-		LDA	trdrep2, X		;Actual square...
+		LDA	trdrepay2, X		;Actual square...
 		AND	#$01
 		BEQ	@togon			;Selecting?
 
-;		LDA	trdprp2, X		;***Don't do this because when
+;		LDA	trddeeds2, X		;***Don't do this because when
 ;		TAX				;repaying, effectively get mvalue
 ;		JSR	doDialogTrdSelRfndMVal	;back again in equity
 
 		LDX	game + GAME::sTrdSel
-		LDA	trdrep2, X		;No
+		LDA	trdrepay2, X		;No
 		AND	#$FE
-		STA	trdrep2, X
+		STA	trdrepay2, X
 
 		LDA	dialogBakupTrdSelRep, X
 		JMP	@proc
 		
 @togon:
-;		LDA	trdprp2, X		;***Don't do this as above
+;		LDA	trddeeds2, X		;***Don't do this as above
 ;		TAX
 ;		JSR	doDialogTrdSelChrgMVal
 		
 		LDX	game + GAME::sTrdSel
-		LDA	trdrep2, X		;Yes
+		LDA	trdrepay2, X		;Yes
 		ORA	#$01	
-		STA	trdrep2, X
+		STA	trdrepay2, X
 		
 		LDA	#$01
 		STA	game + GAME::varP
@@ -15958,11 +16123,11 @@ doDialogTrdSelToggle:
 
 		LDX	game + GAME::sTrdSel
 		
-		LDA	trdprp2, X
+		LDA	trddeeds2, X
 		BEQ	@togon			;Selecting?
 		
 		LDA	#$00			;No, set unselected
-		STA	trdprp2, X
+		STA	trddeeds2, X
 
 		CPX	#$28			;Is it an actual square?
 		BPL	@cont0			;No
@@ -15979,9 +16144,9 @@ doDialogTrdSelToggle:
 		LDA	dialogBakupTrdSelRep, X
 		STA	($A3), Y
 		
-		LDA	trdrep2, X		;Set no repay
+		LDA	trdrepay2, X		;Set no repay
 		AND	#$FE
-		STA	trdrep2, X
+		STA	trdrepay2, X
 
 @cont0:
 		LDA	#$00			;Can ding
@@ -16041,7 +16206,7 @@ doDialogTrdSelToggle:
 		
 		LDA	game + GAME::varO	;Get the mortgage info 
 		LDX	game + GAME::sTrdSel	;Store in trade repay info
-		STA	trdrep2, X
+		STA	trdrepay2, X
 	
 		LDA	dialogTrdSelDoElimin
 		BNE	@repay
@@ -16114,7 +16279,7 @@ doDialogTrdSelToggle:
 @dotogon:
 		LDX	game + GAME::sTrdSel	;Set selected
 		LDA	#$01			
-		STA	trdprp2, X
+		STA	trddeeds2, X
 		
 		LDA	#$AA
 		
@@ -16366,7 +16531,7 @@ doDialogTrdSelSetState:
 		LDY	#$00
 		LDX	#$29
 @loop:
-		LDA	trdprp2, X
+		LDA	trddeeds2, X
 		BEQ	@next
 		
 		LDA	dialogAddrTrdSelSqrLo, X
@@ -16385,7 +16550,7 @@ doDialogTrdSelSetState:
 		LDY	#$00
 		LDX	#$27
 @loop1:
-		LDA	trdrep2, X
+		LDA	trdrepay2, X
 		AND	#$01
 		BEQ	@next1
 		
@@ -16435,14 +16600,14 @@ doDialogTrdSelPackData:
 		
 		LDX	#$00			;For each square
 @loop0:
-		LDA	trdprp2, X		;Is selected for trade?
+		LDA	trddeeds2, X		;Is selected for trade?
 		BEQ	@next0			;No - next
 		
 		TXA				;Yes - add to trade
 		LDY	game + GAME::varA
 		STA	($A5), Y
 		
-		LDA	trdrep2, X
+		LDA	trdrepay2, X
 		STA	($A7), Y
 		
 		INC	game + GAME::varA	;Bump count
@@ -16458,7 +16623,7 @@ doDialogTrdSelPackData:
 		
 		LDY	#TRADE::gofree		;Set GOFree flags
 		
-		LDA	trdprp2, X
+		LDA	trddeeds2, X
 		BEQ	@gofree2
 		
 		LDA	#$01
@@ -16467,7 +16632,7 @@ doDialogTrdSelPackData:
 @gofree2:
 		INX
 		
-		LDA	trdprp2, X
+		LDA	trddeeds2, X
 		BEQ	@exit
 		
 		LDA	#$02
@@ -18001,7 +18166,7 @@ dialogDlgPStats0Draw:
 
 		LDY	#GROUP::count
 		LDA	($FD), Y
-		STA	game + GAME::varG	;prop count in group
+		STA	game + GAME::varG	;deed count in group
 		
 		LDY	game + GAME::varA
 		LDA	($FB), Y
@@ -21027,7 +21192,7 @@ rulesLandOnSquare:
 		CMP	#$09
 		BPL	@test2
 		
-		JSR	rulesLandProp
+		JSR	rulesLandStreet
 		JMP	@exit
 		
 @test2:
@@ -21776,7 +21941,7 @@ rulesLandCrnr:
 
 
 ;-------------------------------------------------------------------------------
-rulesDoPropRent:
+rulesDoDeedRent:
 ;-------------------------------------------------------------------------------
 		LDA	game + GAME::varI
 		AND	#$80			;mrtg
@@ -21840,7 +22005,7 @@ rulesDoPropRent:
 
 
 ;-------------------------------------------------------------------------------
-rulesLandProp:
+rulesLandStreet:
 ;-------------------------------------------------------------------------------
 		TAX
 		LDA	rulesGrpLo, X
@@ -21878,7 +22043,7 @@ rulesLandProp:
 		PLA
 		STA	$FD
 		
-		JSR	rulesDoPropRent
+		JSR	rulesDoDeedRent
 
 @exit:
 		CLC
@@ -23022,7 +23187,7 @@ rulesDoUnsetAllOwned:
 		
 
 ;-------------------------------------------------------------------------------
-rulesDoPurchProp:
+rulesDoPurchDeed:
 ;-------------------------------------------------------------------------------
 		TXA
 		PHA
@@ -23035,7 +23200,7 @@ rulesDoPurchProp:
 
 		LDY	#GROUP::count
 		LDA	($FD), Y
-		STA	game + GAME::varG	;prop count in group
+		STA	game + GAME::varG	;deed count in group
 
 		LDA	game + GAME::varC	;group index
 		ASL
@@ -23217,8 +23382,16 @@ rulesNextImprv:
 		LDA	sqr00 + 1, X
 		AND	#$40
 		BNE	@tstgroup
-		
+	
+@buzzbreak:	
 		PLA
+		
+@buzz:
+		LDA	#<SFXBUZZ
+		LDY	#>SFXBUZZ
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
 		RTS
 		
 @tstgroup:
@@ -23227,15 +23400,13 @@ rulesNextImprv:
 		
 		BNE	@tstupper
 		
-		PLA
-		RTS
+		JMP	@buzzbreak
 		
 @tstupper:
 		CPX	#$09
 		BMI	@collate
 
-		PLA
-		RTS
+		JMP	@buzzbreak
 		
 @collate:
 		LDA	rulesGrpLo, X
@@ -23248,8 +23419,7 @@ rulesNextImprv:
 		LDA	game + GAME::varD
 		BEQ	@tstdist
 		
-		PLA
-		RTS
+		JMP	@buzzbreak
 		
 @tstdist:
 		LDA	game + GAME::varA
@@ -23259,8 +23429,7 @@ rulesNextImprv:
 		CMP	game + GAME::varC
 		BEQ	@begin
 		
-		PLA
-		RTS
+		JMP	@buzzbreak
 		
 @begin:
 		PLA
@@ -23272,7 +23441,7 @@ rulesNextImprv:
 		CMP	#$08
 		BNE	@checkhouse
 		
-		RTS
+		JMP	@buzz
 		
 @checkhouse:
 		CMP	#$04
@@ -23281,12 +23450,12 @@ rulesNextImprv:
 		LDY	game + GAME::cntHs
 		BPL	@availhouse
 		
-		RTS
+		JMP	@buzz
 		
 @availhouse:
 		BNE	@sethouse
 		
-		RTS
+		JMP	@buzz
 		
 @sethouse:
 		TAY
@@ -23303,12 +23472,12 @@ rulesNextImprv:
 		LDY	game + GAME::cntHt
 		BPL	@availhotel
 		
-		RTS
+		JMP	@buzz
 		
 @availhotel:
 		BNE	@sethotel
 		
-		RTS
+		JMP	@buzz
 
 @sethotel:
 		LDA	#musTuneHotel
@@ -23323,8 +23492,7 @@ rulesNextImprv:
 		CMP	game + GAME::pActive
 		BEQ	@tstCash
 		
-		PLA
-		RTS
+		JMP	@buzzbreak
 
 @tstCash:
 		LDY	#GROUP::pImprv		;Get cost
@@ -23349,8 +23517,7 @@ rulesNextImprv:
 		
 		BPL	@update
 		
-		PLA
-		RTS
+		JMP	@buzzbreak
 		
 @update:
 		LDA	sqr00 + 1, X		;Set house/hotel
@@ -23423,7 +23590,15 @@ rulesPriorImprv:
 		LDA	game + GAME::varD
 		BEQ	@tstdist
 		
+@buzzbreak:
 		PLA
+		
+@buzz:
+		LDA	#<SFXBUZZ
+		LDY	#>SFXBUZZ
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
 		RTS
 		
 @tstdist:
@@ -23434,8 +23609,7 @@ rulesPriorImprv:
 		CMP	game + GAME::varC
 		BEQ	@tstimprv
 		
-		PLA
-		RTS
+		JMP	@buzzbreak
 
 @tstimprv:
 		PLA
@@ -23447,7 +23621,7 @@ rulesPriorImprv:
 		CMP	#$00
 		BNE	@begin
 		
-		RTS
+		JMP	@buzz
 
 @begin:
 		CMP	#$08
@@ -23735,13 +23909,19 @@ rulesToggleMrtg:
 		LDA	game + GAME::varA
 		BEQ	@cont0
 		
+@buzz:
+		LDA	#<SFXBUZZ
+		LDY	#>SFXBUZZ
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
 		RTS
 		
 @cont0:
 		LDA	game + GAME::varB
 		BEQ	@cont1
 		
-		RTS
+		JMP	@buzz
 		
 @cont1:
 		LDX	game + GAME::pActive
@@ -23757,7 +23937,7 @@ rulesToggleMrtg:
 		CMP	#$FF
 		BNE	@test
 		
-		RTS
+		JMP	@buzz
 	
 @test:
 		ASL
@@ -23769,7 +23949,7 @@ rulesToggleMrtg:
 		CMP	game + GAME::pActive
 		BEQ	@begin
 		
-		RTS
+		JMP	@buzz
 		
 @begin:
 		LDA	sqr00 + 1, X
@@ -23824,8 +24004,11 @@ rulesToggleMrtg:
 		
 ;		So, if money less than A, Y - set carry else clear
 		JSR	gamePlayerHasFunds
-		BCS	@exit
+		BCC	@havefunds
 		
+		JMP	@buzz
+
+@havefunds:
 		LDA	game + GAME::varH
 		STA	game + GAME::varD
 		LDA	game + GAME::varI
@@ -23891,7 +24074,7 @@ rulesToggleMrtg:
 		
 
 ;-------------------------------------------------------------------------------
-rulesDoXferProp:
+rulesDoXferDeed:
 ;-------------------------------------------------------------------------------
 		LDA	sqr00, X
 		PHA
@@ -23907,7 +24090,7 @@ rulesDoXferProp:
 
 		LDY	#GROUP::count
 		LDA	($FD), Y
-		STA	game + GAME::varG	;prop count in group
+		STA	game + GAME::varG	;deed count in group
 		
 ;		LDX	game + GAME::varB
 		DEX
@@ -24034,7 +24217,7 @@ rulesTradeTitleDeed:
 		BPL	@exit
 		
 		LDX	game + GAME::varF
-		JSR	rulesDoXferProp
+		JSR	rulesDoXferDeed
 		
 		LDA	#$01
 		ORA	game + GAME::dirty
@@ -24098,7 +24281,7 @@ rulesBuyTitleDeed:
 		LDX	game + GAME::varF
 		LDA	sqr00, X
 		
-		JSR	rulesDoPurchProp
+		JSR	rulesDoPurchDeed
 		
 @exit:
 		RTS
@@ -24206,10 +24389,10 @@ rulesInitTradeData:
 		
 		LDX	#$27
 @loop1:
-		STA	trdprp0, X
-		STA	trdrep0, X
-		STA	trdprp1, X
-		STA	trdrep1, X
+		STA	trddeeds0, X
+		STA	trdrepay0, X
+		STA	trddeeds1, X
+		STA	trdrepay1, X
 
 		DEX
 		BPL	@loop1
@@ -24302,7 +24485,7 @@ rulesInitEliminToBank:
 		LDA	trade0, Y
 		TAY
 		LDA	game + GAME::varB
-		STA	trdprp0, Y
+		STA	trddeeds0, Y
 		INY
 		TYA
 		LDY	#TRADE::cntDeed
@@ -25211,6 +25394,10 @@ strOptn2Setup2:		;2 - 2000 HIGH
 			.byte 	$B0, $A0, $88, $89, $87, $88
 
 
+strHeaderSetup3:	;PLAY OPTIONS
+			.byte $0C, $90, $8C, $81, $99, $A0, $8F, $90
+			.byte $94, $89, $8F, $8E, $93
+
 strDescSetup3:		;WAIT FOR PLAYER
 			.byte $0F, $97, $81, $89, $94, $A0, $86, $8F
 			.byte $92, $A0, $90, $8C, $81, $99, $85, $92
@@ -25350,7 +25537,17 @@ strOptn4Play0:		;V - OVERVIEW
 strOptn5Play0:		;S - STATISTICS
 			.byte $0E, $93, $A0, $AD, $A0, $93, $94, $81
 			.byte $94, $89, $93, $94, $89, $83, $93			
-			
+strOptn6Play0:		;O - GAME OPTIONS
+			.byte $10, $8F, $A0, $AD, $A0, $87, $81, $8D
+			.byte $85, $A0, $8F, $90, $94, $89, $8F, $8E
+			.byte $93
+strOptn7Play0:		;C - INPUT CONFIG
+			.byte $10, $83, $A0, $AD, $A0, $89, $8E, $90
+			.byte $95, $94, $A0, $83, $8F, $8E, $86, $89
+			.byte $87
+strOptn8Play0:		;Q - QUIT
+			.byte $08, $91, $A0, $AD, $A0, $91, $95, $89
+			.byte $94
 			
 strOptn0Ftr0:		;F5-QUAD3
 			.byte $08, $86, $B5, $AD, $91, $95, $81, $84
@@ -26722,7 +26919,12 @@ brdMiniMap:
 plrDefName:
 			.byte 	$08, $90, $8C, $81, $99, $85, $92, $E4, $B0
 
+uiActnCache:
+	.repeat		264, I
+			.byte	$00
+	.endrep
+
 heap0:
 			.byte	$00
 			
-	.assert         * < $CC00, error, "Program too large!"
+	.assert         * < $CD00, error, "Program too large!"
