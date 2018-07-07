@@ -1,6 +1,6 @@
 # MONOPOLY 
 
-VERSION 0.01.99 ALPHA
+VERSION 0.02.02 ALPHA
 
 
 FOR THE COMMODORE 64
@@ -156,10 +156,10 @@ in my opinion.  $2000 for three players is questionably high but
 still works alright enough.  For four or more you probably want the 
 normal amount.  I may expand the selection range.  I have been 
 asked for $3000 but this is definitely too high.
-* Coming soon -- taxes can be sent to and collected from Free Parking. 
+* Taxes can be sent to and collected from Free Parking. 
 I actually hate this house rule because it is insanely unbalanced and
 can cause the game to drag on.  It is widely desired, however so I
-will provide it (it has been almost free in the implementation 
+provide it (it has been almost free in the implementation 
 anyway).  Only taxes will be accumulated.
 * I am considering the "double salary for actually landing on Go"
 house rule but I feel it is largely redundant with a high starting
@@ -374,8 +374,20 @@ To compile:
 
 	ca65 -g -l c64client.lst -o c64client.o c64client.s
     
-	cl65 -t none c64client.o -Ln c64client.lbl -o c64client.prg	
+	cl65 -t none c64client.o -Ln c64client.lbl -o c64client.prg
 
+There are some more details about building the strings but these aren't 
+available yet.
+
+The game must also be run from the disk image so it too must be built.
+
+
+## Running
+
+Insert the disk.
+
+LOAD"*",8
+RUN
 
 
 ## Known Issues
@@ -388,11 +400,6 @@ booted prior to loading the game.  I have attempted to fix it but I
 haven't succeeded.  I will now endeavour to debug if and when it
 occurs in my testing.  From what I have been able to see, it seems
 that the IRQ has not been acknowledged correctly when this occurs?
-* Pressing Run/Stop + Restore (to cause an NMI) will bail out of the 
-game.  The game cannot be re-launched.  I should fix this by disabling
-(generating and trapping) the NMIs in the first-time initialisation. 
-This is non-trivial (carnal knowledge) and so the problem has not been 
-addressed.
 * If the game is launched in a non-default memory configuration (the 
 VIC-II screen and charrom locations), it won't attempt to normalise 
 the condition.  The game will be unplayable.  I should normalise the 
@@ -416,23 +423,29 @@ NTSC/PAL-N version in the future.
 * Fix order of buttons on trdsel0 dialog - f, b, select, repay, accept, dismiss, 
   money
 * Buzz for more of the failures (gaol, auction, management).  Must do.
-* Backup/retrieve menu button selection going to/returning from dialogs when
-  the menu hasn't changed?  Would be nice...
-* Could now instead of copy name on elimin and gameover dialogs, just refer.
 * Statistics/Overview from trade approval, must pay.  They should work now.
 
 * Should be able to do beta release state after above
+
+* Could now instead of copy name on elimin and gameover dialogs, just refer.
+* Backup/retrieve menu button selection going to/returning from dialogs when
+  the menu hasn't changed?  Would be nice...
+  
 * Implement autosell?  Complicated.
 * Allow players to input name?
+* Trim down key scan routine.
+* Get exmomiser working.
 * Change "all" dirty to be just board dirty and req. individual flags?
 * Back-fit GoatTracker driver changes from version 2.74.
 * Player sprites on overview dialog.  Would look pretty.  IRQ is a mess.
+* Add CPU player?  Should have enough memory if no longer need Kernal.  
+  Will be rather difficult to do properly.
+* Put code into separate files as indicated.
 * Is rent3 SFX still a little lame?  Does it matter?  Are the sounds okay on 
   Android (where the emulation is terrible)?
-* Properly divide game and rule routines.  How?
-* Put code into separate files as indicated
-* Fix ZPage variable use, in particular active player pointer and IRQ
-* Fix IRQ handler -- its gotten hacked to death
+* Properly divide game and rule routines.  Finished yet?
+* Fix ZPage variable use, in particular active player pointer and IRQ.
+* Fix IRQ handler -- its gotten hacked to death.
 * Screen double buffering?  Is it required if the dirty/update code is 
   optimised?  Would be difficult - quite a bit of rework.
 * Optimise, optimise, optimise (eg. BIT instead of LDA, AND/ORA trains).
@@ -440,11 +453,6 @@ NTSC/PAL-N version in the future.
   items.
 * Check music/sfx - sometimes does not fire correctly at all (other than
   resource contention issue).  Perhaps fixed by 2.74?  Very rare issue.
-* Implement own keyboard scan, remove dependency on Kernal
-* Load strings into high RAM (Kernal space) saving 4KB in program area?  Need to
-  build it somehow...
-* Add CPU player?  Should have enough memory if no longer need Kernal.  
-  Will be rather difficult to do properly.
 
 ## For Testing (Needs Confirmation):
 * Player focus restored after player lose to player interrupt?
@@ -460,6 +468,18 @@ NTSC/PAL-N version in the future.
 
 
 ## Change History (Since Version 0.01.99A)
+* 08JUL208
+	* Load strings resource.  This is still very slow. *sigh*
+	* Rip out strings and put in separate files.  I have built a strings.prg
+	  file out of the process but I can't get exomiser to work yet so the
+	  process is unfinalised.
+	* Unload Kernal and use the machine bare.
+	* Replace Kernal scankey with my own copy. *ugh*
+* 07JUL2018
+	* Rework trade stepping interrupt into a generic execute on the 
+	  front-end feature, ui Actions.
+	* Bump the version.  I have everything in from my initial requirements
+	  (except for tidy up) and am now going beyond.
 * 06JUL2018
 	* Buzz when fail attempting to mortgage, construct or sell.
 	* Change order of button on setup3 and setup5 menus to better 

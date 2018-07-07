@@ -31,7 +31,7 @@
 ;defs
 ;-------------------------------------------------------------------------------
 	.define	DEBUG_IRQ	0
-	.define DEBUG_KEYS	0
+	.define DEBUG_KEYS	1
 
 spriteMemD	=	$0340
 spriteMemE	=	$0380
@@ -96,10 +96,19 @@ buttonLeft	=	$10
 buttonRight	=	$01
 
 
-krnlUsrIRQ	=	$0314
+;krnlUsrIRQ	=	$0314
+cpuIRQ		=	$FFFE
+cpuRESET	=	$FFFC
+cpuNMI		=	$FFFA
+
 
 krnlOutChr	= 	$E716
-krnlScnKey	=	$EA87
+krnlLoad	=	$FFD5
+krnlSetLFS	=	$FFBA
+krnlSetNam	=	$FFBD
+knrlClAll	=	$FFE7
+
+;krnlScnKey	=	$EA87
 
 musTuneIntro	=	$00
 musTuneSilence  =	$01
@@ -185,6 +194,12 @@ JSTKSENS_HIGH	=	9
 		
 		fBtUpd1 .byte
 		fBtSta1 .byte
+		
+		cActns	.word
+		gMdAct	.byte
+		pActBak .byte
+		fActTyp .byte			;type (regular, elimin)
+		fActInt .byte			;interactive
 	.endstruct
 
 
@@ -271,7 +286,6 @@ JSTKSENS_HIGH	=	9
 		iTrdStp .byte			;step
 		fTrdPhs .byte			;phase
 		fTrdTyp .byte			;type (regular, elimin)
-		fTrdInt .byte			;interactive
 		
 		gMdQuit .byte			
 		pQuitCP	.byte
@@ -499,6 +513,13 @@ JSTKSENS_HIGH	=	9
 	.endstruct
 
 
+	.struct	DIALOG
+		fKeys	.word
+		fDraw	.word
+		bDef	.byte
+	.endstruct
+	
+
 ;-------------------------------------------------------------------------------
 ;BASIC launcher
 ;-------------------------------------------------------------------------------
@@ -674,9 +695,17 @@ trdrepay2:
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 	
 	
+	.include 	"strings.inc"
+
+	
 ;-------------------------------------------------------------------------------
 ;init
 ;-------------------------------------------------------------------------------
+FILENAME:
+		.byte	"STRINGS"
+FILENAME_2:
+
+
 init:
 ;		PHP				;save the initial state
 ;		PHA	
@@ -686,6 +715,13 @@ init:
 ;		PHA
 
 		CLD
+		
+		LDA	#<screenClear1
+		STA	$FD
+		LDA	#>screenClear1
+		STA	$FE
+		
+		JSR	screenPerformList
 
 		LDA	#$8E			;go to uppercase characters
 		JSR	krnlOutChr
@@ -693,20 +729,48 @@ init:
 		LDA	#$08			;disable change character case
 		JSR	krnlOutChr
 
+		LDA	#$01
+		LDX	#$08
+		LDY	#$01
+		
+		JSR	krnlSetLFS
+		
+		LDA	#FILENAME_2 - FILENAME
+		LDX	#<FILENAME
+		LDY	#>FILENAME
+
+		JSR	krnlSetNam
+		
+		LDA	#$00
+		LDX	#<$E000
+		LDY	#>$E000
+		
+		JSR	krnlLoad
+		
+		JSR	knrlClAll
+		
+		LDA	#$7F			;disable standard CIA irqs
+		STA	cia1IRQCtl
+
+		SEI
+
+;***FIXME:	Reset the stack pointer?
+
+		JSR	initMem
+;		JSR	decrunch
+
 		LDA  	#$0B			;set screen colours
 		STA	vicBrdrClr
 		LDA	#$00
 		STA	vicBkgdClr
 
-		JSR	initMem
-
+		JSR	initFirstTime
+		
 		JSR	initBoard
 
 		JSR	initSprites		
 		
 		JSR	initPlayers		
-
-		JSR	initFirstTime
 
 		JSR	initScreen
 
@@ -719,8 +783,9 @@ init:
 		
 		JSR	plyrInit
  		JSR	plyrInstall
-
-
+		
+		CLI
+	
 		JMP	uloop			;jump to updates
 
 ;-------------------------------------------------------------------------------
@@ -750,13 +815,11 @@ uloop:
 		JMP	main
 		
 exit:
-		JSR	plyrUninstall
-		
-		JSR	finMem
-		
-		LDA	#$09			;enable change character case
-		JSR	krnlOutChr
-
+;		JSR	plyrUninstall
+;		JSR	finMem
+;		LDA	#$09			;enable change character case
+;		JSR	krnlOutChr
+;
 ;		PLA				;restore initial state
 ;		TAX
 ;		PLA				;We're not going back
@@ -774,16 +837,17 @@ hang:
 ;initMem
 ;-------------------------------------------------------------------------------
 initMem:
-;	Bank out BASIC (keep Kernal and IO).  First, make sure that the IO port
+;	Bank out BASIC + Kernal (keep IO).  First, make sure that the IO port
 ;	is set to output on those lines.
 		LDA	$00
 		ORA	#$07
 		STA	$00
 		
-;	Now, exclude BASIC from the memory map (and include Kernal and IO)
-		LDA	$01
-		AND	#$FE
-		ORA	#$06
+;	Now, exclude BASIC + KERNAL from the memory map (include only IO)
+;		LDA	$01
+;		AND	#$FC
+;		ORA	#$01
+		LDA	#$1D
 		STA	$01		
 		
 ;		LDX	#$00			;We don't need to back-up the
@@ -792,6 +856,8 @@ initMem:
 ;		STA	$C000, X
 ;		INX
 ;		BNE	@loop
+		
+		JSR	keyInit
 		
 		RTS
 
@@ -828,6 +894,9 @@ handleUpdates:
 		CMP	#$06
 		BNE	@tsttrdsel
 		
+		LDA	game + GAME::dlgVis	;***FIXME: I'm not sure this is
+		BNE	@tsttrdsel		;really required but makes sense
+		
 		JSR	gamePerfStepping
 		
 @tsttrdsel:
@@ -840,8 +909,11 @@ handleUpdates:
 		LDA	game + GAME::gMode
 		CMP	#$08
 		BNE	@tstdirty
-		
-		JSR	gamePerfTradeStepping
+
+		LDA	game + GAME::dlgVis
+		BNE	@tstdirty
+
+		JSR	uiProcessActions
 
 @tstdirty:
 		LDA	game + GAME::dirty
@@ -1067,6 +1139,388 @@ gameRebuildScreen:
 		STA	game + GAME::dirty
 
 		RTS
+
+
+;==============================================================================
+;FOR KEYS.S
+;==============================================================================
+
+keyInit:
+		LDA	#<keyEvaluateSpecial
+		STA	$028F
+		LDA	#>keyEvaluateSpecial
+		STA	$0290
+		
+		RTS
+
+keyScanKey:
+;.,EA87 A9 00    clear A
+		LDA 	#$00        
+		
+;.,EA89 8D 8D 02 clear the keyboard shift/control/c= flag
+		STA 	$028D       
+;.,EA8C A0 40    set no key
+		LDY 	#$40
+;.,EA8E 84 CB    save which key
+		STY 	$CB         
+;.,EA90 8D 00 DC clear VIA 1 DRA, keyboard column drive
+		STA 	$DC00       
+;.,EA93 AE 01 DC read VIA 1 DRB, keyboard row port
+		LDX 	$DC01       
+;.,EA96 E0 FF    compare with all bits set
+		CPX 	#$FF        
+;.,EA98 F0 61    if no key pressed clear current key and exit (does
+;                                further BEQ to $EBBA)
+		BEQ 	keysTstSave		;$EAFB       
+;.,EA9A A8       clear the key count
+		TAY             
+;.,EA9B A9 81    get the decode table low byte
+		LDA 	#<keyTableStandard	;$81        
+;.,EA9D 85 F5    save the keyboard pointer low byte
+		STA 	$F5         
+;.,EA9F A9 EB    get the decode table high byte
+		LDA 	#>keyTableStandard	;$EB        
+;.,EAA1 85 F6    save the keyboard pointer high byte
+		STA 	$F6         
+;.,EAA3 A9 FE    set column 0 low
+		LDA 	#$FE
+;.,EAA5 8D 00 DC save VIA 1 DRA, keyboard column drive
+		STA 	$DC00    
+@loopcol:		
+;.,EAA8 A2 08    set the row count
+		LDX 	#$08        
+;.,EAAA 48       save the column
+		PHA          
+@pollport:		
+;.,EAAB AD 01 DC read VIA 1 DRB, keyboard row port
+		LDA 	$DC01       
+;.,EAAE CD 01 DC compare it with itself
+		CMP 	$DC01       
+;.,EAB1 D0 F8    loop if changing
+		BNE 	@pollport		;$EAAB       
+@loop0:
+;.,EAB3 4A       shift row to Cb
+		LSR             
+;.,EAB4 B0 16    if no key closed on this row go do next row
+		BCS 	@next			;$EACC       
+;.,EAB6 48       save row
+		PHA             
+;.,EAB7 B1 F5    get character from decode table
+		LDA 	($F5),Y     
+;.,EAB9 C9 05    compare with $05, there is no $05 key but the control
+;                                keys are all less than $05
+		CMP 	#$05        
+;.,EABB B0 0C    if not shift/control/c=/stop go save key count
+;                                else was shift/control/c=/stop key
+		BCS 	@nextfix		;$EAC9       
+;.,EABD C9 03    compare with $03, stop
+		CMP 	#$03        
+;.,EABF F0 08    if stop go save key count and continue
+;                                character is $01 - shift, $02 - c= or $04 - control
+		BEQ 	@nextfix		;$EAC9       
+;.,EAC1 0D 8D 02 OR it with the keyboard shift/control/c= flag
+		ORA 	$028D       
+;.,EAC4 8D 8D 02 save the keyboard shift/control/c= flag
+		STA 	$028D       
+;.,EAC7 10 02    skip save key, branch always
+		BPL 	@nextfix1		;$EACB       
+@nextfix:
+;.,EAC9 84 CB    save key count
+		STY 	$CB         
+@nextfix1:
+;.,EACB 68       restore row
+		PLA             
+@next:
+;.,EACC C8       increment key count
+		INY             
+;.,EACD C0 41    compare with max+1
+		CPY 	#$41        
+;.,EACF B0 0B    exit loop if >= max+1
+		BCS 	@evalspecialfix		;$EADC       
+;                                else still in matrix
+;.,EAD1 CA       decrement row count
+		DEX             
+;.,EAD2 D0 DF    loop if more rows to do
+		BNE 	@loop0			;$EAB3       
+;.,EAD4 38       set carry for keyboard column shift
+		SEC             
+;.,EAD5 68       restore the column
+		PLA             
+;.,EAD6 2A       shift the keyboard column
+		ROL             
+;.,EAD7 8D 00 DC save VIA 1 DRA, keyboard column drive
+		STA 	$DC00       
+;.,EADA D0 CC    loop for next column, branch always
+		BNE 	@loopcol		;$EAA8       
+@evalspecialfix:
+;.,EADC 68       dump the saved column
+		PLA             
+;.,EADD 6C 8F 02 evaluate the SHIFT/CTRL/C= keys, $EBDC
+;                                key decoding continues here after the SHIFT/CTRL/C= keys are evaluated
+		JMP 	($028F)     
+keysCont:
+;.,EAE0 A4 CB    get saved key count
+		LDY 	$CB         
+;.,EAE2 B1 F5    get character from decode table
+		LDA 	($F5), Y     
+;.,EAE4 AA       copy character to X
+		TAX             
+;.,EAE5 C4 C5    compare key count with last key count
+		CPY 	$C5         
+;.,EAE7 F0 07    if this key = current key, key held, go test repeat
+		BEQ 	@tstrepeat		;$EAF0 
+;.,EAE9 A0 10    set the repeat delay count
+		LDY 	#$10        
+;.,EAEB 8C 8C 02 save the repeat delay count
+		STY 	$028C       
+;.,EAEE D0 36    go save key to buffer and exit, branch always
+		BNE 	keysSave		;$EB26       
+@tstrepeat:
+;.,EAF0 29 7F    clear b7
+		AND 	#$7F        
+;.,EAF2 2C 8A 02 test key repeat
+		BIT 	$028A       
+;.,EAF5 30 16    if repeat all go ??
+		BMI 	keysNextRep		;$EB0D       
+;.,EAF7 70 49    
+		BVS 	exitKeys		;$EB42       if repeat none go ??
+;.,EAF9 C9 7F    compare with end marker
+		CMP 	#$7F        
+keysTstSave:
+;.,EAFB F0 29           if $00/end marker go save key to buffer and exit
+		BEQ 	keysSave		;$EB26
+;.,EAFD C9 14    compare with [INSERT]/[DELETE]
+		CMP 	#$14        
+;.,EAFF F0 0C    if [INSERT]/[DELETE] go test for repeat
+		BEQ 	keysNextRep		;$EB0D       
+;.,EB01 C9 20    compare with [SPACE]
+		CMP 	#$20        
+;.,EB03 F0 08    if [SPACE] go test for repeat
+		BEQ 	keysNextRep		;$EB0D       
+;.,EB05 C9 1D    compare with [CURSOR RIGHT]
+		CMP 	#$1D        
+;.,EB07 F0 04    if [CURSOR RIGHT] go test for repeat
+		BEQ 	keysNextRep		;$EB0D       
+;.,EB09 C9 11    compare with [CURSOR DOWN]
+		CMP 	#$11        
+;.,EB0B D0 35    if not [CURSOR DOWN] just exit
+;                               was one of the cursor movement keys, insert/delete
+;                                key or the space bar so always do repeat tests
+		BNE 	exitKeys		;$EB42       
+
+keysNextRep:
+;.,EB0D AC 8C 02 get the repeat delay counter
+		LDY 	$028C       
+;.,EB10 F0 05    if delay expired go ??
+		BEQ 	@decrephigh		;$EB17       
+;.,EB12 CE 8C 02 else decrement repeat delay counter
+		DEC 	$028C       
+;.,EB15 D0 2B    if delay not expired go ??
+;                                repeat delay counter has expired
+		BNE 	exitKeys		;$EB42       
+@decrephigh:
+;.,EB17 CE 8B 02 decrement the repeat speed counter
+		DEC 	$028B       
+;.,EB1A D0 26    branch if repeat speed count not expired
+		BNE 	exitKeys		;$EB42       
+;.,EB1C A0 04    set for 4/60ths of a second
+		LDY 	#$04        
+;.,EB1E 8C 8B 02 save the repeat speed counter
+		STY 	$028B       
+;.,EB21 A4 C6    get the keyboard buffer index
+		LDY 	$C6         
+;.,EB23 88       decrement it
+		DEY             
+;.,EB24 10 1C    if the buffer isn't empty just exit
+;                                else repeat the key immediately
+;                                possibly save the key to the keyboard buffer. if there was no key pressed or the key
+;                                was not found during the scan (possibly due to key bounce) then X will be $FF here
+		BPL 	exitKeys		;$EB42       
+keysSave:
+;.,EB26 A4 CB    get the key count
+		LDY 	$CB         
+;.,EB28 84 C5    save it as the current key count
+		STY 	$C5         
+;.,EB2A AC 8D 02 get the keyboard shift/control/c= flag
+		LDY 	$028D       
+;.,EB2D 8C 8E 02 save it as last keyboard shift pattern
+		STY 	$028E       
+;.,EB30 E0 FF    compare the character with the table end marker or no key
+		CPX 	#$FF        
+;.,EB32 F0 0E    if it was the table end marker or no key just exit
+		BEQ 	exitKeys		;$EB42       
+;.,EB34 8A       copy the character to A
+		TXA             
+;.,EB35 A6 C6    get the keyboard buffer index
+		LDX 	$C6         
+;.,EB37 EC 89 02 compare it with the keyboard buffer size
+		CPX 	$0289       
+;.,EB3A B0 06    if the buffer is full just exit
+		BCS 	exitKeys		;$EB42       
+;.,EB3C 9D 77 02 save the character to the keyboard buffer
+		STA 	$0277, X     
+;.,EB3F E8       increment the index
+		INX             
+;.,EB40 86 C6    save the keyboard buffer index
+		STX 	$C6         
+exitKeys:
+;.,EB42 A9 7F    enable column 7 for the stop key
+		LDA 	#$7F        
+;.,EB44 8D 00 DC save VIA 1 DRA, keyboard column drive
+		STA 	$DC00       
+;.,EB47 60       
+		RTS             
+		
+
+keyEvaluateSpecial:
+;				*** evaluate the SHIFT/CTRL/C= keys
+;.,EB48 AD 8D 02 get the keyboard shift/control/c= flag
+		LDA 	$028D       
+;.,EB4B C9 03    compare with [SHIFT][C=]
+		CMP 	#$03        
+;.,EB4D D0 15    if not [SHIFT][C=] go ??
+		BNE 	@control		;$EB64       
+;.,EB4F CD 8E 02 compare with last
+		CMP 	$028E       
+;.,EB52 F0 EE    exit if still the same
+		BEQ 	exitKeys		;$EB42       
+;.,EB54 AD 91 02 get the shift mode switch $00 = enabled, $80 = locked
+		LDA 	$0291       
+;.,EB57 30 1D    if locked continue keyboard decode
+;                                toggle text mode
+		BMI 	@done			;$EB76       
+;.,EB59 AD 18 D0 get the start of character memory address
+		LDA 	$D018       
+;.,EB5C 49 02    toggle address b1
+		EOR 	#$02        
+;.,EB5E 8D 18 D0 save the start of character memory address
+		STA 	$D018       
+;.,EB61 4C 76 EB continue the keyboard decode
+;                                select keyboard table
+		JMP 	@done			;$EB76       
+@control:
+;.,EB64 0A       << 1
+		ASL             
+;.,EB65 C9 08    compare with [CTRL]
+		CMP 	#$08        
+;.,EB67 90 02    if [CTRL] is not pressed skip the index change
+		BCC 	@copy			;$EB6B       
+;.,EB69 A9 06    else [CTRL] was pressed so make the index = $06
+		LDA 	#$06        
+@copy:
+;.,EB6B AA       copy the index to X
+		TAX             
+;.,EB6C BD 79 EB get the decode table pointer low byte
+		LDA 	keyTableAddresses, X     
+;.,EB6F 85 F5    save the decode table pointer low byte
+		STA 	$F5         
+;.,EB71 BD 7A EB get the decode table pointer high byte
+		LDA 	keyTableAddresses + 1,X     
+;.,EB74 85 F6    save the decode table pointer high byte
+		STA 	$F6         
+@done:
+;.,EB76 4C E0 EA continue the keyboard decode
+		JMP 	keysCont		;$EAE0       
+
+
+
+;                                *** table addresses
+keyTableAddresses:
+;.:EB79 81 EB                    standard
+	.word	keyTableStandard
+;.:EB7B C2 EB                    shift
+	.word	keyTableShifted
+;.:EB7D 03 EC                    commodore
+	.word	keyTableAlt
+;.:EB7F 78 EC                    control
+	.word	keyTableControl
+
+
+;				*** standard keyboard table
+keyTableStandard:
+;.:EB81 14 0D 1D 88 85 86 87 11
+	.byte	$14, $0D, $1D, $88, $85, $86, $87, $11
+;.:EB89 33 57 41 34 5A 53 45 01
+	.byte	$33, $57, $41, $34, $5A, $53, $45, $01
+;.:EB91 35 52 44 36 43 46 54 58
+	.byte	$35, $52, $44, $36, $43, $46, $54, $58
+;.:EB99 37 59 47 38 42 48 55 56
+	.byte	$37, $59, $47, $38, $42, $48, $55, $56
+;.:EBA1 39 49 4A 30 4D 4B 4F 4E
+	.byte	$39, $49, $4A, $30, $4D, $4B, $4F, $4E
+;.:EBA9 2B 50 4C 2D 2E 3A 40 2C
+	.byte	$2B, $50, $4C, $2D, $2E, $3A, $40, $2C
+;.:EBB1 5C 2A 3B 13 01 3D 5E 2F
+	.byte	$5C, $2A, $3B, $13, $01, $3D, $5E, $2F
+;.:EBB9 31 5F 04 32 20 02 51 03
+	.byte	$31, $5F, $04, $32, $20, $02, $51, $03
+;.:EBC1 FF
+	.byte	$FF
+	
+	
+;                                *** shifted keyboard table
+keyTableShifted:
+;.:EBC2 94 8D 9D 8C 89 8A 8B 91
+	.byte	$94, $8D, $9D, $8C, $89, $8A, $8B, $91
+;.:EBCA 23 D7 C1 24 DA D3 C5 01
+	.byte	$23, $D7, $C1, $24, $DA, $D3, $C5, $01
+;.:EBD2 25 D2 C4 26 C3 C6 D4 D8
+	.byte	$25, $D2, $C4, $26, $C3, $C6, $D4, $D8
+;.:EBDA 27 D9 C7 28 C2 C8 D5 D6
+	.byte	$27, $D9, $C7, $28, $C2, $C8, $D5, $D6
+;.:EBE2 29 C9 CA 30 CD CB CF CE
+	.byte	$29, $C9, $CA, $30, $CD, $CB, $CF, $CE
+;.:EBEA DB D0 CC DD 3E 5B BA 3C
+	.byte	$DB, $D0, $CC, $DD, $3E, $5B, $BA, $3C
+;.:EBF2 A9 C0 5D 93 01 3D DE 3F
+	.byte	$A9, $C0, $5D, $93, $01, $3D, $DE, $3F
+;.:EBFA 21 5F 04 22 A0 02 D1 83
+	.byte	$21, $5F, $04, $22, $A0, $02, $D1, $83
+;.:EC02 FF
+	.byte	$FF
+
+;                                *** CBM key keyboard table
+keyTableAlt:
+;.:EC03 94 8D 9D 8C 89 8A 8B 91
+	.byte	$94, $8D, $9D, $8C, $89, $8A, $8B, $91
+;.:EC0B 96 B3 B0 97 AD AE B1 01
+	.byte	$96, $B3, $B0, $97, $AD, $AE, $B1, $01
+;.:EC13 98 B2 AC 99 BC BB A3 BD
+	.byte	$98, $B2, $AC, $99, $BC, $BB, $A3, $BD
+;.:EC1B 9A B7 A5 9B BF B4 B8 BE
+	.byte	$9A, $B7, $A5, $9B, $BF, $B4, $B8, $BE
+;.:EC23 29 A2 B5 30 A7 A1 B9 AA
+	.byte	$29, $A2, $B5, $30, $A7, $A1, $B9, $AA
+;.:EC2B A6 AF B6 DC 3E 5B A4 3C
+	.byte	$A6, $AF, $B6, $DC, $3E, $5B, $A4, $3C
+;.:EC33 A8 DF 5D 93 01 3D DE 3F
+	.byte	$A8, $DF, $5D, $93, $01, $3D, $DE, $3F
+;.:EC3B 81 5F 04 95 A0 02 AB 83
+	.byte	$81, $5F, $04, $95, $A0, $02, $AB, $83
+;.:EC43 FF
+	.byte	$FF
+
+
+;                                *** control keyboard table
+keyTableControl:
+;.:EC78 FF FF FF FF FF FF FF FF
+	.byte	$FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
+;.:EC80 1C 17 01 9F 1A 13 05 FF
+	.byte	$1C, $17, $01, $9F, $1A, $13, $05, $FF
+;.:EC88 9C 12 04 1E 03 06 14 18
+	.byte	$9C, $12, $04, $1E, $03, $06, $14, $18
+;.:EC90 1F 19 07 9E 02 08 15 16
+	.byte	$1F, $19, $07, $9E, $02, $08, $15, $16
+;.:EC98 12 09 0A 92 0D 0B 0F 0E
+	.byte	$12, $09, $0A, $92, $0D, $0B, $0F, $0E
+;.:ECA0 FF 10 0C FF FF 1B 00 FF
+	.byte	$FF, $10, $0C, $FF, $FF, $1B, $00, $FF
+;.:ECA8 1C FF 1D FF FF 1F 1E FF
+	.byte	$1C, $FF, $1D, $FF, $FF, $1F, $1E, $FF
+;.:ECB0 90 06 FF 05 FF FF 11 FF
+	.byte	$90, $06, $FF, $05, $FF, $FF, $11, $FF
+;.:ECB8 FF
+	.byte	$FF
 
 
 ;==============================================================================
@@ -2358,6 +2812,17 @@ pointCodes:
 screenClear0:
 			.byte	$11, $00, $00, $28, $19
 			.byte	$00
+screenClear1:
+			.byte	$11, $00, $00, $28, $19
+			.byte	$90, $00, $01
+			.word	screenText0Clear1
+			.byte	$00
+			
+screenText0Clear1:	;LOADING RESOURCES...
+			.byte $14, $0C, $0F, $01, $04, $09, $0E, $07
+			.byte $20, $12, $05, $13, $0F, $15, $12, $03
+			.byte $05, $13, $2E, $2E, $2E
+			
 screenQErase0:
 ;			.byte	$58, $00, $00, $06
 			.byte	$58, $12, $00, $07
@@ -2455,7 +2920,7 @@ brushesHi:
 
 	.struct	IRQGLOBS
 		instld	.byte
-		vector	.word
+;		vector	.word
 		saveA	.byte
 		saveB	.byte
 		saveC	.byte
@@ -2533,6 +2998,10 @@ plyrInit:
 		RTS
 
 
+plyrNOP:
+		RTI
+
+
 ;-------------------------------------------------------------------------------
 ;plyrInstall
 ;-------------------------------------------------------------------------------
@@ -2541,17 +3010,21 @@ plyrInstall:
 		CMP	#$01
 		BEQ	@exit
 
-		SEI
-		
-		LDA	krnlUsrIRQ		;Save current IRQ handler
-		STA	irqglob + IRQGLOBS::vector
-		LDA	krnlUsrIRQ + 1
-		STA	irqglob + IRQGLOBS::vector + 1
-		
 		LDA	#<plyrIRQ		;install our handler
-		STA	$0314
+		STA	cpuIRQ
 		LDA	#>plyrIRQ
-		STA	$0315
+		STA	cpuIRQ + 1
+
+		LDA	#<plyrNOP		;install our handler
+		STA	cpuRESET
+		LDA	#>plyrNOP
+		STA	cpuRESET + 1
+
+		LDA	#<plyrNOP		;install our handler
+		STA	cpuNMI
+		LDA	#>plyrNOP
+		STA	cpuNMI + 1
+
 
 		LDA	#%01111111		;We'll always want rasters
 		AND	vicCtrlReg		;    less than $0100
@@ -2570,46 +3043,9 @@ plyrInstall:
 		LDA	#$01			;flag installed irq handler
 		STA	irqglob + IRQGLOBS::instld
 
-		LDA	#$7F			;disable standard CIA irqs
-		STA	cia1IRQCtl
-
-		CLI
-
 @exit:
 		RTS
 		
-
-;-------------------------------------------------------------------------------
-;plyrUninstall
-;-------------------------------------------------------------------------------
-plyrUninstall:
-		LDA	irqglob + IRQGLOBS::instld
-		CMP	#$00
-		BEQ	@exit
-
-		SEI
-		
-						;restore original handler
-		LDA	irqglob + IRQGLOBS::vector
-		STA	krnlUsrIRQ
-		LDA	irqglob + IRQGLOBS::vector + 1
-		STA	krnlUsrIRQ + 1
-		
-		LDA	#$00			;disable raster IRQs
-		STA	vicIRQMask
-		
-		LDA	#$FF			;enable standard CIA IRQs
-		STA	cia1IRQCtl
-		
-		LDA	#$00
-		STA	irqglob + IRQGLOBS::instld
-		
-		CLI
-		
-@exit:
-		RTS
-
-
 
 ;-------------------------------------------------------------------------------
 ;plyrIRQ
@@ -2621,12 +3057,12 @@ plyrUninstall:
 ;			second?
 
 plyrIRQ:
-;		PHP				;save the initial state
-;		PHA
-;		TXA				;de This is done in the kernal
-;		PHA
-;		TYA
-;		PHA
+		PHP				;save the initial state
+		PHA
+		TXA				;de This is done in the kernal
+		PHA
+		TYA
+		PHA
 
 		CLD
 		
@@ -2646,7 +3082,6 @@ plyrIRQ:
 		AND	#$01
 		BNE	@1
 		
-;		JMP	(irqglob + IRQGLOBS::vector)
 		JMP 	@done
 		
 @1:
@@ -2696,7 +3131,8 @@ plyrIRQ:
 ;dengland
 ;		I seem to need to call this regularly or else there is a jam for 
 ;		some reason???
-		JSR	krnlScnKey
+;		JSR	krnlScnKey
+		JSR	keyScanKey
 
 		LDA	game + GAME::sig	;Don't process the mouse click
 		BNE	@skipKeys		;or keys if the FrontEnd is busy
@@ -2856,6 +3292,8 @@ plyrIRQ:
 		PLA             
 		TAX             
 		PLA             
+		
+		PLP
 
 		RTI
 
@@ -4748,6 +5186,61 @@ prmptTemp3:
 		.byte	$00
 
 
+tokPrmptRolled:		;ROLLED 
+			.byte 	$51, $12, $0F, $0C, $0C, $05, $04, $20
+			.byte	$20, $20, $20, $20, $20, $20, $20, $20
+tokPrmptRent:		;RENT   
+			.byte 	$51, $12, $05, $0E, $14, $20, $20, $20
+			.byte	$20, $24, $20, $20, $20, $20, $20, $20
+tokPrmptBought:		;BOUGHT
+			.byte	$51, $02, $0F, $15, $07, $08, $14, $20
+			.byte	$20, $24, $20, $20, $20, $20, $20, $20
+tokPrmptTax:		;TAX
+			.byte 	$51, $14, $01, $18, $20, $20, $20, $20
+			.byte	$20, $24, $20, $20, $20, $20, $20, $20
+tokPrmptGaol:		;GONE TO GAOL
+			.byte 	$51, $07, $0F, $0E, $05, $20, $14, $0F
+			.byte 	$20, $07, $01, $0F, $0C, $20, $20, $20
+tokPrmptManage:		;HSES+00 HTLS+00
+			.byte 	$51, $08, $13, $05, $13, $2B, $30, $30
+			.byte 	$20, $08, $14, $0C, $13, $2B, $30, $30
+tokPrmptMustSell:	;MUST SELL IMPRV
+			.byte 	$51, $0D, $15, $13, $14, $20, $13, $05
+			.byte 	$0C, $0C, $20, $09, $0D, $10, $12, $16
+tokPrmptSalary:		;SALARY   
+			.byte 	$51, $13, $01, $0C, $01, $12, $19, $20
+			.byte 	$20, $24, $20, $20, $20, $20, $20, $20
+tokPrmptFParking:	;FPARKING
+			.byte 	$51, $06, $10, $01, $12, $0B, $09, $0E
+			.byte 	$07, $24, $20, $20, $20, $20, $20, $20
+tokPrmptMortgage:	;MORTGAGE
+			.byte 	$51, $0D, $0F, $12, $14, $07, $01, $07
+			.byte 	$05, $24, $20, $20, $20, $20, $20, $20
+tokPrmptRepay:		;REPAY    
+			.byte 	$51, $12, $05, $10, $01, $19, $20, $20
+			.byte 	$20, $24, $20, $20, $20, $20, $20, $20
+tokPrmptSold:		;SOLD     
+			.byte 	$51, $13, $0F, $0C, $04, $20, $20, $20
+			.byte 	$20, $24, $20, $20, $20, $20, $20, $20
+tokPrmptShuffle:	;SHUFFLING...
+			.byte 	$51, $13, $08, $15, $06, $06, $0C, $09
+			.byte 	$0E, $07, $2E, $2E, $2E, $20, $20, $20
+tokPrmptChest:		;CHEST
+			.byte 	$51, $03, $08, $05, $13, $14, $20, $20
+			.byte 	$20, $24, $20, $20, $20, $20, $20, $20
+tokPrmptChance:		;CHANCE 
+			.byte 	$51, $03, $08, $01, $0E, $03, $05, $20
+			.byte 	$20, $24, $20, $20, $20, $20, $20, $20
+tokPrmptForSale:	;FOR SALE
+			.byte 	$51, $06, $0F, $12, $20, $13, $01, $0C
+			.byte 	$05, $24, $20, $20, $20, $20, $20, $20
+tokPrmptPostBail:	;BAIL
+			.byte 	$51, $02, $01, $09, $0C, $20, $20, $20
+			.byte	$20, $24, $20, $20, $20, $20, $20, $20
+tokPrmptFee:		;FEE
+			.byte 	$51, $06, $05, $05, $20, $20, $20, $20
+			.byte	$20, $24, $20, $20, $20, $20, $20, $20
+
 ;-------------------------------------------------------------------------------
 ;prmptClear
 ;-------------------------------------------------------------------------------
@@ -5665,7 +6158,522 @@ statsDisplay:
 		RTS
 
 		
+
+;==============================================================================
+;FOR UI.S
+;==============================================================================
+
+uiActionCallsLo:
+		.byte	<(uiActionNull), <(uiActionTrade - 1)
+		.byte	<(uiActionRepay - 1), <(uiActionFee - 1)
+		.byte	<(uiActionAuction - 1)
+uiActionCallsHi:
+		.byte	>(uiActionNull), >(uiActionTrade - 1)
+		.byte	>(uiActionRepay - 1), >(uiActionFee - 1)
+		.byte	>(uiActionAuction - 1)
+
+
+;-------------------------------------------------------------------------------
+uiInitQueue:
+;-------------------------------------------------------------------------------
+		LDA	#<uiActnCache
+		STA	$6D
+		LDA	#>uiActnCache
+		STA	$6E
+
+;		LDA	#$FF
+;		STA	($6D), Y
 		
+;		CLC
+;		LDA	$6D
+;		ADC	#$04
+;		STA	$6D
+;		LDA	$6E
+;		ADC	#$00
+;		STA	$6E
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
+uiDequeueAction:
+;-------------------------------------------------------------------------------
+		LDY	#$00
+		
+		SEC
+		LDA	ui + UI::cActns
+		SBC	#$01
+		STA	ui + UI::cActns
+		LDA	ui + UI::cActns + 1
+		SBC	#$00
+		STA	ui + UI::cActns + 1
+		
+		LDA	($6D), Y
+		STA	$68
+		INY
+		LDA	($6D), Y
+		STA	$69
+		INY
+		LDA	($6D), Y
+		STA	$6A
+		INY
+		LDA	($6D), Y
+		STA	$6B
+
+		CLC
+		LDA	$6D
+		ADC	#$04
+		STA	$6D
+		LDA	$6E
+		ADC	#$00
+		STA	$6E
+		
+
+		RTS
+		
+
+;-------------------------------------------------------------------------------
+uiEnqueueAction:
+;-------------------------------------------------------------------------------
+		LDY	#$00
+		
+		LDA	$68
+		STA	($6D), Y
+		INY
+		LDA	$69
+		STA	($6D), Y
+		INY
+		LDA	$6A
+		STA	($6D), Y
+		INY
+		LDA	$6B
+		STA	($6D), Y
+		
+		CLC
+		LDA	ui + UI::cActns
+		ADC	#$01
+		STA	ui + UI::cActns
+		LDA	ui + UI::cActns + 1
+		ADC	#$00
+		STA	ui + UI::cActns + 1
+		
+		CLC
+		LDA	$6D
+		ADC	#$04
+		STA	$6D
+		LDA	$6E
+		ADC	#$00
+		STA	$6E
+		
+		LDA	#$FF
+		STA	($6D), Y
+
+		RTS
+
+;-------------------------------------------------------------------------------
+uiPerformAction:
+;-------------------------------------------------------------------------------
+		LDX	$68
+		
+		LDA	#>(@farreturn - 1)
+		PHA
+		LDA	#<(@farreturn - 1)
+		PHA
+		
+		LDA	uiActionCallsHi, X
+		PHA
+		LDA	uiActionCallsLo, X
+		PHA
+		
+		RTS				;Call our routine
+		
+@farreturn:
+		RTS
+
+
+;-------------------------------------------------------------------------------
+uiProcessInit:
+;-------------------------------------------------------------------------------
+		JSR	uiInitQueue
+		
+		LDA	#$60
+		STA	game + GAME::iStpCnt
+		LDA	#$00			
+		STA	game + GAME::fStpSig
+
+		LDA	game + GAME::gMode
+		STA	ui + UI::gMdAct
+		LDA	game + GAME::pActive
+		STA	ui + UI::pActBak
+
+		LDA	#$08
+		STA	game + GAME::gMode
+		
+		JSR	gameUpdateMenu
+
+		LDA	#<$DA18
+		STA	game + GAME::aWai
+		LDA	#>$DA18
+		STA	game + GAME::aWai + 1
+
+		LDA	#$01
+		STA	game + GAME::kWai
+	
+		RTS
+		
+
+;-------------------------------------------------------------------------------
+uiProcessActions:
+;-------------------------------------------------------------------------------
+		LDA	game + GAME::fStpSig
+		BNE	@proc
+
+		LDA	ui + UI::fActInt
+		BEQ	@proc
+
+		RTS
+		
+@proc:
+		JSR	uiActionDeselect
+		
+		JSR	uiDequeueAction
+		
+		LDA	$68
+		CMP	#$FF
+		BEQ	@terminate
+		
+		JSR	uiPerformAction
+		JMP	@exit
+		
+@terminate:
+		JSR	uiProcessTerminate
+		JSR	uiInitQueue
+
+@exit:
+		LDA	#$00
+		STA	game + GAME::fStpSig
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
+uiProcessMPay:
+;-------------------------------------------------------------------------------
+		LDA	game + GAME::gMode
+		STA	game + GAME::gMdMPyI	
+		
+		LDA	game + GAME::pActive
+		STA	game + GAME::pMstPyI
+
+		STA	game + GAME::pMPyLst
+		STA	game + GAME::pMPyCur
+
+		LDA	#$03
+		STA	game + GAME::gMode
+		
+		RTS
+		
+		
+;-------------------------------------------------------------------------------
+uiProcessChkAllMPay:
+;-------------------------------------------------------------------------------
+		LDX	game + GAME::pActive
+		JMP	@next1
+@loop1:
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+
+		LDY	#PLAYER::status
+		LDA	($FB), Y
+		AND	#$0A
+		BEQ	@next1
+
+		JSR	uiProcessMPay
+		JMP	@exit1
+		
+@next1:
+		INX
+
+		CPX	#$06
+		BNE	@tstloop1
+		
+@wrap1:		
+		LDX	#$00
+		
+@tstloop1:
+		CPX	game + GAME::pActive
+		BNE	@loop1
+		
+@exit1:
+		RTS
+
+
+;-------------------------------------------------------------------------------
+uiProcessTerminate:
+;-------------------------------------------------------------------------------
+		JSR	uiActionDeselect
+		
+		LDA	ui + UI::fActTyp
+		BNE	@endelimin
+
+;		Pop player and mode from trade 
+		LDA	ui + UI::pActBak
+		STA	game + GAME::pActive
+		LDA	#$FF
+		STA	game + GAME::pLast
+		
+		LDA	ui + UI::gMdAct
+		STA	game + GAME::gMode
+
+		LDA	#$00
+		STA	game + GAME::fStpSig
+		STA	game + GAME::kWai
+		
+		JSR	rulesFocusOnActive
+		JSR	gamePlayersDirty
+
+		LDX	game + GAME::pActive	
+		LDA	plrLo, X		
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDY	#PLAYER::colour
+		LDA	($FB), Y
+		TAX
+		JSR	prmptClearOrRoll
+
+		JSR	uiProcessChkAllMPay	
+
+		JSR	gameUpdateMenu
+
+		LDA	#$01
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+
+		RTS
+
+@endelimin:
+		LDA	ui + UI::pActBak
+		STA	game + GAME::pActive
+		LDA	#$FF
+		STA	game + GAME::pLast
+		
+		LDA	ui + UI::gMdAct
+		STA	game + GAME::gMode
+
+		LDA	#$00
+		STA	game + GAME::fStpSig
+		STA	game + GAME::kWai
+		
+		JSR	rulesFocusOnActive
+		JSR	gamePlayersDirty
+		
+		LDA	game + GAME::gMode
+		CMP	#$03
+		BEQ	@alreadympay
+		
+		JSR	uiProcessChkAllMPay
+		
+		LDA	game + GAME::gMode
+		CMP	#$03
+		BEQ	@complete
+		
+		JSR	rulesDoNextPlyr
+		JMP	@complete
+		
+		
+@alreadympay:
+		LDA	game + GAME::pActive	;Check them all again
+		STA	game + GAME::pMstPyI
+
+		STA	game + GAME::pMPyLst
+
+@complete:
+		JSR	gameUpdateMenu
+		
+		LDA	#$01
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
+uiActionDeselect:
+;-------------------------------------------------------------------------------
+		LDA	game + GAME::sSelect
+		CMP	#$FF
+		BEQ	@exit
+		
+		JSR	gameDeselect
+		
+@exit:
+		RTS
+		
+
+;-------------------------------------------------------------------------------
+uiActionFocusSquare:
+;-------------------------------------------------------------------------------
+		STA	game + GAME::varA
+		
+		TXA
+		PHA
+		
+		LDA	ui + UI::fActInt
+		BEQ	@exit
+		
+		JSR	uiActionDeselect
+		
+		LDA	game + GAME::varA
+		JSR	gameSelect
+
+		LDA	game + GAME::varA
+		LDX	#$00
+		JSR	rulesCalcQForSquare
+		
+		CMP	game + GAME::qVis
+		BEQ	@focusskipv
+		
+		STA	game + GAME::qVis
+
+		JSR	gamePlayersDirty
+		
+@focusskipv:
+		LDA	#$01
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+@exit:
+		PLA
+		TAX
+		
+		RTS
+
+;-------------------------------------------------------------------------------
+uiActionNull:
+;-------------------------------------------------------------------------------
+		LDA 	#<dialogDlgNull0
+		LDY	#>dialogDlgNull0
+		
+		JSR	dialogSetDialog
+		JSR	dialogDispDefDialog
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
+uiActionTrade:
+;-------------------------------------------------------------------------------
+;		LDY	#TRADE::player
+;		LDA	trade0, Y
+
+		LDA	$69			;byte 01 = player
+
+		STA	game + GAME::pLast
+		STA	game + GAME::pActive
+
+;			- phase 0 - transfer deed
+;		LDX	game + GAME::iTrdStp 
+;		LDA	trddeeds1, X
+		
+		LDA	$6A			;byte 02 = square
+		
+		JSR	uiActionFocusSquare
+		
+;		LDA	trddeeds1, X
+;		TAX
+
+		LDX	$6A
+
+		JSR	rulesTradeTitleDeed
+		
+		RTS
+
+uiActionRepay:
+;		LDY	#TRADE::player
+;		LDA	trade0, Y
+
+		LDA	$69			;byte 01 = player
+
+		STA	game + GAME::pLast
+		STA	game + GAME::pActive
+
+;		LDX	game + GAME::iTrdStp 
+;		LDA	trddeeds1, X
+
+		LDA	$6A
+		JSR	uiActionFocusSquare
+
+;		LDA	trddeeds1, X
+		LDA	$6A
+		JSR	rulesUnmortgageImmed
+		
+;		JSR	gamePerfTradeDeselect
+
+		RTS
+		
+uiActionFee:
+;		LDY	#TRADE::player
+;		LDA	trade0, Y
+
+		LDA	$69			;byte 01 = player
+
+		STA	game + GAME::pLast
+		STA	game + GAME::pActive
+		
+;			- phase 1 - fee/repay deed
+;		LDX	game + GAME::iTrdStp 
+;		LDA	trdrepay1, X
+;		AND	#$01
+;		BNE	@stage0ph1repay
+
+;		LDX	game + GAME::iTrdStp 
+;		LDA	trddeeds1, X
+
+		LDA	$6A
+		JSR	uiActionFocusSquare
+
+;		LDA	trddeeds1, X
+		
+		LDA	$6A
+		JSR	rulesMortgageFeeImmed
+
+		RTS
+		
+uiActionAuction:
+;***TODO:	Probably should make a routine that toggles off interactive and
+;		sets this, too.
+		LDA	#$00
+		STA	game + GAME::kWai
+		
+;		LDY	game + GAME::iTrdStp
+;		LDA	trddeeds0, Y
+
+		LDA	$6A
+		STA	game + GAME::sAuctn
+
+;		INC	game + GAME::iTrdStp
+
+;		LDY	#TRADE::player
+;		LDA	trade0, Y
+
+		LDA	$69
+
+		STA	game + GAME::pActive
+		LDA	#$FF
+		STA	game + GAME::pLast
+
+		JSR	rulesDoNextPlyr
+
+		LDX	#$01
+		JSR	gameStartAuction
+		
+		RTS
+
+
 ;==============================================================================
 ;FOR MENU.S
 ;==============================================================================
@@ -9098,6 +10106,9 @@ menuPageTrade0Draw:
 		LDA	menuPlyrSelSelect
 		STA	trade0, X
 		
+		LDA	game + GAME::pActive
+		STA	trade1, X
+		
 		JSR	menuTrade0RWealthRecalc
 		
 @cont:
@@ -9398,7 +10409,9 @@ menuPageTrade1Keys:
 
 		LDA	#$00
 		STA	game + GAME::fTrdTyp
-		JSR	gamePerfTradeFullTerm
+		JSR	gamePerfTradePopMode
+		
+		JSR	gameUpdateMenu
 
 		JMP	@keysDing
 		
@@ -9461,9 +10474,7 @@ menuPageTrade6Keys:
 		JSR	SNDBASE + 6
 		
 		LDA	#$00
-		STA	game + GAME::fTrdInt
-		
-		JSR	gamePerfTradeFullCont
+		STA	ui + UI::fActInt
 
 @exit:
 		RTS
@@ -9665,11 +10676,17 @@ menuPageElimin0Keys:
 		LDA	game + GAME::fDoJump
 		BEQ	@stepping
 
-		JSR	gamePerfTradeFull
-		JMP	@keysDing
+		LDA	#$00
+		STA	ui + UI::fActInt		
+		
+		JMP	@cont
 		
 @stepping:
-		JSR	gamePerfTradeIntrpt
+		LDA	#$01
+		STA	ui + UI::fActInt		
+
+@cont:
+		JSR	gamePerfTradeFull
 		
 @keysDing:
 		LDA	#<SFXDING
@@ -10710,31 +11727,6 @@ gamePerfStepping:
 		
 		JSR	gameUpdateMenu
 		
-		RTS
-
-
-;-------------------------------------------------------------------------------
-gamePerfTradeStepping:
-;-------------------------------------------------------------------------------
-		LDA	game + GAME::fStpSig
-		BNE	@proc
-		
-		RTS
-		
-@proc:
-		JSR	gamePerfTradeStep
-		
-		LDA	#$00
-		STA	game + GAME::fStpSig
-		
-		LDA	game + GAME::fTrdStg
-		CMP	#$FF
-		BNE	@exit
-		
-;		Pop player and mode from trade/elimin
-		JSR	gamePerfTradeFullTerm
-
-@exit:
 		RTS
 
 
@@ -11944,15 +12936,19 @@ gameApproveTrade:
 
 		LDA	#$00
 		STA	game + GAME::fTrdTyp
+		STA	ui + UI::fActInt		
 		
-		JSR	gamePerfTradeFull
-		RTS
+		JMP	@proc
 		
 @stepping:
 		LDA	#$00
 		STA	game + GAME::fTrdTyp
 		
-		JSR	gamePerfTradeIntrpt
+		LDA	#$01
+		STA	ui + UI::fActInt		
+		
+@proc:
+		JSR	gamePerfTradeFull
 
 		RTS
 
@@ -11960,7 +12956,7 @@ gameApproveTrade:
 ;-------------------------------------------------------------------------------
 gamePerfTradeStep:
 ;-------------------------------------------------------------------------------
-		JSR	gamePerfTradeDeselect
+;		JSR	gamePerfTradeDeselect
 
 ;		Check if doing stage 0 - offered xfer
 		LDA	game + GAME::fTrdStg
@@ -11977,22 +12973,35 @@ gamePerfTradeStep:
 	
 		LDA	game + GAME::fTrdPhs
 		BNE	@stage0phase1
-		
+
+		LDA	#$01
+		STA	$68
+
 		LDY	#TRADE::player
 		LDA	trade0, Y
-		STA	game + GAME::pLast
-		STA	game + GAME::pActive
+		
+		STA	$69
+		
+;		STA	game + GAME::pLast
+;		STA	game + GAME::pActive
 		
 ;			- phase 0 - transfer deed
 		LDX	game + GAME::iTrdStp 
 		LDA	trddeeds1, X
-		JSR	gamePerfTradeFocus
+
+		STA	$6A
 		
-		LDA	trddeeds1, X
-		TAX
-		JSR	rulesTradeTitleDeed
-		
+		JSR	uiEnqueueAction
+
+;		JSR	gamePerfTradeFocus
+;		
+;		LDA	trddeeds1, X
+;		TAX
+;		JSR	rulesTradeTitleDeed
+;		
 ;		JSR	gamePerfTradeDeselect
+
+;***
 
 ;				- if mrtg, go to phase 1
 		LDX	game + GAME::iTrdStp 
@@ -12009,10 +13018,13 @@ gamePerfTradeStep:
 		RTS
 		
 @stage0phase1:
+
 		LDY	#TRADE::player
 		LDA	trade0, Y
-		STA	game + GAME::pLast
-		STA	game + GAME::pActive
+;		STA	game + GAME::pLast
+;		STA	game + GAME::pActive
+		
+		STA	$69
 		
 ;			- phase 1 - fee/repay deed
 		LDX	game + GAME::iTrdStp 
@@ -12020,28 +13032,46 @@ gamePerfTradeStep:
 		AND	#$01
 		BNE	@stage0ph1repay
 
+		LDA	#$03
+		STA	$68
+
 		LDX	game + GAME::iTrdStp 
 
 		LDA	trddeeds1, X
-		JSR	gamePerfTradeFocus
-
-		LDA	trddeeds1, X
-		JSR	rulesMortgageFeeImmed
-
+		
+		STA	$6A
+		
+		JSR	uiEnqueueAction
+		
+;		JSR	gamePerfTradeFocus
+;
+;		LDA	trddeeds1, X
+;		JSR	rulesMortgageFeeImmed
+;
 ;		JSR	gamePerfTradeDeselect
 		
 		JMP	@stage0nextdeed
 		
 @stage0ph1repay:
+
+		LDA	#$02
+		STA	$68
+
 		LDX	game + GAME::iTrdStp 
 		LDA	trddeeds1, X
-		JSR	gamePerfTradeFocus
 
-		LDA	trddeeds1, X
-		JSR	rulesUnmortgageImmed
+		STA	$6A
 		
+		JSR	uiEnqueueAction
+		
+;		JSR	gamePerfTradeFocus
+;
+;		LDA	trddeeds1, X
+;		JSR	rulesUnmortgageImmed
+;		
 ;		JSR	gamePerfTradeDeselect
-		
+
+
 @stage0nextdeed:
 ;			- next deed
 		INC 	game + GAME::iTrdStp 
@@ -12074,9 +13104,9 @@ gamePerfTradeStep:
 		LDA	#$00
 		STA	game + GAME::iTrdStp
 		STA	game + GAME::fTrdPhs
-		STA	game + GAME::kWai
+;		STA	game + GAME::kWai
 		
-		JSR	gamePerfTradeDeselect
+;		JSR	gamePerfTradeDeselect
 		
 		RTS
 		
@@ -12102,22 +13132,36 @@ gamePerfTradeStep:
 	
 		LDA	game + GAME::fTrdPhs
 		BNE	@stage1phase1
-		
+	
+		LDA	#$01
+		STA	$68
+
 		LDY	#TRADE::player
 		LDA	trade1, Y
-		STA	game + GAME::pLast
-		STA	game + GAME::pActive
+		
+		STA	$69
+		
+;		STA	game + GAME::pLast
+;		STA	game + GAME::pActive
 		
 ;			- phase 0 - transfer deed
 		LDX	game + GAME::iTrdStp 
 		LDA	trddeeds0, X
-		JSR	gamePerfTradeFocus
-
-		LDA	trddeeds0, X
-		TAX
-		JSR	rulesTradeTitleDeed
 		
+		STA	$6A
+		
+		JSR	uiEnqueueAction
+		
+		
+;		JSR	gamePerfTradeFocus
+;
+;		LDA	trddeeds0, X
+;		TAX
+;		JSR	rulesTradeTitleDeed
+;		
 ;		JSR	gamePerfTradeDeselect
+
+
 
 ;				- if mrtg, go to phase 1
 		LDX	game + GAME::iTrdStp 
@@ -12136,8 +13180,11 @@ gamePerfTradeStep:
 @stage1phase1:
 		LDY	#TRADE::player
 		LDA	trade1, Y
-		STA	game + GAME::pLast
-		STA	game + GAME::pActive
+		
+		STA	$69
+		
+;		STA	game + GAME::pLast
+;		STA	game + GAME::pActive
 		
 ;			- phase 1 - fee/repay deed
 		LDX	game + GAME::iTrdStp 
@@ -12145,26 +13192,44 @@ gamePerfTradeStep:
 		AND	#$01
 		BNE	@stage1ph1repay
 
+		LDA	#$03
+		STA	$68
+
 		LDX	game + GAME::iTrdStp 
 		LDA	trddeeds0, X
-		JSR	gamePerfTradeFocus
 
-		LDA	trddeeds0, X
-		JSR	rulesMortgageFeeImmed
+		STA	$69
 		
+		JSR	uiEnqueueAction
+
+;		JSR	gamePerfTradeFocus
+;
+;		LDA	trddeeds0, X
+;		JSR	rulesMortgageFeeImmed
+;		
 ;		JSR	gamePerfTradeDeselect
 
 		JMP	@stage1nextdeed
 		
 @stage1ph1repay:
+		LDA	#$02
+		STA	$68
+
 		LDX	game + GAME::iTrdStp 
 		LDA	trddeeds0, X
-		JSR	gamePerfTradeFocus
-
-		LDA	trddeeds0, X
-		JSR	rulesUnmortgageImmed
 		
+		STA	$69
+		
+		JSR	uiEnqueueAction
+
+;		JSR	gamePerfTradeFocus
+;
+;		LDA	trddeeds0, X
+;		JSR	rulesUnmortgageImmed
+;		
 ;		JSR	gamePerfTradeDeselect
+		
+;***
 		
 @stage1nextdeed:
 ;			- next deed
@@ -12187,27 +13252,39 @@ gamePerfTradeStep:
 
 ;		check if doing stage 2 - auction 
 @tststage2:
+
 		LDY	#TRADE::cntDeed
 		LDA	trade0, Y
 		CMP	game + GAME::iTrdStp
 		BEQ	@stage2done	
 
+		LDA	#$04
+		STA	$68
+
 		LDY	game + GAME::iTrdStp
 		LDA	trddeeds0, Y
-		STA	game + GAME::sAuctn
+;		STA	game + GAME::sAuctn
+		STA	$6A
 
 		INC	game + GAME::iTrdStp
 
 		LDY	#TRADE::player
 		LDA	trade0, Y
-		STA	game + GAME::pActive
-		LDA	#$FF
-		STA	game + GAME::pLast
+		
+		STA	$69
+		
+		JSR	uiEnqueueAction
+		
+;		STA	game + GAME::pActive
+;		LDA	#$FF
+;		STA	game + GAME::pLast
+;
+;		JSR	rulesDoNextPlyr
+;
+;		LDX	#$01
+;		JSR	gameStartAuction
+;		
 
-		JSR	rulesDoNextPlyr
-
-		LDX	#$01
-		JSR	gameStartAuction
 		
 		RTS
 
@@ -12217,61 +13294,6 @@ gamePerfTradeStep:
 		
 		RTS
 
-
-;-------------------------------------------------------------------------------
-gamePerfTradeFocus:
-;-------------------------------------------------------------------------------
-		STA	game + GAME::varA
-		
-		TXA
-		PHA
-		
-		LDA	game + GAME::fTrdInt
-		BEQ	@exit
-		
-		JSR	gamePerfTradeDeselect
-		
-		LDA	game + GAME::varA
-		JSR	gameSelect
-
-		LDA	game + GAME::varA
-		LDX	#$00
-		JSR	rulesCalcQForSquare
-		
-		CMP	game + GAME::qVis
-		BEQ	@focusskipv
-		
-		STA	game + GAME::qVis
-
-		JSR	gamePlayersDirty
-		
-@focusskipv:
-		LDA	#$01
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty
-		
-@exit:
-		PLA
-		TAX
-		
-		RTS
-		
-		
-;-------------------------------------------------------------------------------
-gamePerfTradeDeselect:
-;-------------------------------------------------------------------------------
-;		LDA	game + GAME::fTrdInt
-;		BEQ	@exit
-		
-		LDA	game + GAME::sSelect
-		CMP	#$FF
-		BEQ	@exit
-		
-		JSR	gameDeselect
-		
-@exit:
-		RTS
-		
 
 ;-------------------------------------------------------------------------------
 gamePerfTradeMoney:
@@ -12325,142 +13347,7 @@ gamePerfTradeMoney:
 		RTS
 
 
-;-------------------------------------------------------------------------------
-gamePerfTradeIntrpt:
-;-------------------------------------------------------------------------------
-		LDA	#$00
-		STA	game + GAME::fTrdStg
-		STA	game + GAME::iTrdStp 
-		STA	game + GAME::fTrdPhs
-;		STA	game + GAME::fTrdTyp
-		
-		LDA	#$01
-		STA	game + GAME::fTrdInt		
-		
-		JSR	gamePerfTradeMoney
-	
-		JSR	gamePerfTradeStep
-
-		LDA	game + GAME::fTrdStg
-		CMP	#$FF
-		BNE	@cont
-	
-		JSR	gamePerfTradeFullTerm
-		RTS
-		
-@cont:
-		LDA	#$60
-		STA	game + GAME::iStpCnt
-		LDA	#$00			
-		STA	game + GAME::fStpSig
-		
-		LDA	#$08
-		STA	game + GAME::gMode
-		
-		JSR	gameUpdateMenu
-
-		LDA	#<$DA18
-		STA	game + GAME::aWai
-		LDA	#>$DA18
-		STA	game + GAME::aWai + 1
-
-		LDA	#$01
-		STA	game + GAME::kWai
-
-		RTS
-		
-		
-;-------------------------------------------------------------------------------
-gamePerfTradeMPay:
-;-------------------------------------------------------------------------------
-		LDA	game + GAME::gMode
-		STA	game + GAME::gMdMPyI	
-		
-		LDA	game + GAME::pActive
-		STA	game + GAME::pMstPyI
-
-		STA	game + GAME::pMPyLst
-		STA	game + GAME::pMPyCur
-
-		LDA	#$03
-		STA	game + GAME::gMode
-		
-		RTS
-		
-		
-;-------------------------------------------------------------------------------
-gamePerfTradeChkAllMPay:
-;-------------------------------------------------------------------------------
-		LDX	game + GAME::pActive
-		JMP	@next1
-@loop1:
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
-		LDY	#PLAYER::status
-		LDA	($FB), Y
-		AND	#$0A
-		BEQ	@next1
-
-		JSR	gamePerfTradeMPay
-		JMP	@exit1
-		
-@next1:
-		INX
-
-		CPX	#$06
-		BNE	@tstloop1
-		
-@wrap1:		
-		LDX	#$00
-		
-@tstloop1:
-		CPX	game + GAME::pActive
-		BNE	@loop1
-		
-@exit1:
-		RTS
-		
-
-;-------------------------------------------------------------------------------
-gamePerfTradeFull:
-;-------------------------------------------------------------------------------
-		LDA	#$00
-		STA	game + GAME::fTrdStg
-		STA	game + GAME::iTrdStp 
-		STA	game + GAME::fTrdPhs
-;		STA	game + GAME::fTrdTyp
-		STA	game + GAME::fTrdInt
-
-		JSR	gamePerfTradeMoney
-		
-gamePerfTradeFullCont:
-
-@loop:
-		JSR	gamePerfTradeStep
-
-		LDA	game + GAME::fTrdStg
-		
-		CMP	#$02
-		BNE	@tstnext
-	
-		LDA	#$01
-		STA	game + GAME::fTrdInt
-		
-;***FIXME:	What else do I need to do to go back to interactive?
-;***TODO:	Go back to interactive stepping for auctions??
-		
-		RTS
-
-@tstnext:
-		CMP	#$FF
-		BNE	@loop
-	
-gamePerfTradeFullTerm:	
-		JSR	gamePerfTradeDeselect
-		
+gamePerfTradePopMode:
 		LDA	game + GAME::fTrdTyp
 		BNE	@endelimin
 
@@ -12472,28 +13359,6 @@ gamePerfTradeFullTerm:
 		
 		LDA	game + GAME::gMdTrdI
 		STA	game + GAME::gMode
-
-		LDA	#$00
-		STA	game + GAME::fStpSig
-		STA	game + GAME::kWai
-		
-		JSR	rulesFocusOnActive
-		JSR	gamePlayersDirty
-
-		LDX	game + GAME::pActive	
-		LDA	plrLo, X		
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
-		LDY	#PLAYER::colour
-		LDA	($FB), Y
-		TAX
-		JSR	prmptClearOrRoll
-
-		JSR	gamePerfTradeChkAllMPay	
-
-		JSR	gameUpdateMenu
 
 		RTS
 
@@ -12507,36 +13372,36 @@ gamePerfTradeFullTerm:
 		LDA	game + GAME::gMdElim
 		STA	game + GAME::gMode
 
+		RTS
+
+
+;-------------------------------------------------------------------------------
+gamePerfTradeFull:
+;-------------------------------------------------------------------------------
 		LDA	#$00
-		STA	game + GAME::fStpSig
-		STA	game + GAME::kWai
-		
-		JSR	rulesFocusOnActive
-		JSR	gamePlayersDirty
-		
-		LDA	game + GAME::gMode
-		CMP	#$03
-		BEQ	@alreadympay
-		
-		JSR	gamePerfTradeChkAllMPay	
-		
-		LDA	game + GAME::gMode
-		CMP	#$03
-		BEQ	@complete
-		
-		JSR	rulesDoNextPlyr
-		JMP	@complete
-		
-		
-@alreadympay:
-		LDA	game + GAME::pActive	;Check them all again
-		STA	game + GAME::pMstPyI
+		STA	game + GAME::fTrdStg
+		STA	game + GAME::iTrdStp 
+		STA	game + GAME::fTrdPhs
+;		STA	game + GAME::fTrdTyp
+;		STA	game + GAME::fTrdInt
 
-		STA	game + GAME::pMPyLst
-
-@complete:
-		JSR	gameUpdateMenu
+		JSR	gamePerfTradeMoney
 		
+@loop:
+		JSR	gamePerfTradeStep
+
+		LDA	game + GAME::fTrdStg
+@tstnext:
+		CMP	#$FF
+		BNE	@loop
+	
+		JSR	gamePerfTradePopMode
+	
+		JSR	uiProcessInit
+		
+		LDA	game + GAME::fTrdTyp
+		STA	ui + UI::fActTyp
+
 		RTS
 		
 		
@@ -12657,6 +13522,13 @@ gameSelect:
 		ORA	#$20
 		STA	sqr00 + 1, X
 		
+		LDA	game + GAME::sSelect
+		CMP	#$FF
+		BEQ	@select
+	
+		JSR	gameDeselect
+
+@select:
 		PLA
 		STA	game + GAME::sSelect
 		
@@ -13357,11 +14229,6 @@ gameCheckChanceShuffle:
 ;==============================================================================
 ;FOR DIALOG.S
 ;==============================================================================
-	.struct	DIALOG
-		fKeys	.word
-		fDraw	.word
-		bDef	.byte
-	.endstruct
 	
 dialogDefWindow0:		
 			.byte	$13, $08, $05, $18, $0C
@@ -13472,6 +14339,10 @@ dialogDlgTrade7:
 		.word	dialogDlgTrade7Draw
 		.byte	$01
 		
+dialogDlgNull0:
+		.word	dialogDefKeys
+		.word	dialogDlgNull0Draw
+		.byte	$01
 
 ;-------------------------------------------------------------------------------
 dialogSetDialog:
@@ -18235,6 +19106,27 @@ dialogDlgPStats0Draw:
 		JSR	screenResetSelBtn
 		RTS
 
+
+dialogWindowNull0:
+			.byte	$90, $09, $06
+			.word		strHeaderNull0
+			
+			.byte	$90, $09, $09
+			.word		strText0Null0
+
+			.byte	$00
+
+
+dialogDlgNull0Draw:
+		LDA	#<dialogWindowNull0
+		STA	$FD
+		LDA	#>dialogWindowNull0
+		STA	$FE
+		
+		JSR	screenPerformList
+
+		JSR	screenResetSelBtn
+		RTS
 
 ;===============================================================================
 ;FOR BOARD.S
@@ -24505,7 +25397,10 @@ rulesInitEliminToBank:
 		
 ;***FIXME:	Do I need to change game + GAME::pActive?
 
-		JSR	gamePerfTradeIntrpt
+		LDA	#$01
+		STA	ui + UI::fActInt		
+		
+		JSR	gamePerfTradeFull
 		RTS
 		
 
@@ -25216,1241 +26111,6 @@ RTRN:
 		RTS         			;RETURN
 
 
-
-;==============================================================================
-;FOR STRINGS.S
-;==============================================================================
-
-strHeaderTitles0:	;M O N O P O L Y
-			.byte $0F, $8D, $A0, $8F, $A0, $8E, $A0, $8F
-			.byte $A0, $90, $A0, $8F, $A0, $8C, $A0, $99
-			
-;***These should be strTextNTitles0, doh...
-
-strDesc0Titles0:	;BY
-			.byte $02, $82, $99			
-strDesc1Titles0:	;DANIEL ENGLAND
-			.byte $0E, $84, $81, $8E, $89, $85, $8C, $A0
-			.byte $85, $8E, $87, $8C, $81, $8E, $84
-strDesc2Titles0:	;FOR
-			.byte $03, $86, $8F, $92
-strDesc3Titles0:	;ECCLESTIAL
-			.byte $0A, $85, $83, $83, $8C, $85, $93, $94
-			.byte $89, $81, $8C
-strDesc4Titles0:	;SOLUTIONS
-			.byte $09, $93, $8F, $8C, $95, $94, $89, $8F
-			.byte $8E, $93	
-strDesc8Titles0:	;VERSION 0.01.99A
-			.byte $10, $96, $85, $92, $93, $89, $8F, $8E
-			.byte $A0, $B0, $AE, $B0, $B1, $AE, $B9, $B9
-			.byte $81			
-strDesc5Titles0:	;(C) 1935, 2016
-			.byte $0E, $A8, $83, $A9, $A0, $B1, $B9, $B3
-			.byte $B5, $AC, $A0, $B2, $B0, $B1, $B6			
-strDesc6Titles0:	;HASBRO
-			.byte $06, $88, $81, $93, $82, $92, $8F
-strDesc7Titles0:	;PRESS ANY KEY
-			.byte $0D, $90, $92, $85, $93, $93, $A0, $81
-			.byte $8E, $99, $A0, $8B, $85, $99
-
-
-tokPrmptRolled:		;ROLLED 
-			.byte 	$51, $12, $0F, $0C, $0C, $05, $04, $20
-			.byte	$20, $20, $20, $20, $20, $20, $20, $20
-tokPrmptRent:		;RENT   
-			.byte 	$51, $12, $05, $0E, $14, $20, $20, $20
-			.byte	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptBought:		;BOUGHT
-			.byte	$51, $02, $0F, $15, $07, $08, $14, $20
-			.byte	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptTax:		;TAX
-			.byte 	$51, $14, $01, $18, $20, $20, $20, $20
-			.byte	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptGaol:		;GONE TO GAOL
-			.byte 	$51, $07, $0F, $0E, $05, $20, $14, $0F
-			.byte 	$20, $07, $01, $0F, $0C, $20, $20, $20
-tokPrmptManage:		;HSES+00 HTLS+00
-			.byte 	$51, $08, $13, $05, $13, $2B, $30, $30
-			.byte 	$20, $08, $14, $0C, $13, $2B, $30, $30
-tokPrmptMustSell:	;MUST SELL IMPRV
-			.byte 	$51, $0D, $15, $13, $14, $20, $13, $05
-			.byte 	$0C, $0C, $20, $09, $0D, $10, $12, $16
-tokPrmptSalary:		;SALARY   
-			.byte 	$51, $13, $01, $0C, $01, $12, $19, $20
-			.byte 	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptFParking:	;FPARKING
-			.byte 	$51, $06, $10, $01, $12, $0B, $09, $0E
-			.byte 	$07, $24, $20, $20, $20, $20, $20, $20
-tokPrmptMortgage:	;MORTGAGE
-			.byte 	$51, $0D, $0F, $12, $14, $07, $01, $07
-			.byte 	$05, $24, $20, $20, $20, $20, $20, $20
-tokPrmptRepay:		;REPAY    
-			.byte 	$51, $12, $05, $10, $01, $19, $20, $20
-			.byte 	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptSold:		;SOLD     
-			.byte 	$51, $13, $0F, $0C, $04, $20, $20, $20
-			.byte 	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptShuffle:	;SHUFFLING...
-			.byte 	$51, $13, $08, $15, $06, $06, $0C, $09
-			.byte 	$0E, $07, $2E, $2E, $2E, $20, $20, $20
-tokPrmptChest:		;CHEST
-			.byte 	$51, $03, $08, $05, $13, $14, $20, $20
-			.byte 	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptChance:		;CHANCE 
-			.byte 	$51, $03, $08, $01, $0E, $03, $05, $20
-			.byte 	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptForSale:	;FOR SALE
-			.byte 	$51, $06, $0F, $12, $20, $13, $01, $0C
-			.byte 	$05, $24, $20, $20, $20, $20, $20, $20
-tokPrmptPostBail:	;BAIL
-			.byte 	$51, $02, $01, $09, $0C, $20, $20, $20
-			.byte	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptFee:		;FEE
-			.byte 	$51, $06, $05, $05, $20, $20, $20, $20
-			.byte	$20, $24, $20, $20, $20, $20, $20, $20
-
-strDummyDummy0:
-			.byte	$00
-
-
-strText0NumConv0:	;INTERNAL ERROR (OVERFLOW)
-			.byte $19, $09, $0E, $14, $05, $12, $0E, $01
-			.byte $0C, $20, $05, $12, $12, $0F, $12, $20
-			.byte $28, $0F, $16, $05, $12, $06, $0C, $0F
-			.byte $17, $29
-
-
-strHeaderSetup0:	;PREGAME CONFIG
-			.byte 	$0E, $90, $92, $85, $87, $81, $8D, $85
-			.byte	$A0, $83, $8F, $8E, $86, $89, $87
-strDescSetup0:		;SET PLAYER COUNT
-			.byte 	$10, $93, $85, $94, $A0, $90, $8C, $81
-			.byte 	$99, $85, $92, $A0, $83, $8F, $95, $8E
-			.byte 	$94
-strOptn0Setup0:		;2 - 2 PLAYERS
-			.byte 	$0D, $B2, $A0, $AD, $A0, $B2, $A0, $90
-			.byte 	$8C, $81, $99, $85, $92, $93
-strOptn1Setup0:		;3 - 3 PLAYERS
-			.byte 	$0D, $B3, $A0, $AD, $A0, $B3, $A0, $90
-			.byte 	$8C, $81, $99, $85, $92, $93
-strOptn2Setup0:		;4 - 4 PLAYERS
-			.byte 	$0D, $B4, $A0, $AD, $A0, $B4, $A0, $90
-			.byte 	$8C, $81, $99, $85, $92, $93
-strOptn3Setup0:		;5 - 5 PLAYERS
-			.byte 	$0D, $B5, $A0, $AD, $A0, $B5, $A0, $90
-			.byte 	$8C, $81, $99, $85, $92, $93
-strOptn4Setup0:		;6 - 6 PLAYERS
-			.byte 	$0D, $B6, $A0, $AD, $A0, $B6, $A0, $90
-			.byte 	$8C, $81, $99, $85, $92, $93
-
-
-strDescSetup1:		;SET PLAYER COLOUR
-			.byte $11, $93, $85, $94, $A0, $90, $8C, $81
-			.byte $99, $85, $92, $A0, $83, $8F, $8C, $8F
-			.byte $95, $92
-strOptn0Setup1:		;0 - RED
-			.byte 	$07, $B0, $A0, $AD, $A0, $92, $85, $84
-strOptn1Setup1:		;1 - PURPLE
-			.byte 	$0A, $B1, $A0, $AD, $A0, $90, $95, $92
-			.byte 	$90, $8C, $85
-strOptn2Setup1:		;2 - GREEN
-			.byte 	$09, $B2, $A0, $AD, $A0, $87, $92, $85
-			.byte 	$85, $8E
-strOptn3Setup1:		;3 - BLUE
-			.byte 	$08, $B3, $A0, $AD, $A0, $82, $8C, $95
-			.byte 	$85
-strOptn4Setup1:		;4 - YELLOW
-			.byte 	$0A, $B4, $A0, $AD, $A0, $99, $85, $8C
-			.byte 	$8C, $8F, $97
-strOptn5Setup1:		;5 - ORANGE
-			.byte 	$0A, $B5, $A0, $AD, $A0, $8F, $92, $81
-			.byte 	$8E, $87, $85
-strOptn6Setup1:		;6 - BROWN
-			.byte 	$09, $B6, $A0, $AD, $A0, $82, $92, $8F
-			.byte 	$97, $8E
-strOptn7Setup1:		;7 - PINK
-			.byte 	$08, $B7, $A0, $AD, $A0, $90, $89, $8E
-			.byte 	$8B
-strOptn8Setup1:		;8 - LIGHT GREEN
-			.byte 	$0F, $B8, $A0, $AD, $A0, $8C, $89, $87
-			.byte 	$88, $94, $A0, $87, $92, $85, $85, $8E
-strOptn9Setup1:		;9 - LIGHT BLUE
-			.byte 	$0E, $B9, $A0, $AD, $A0, $8C, $89, $87
-			.byte 	$88, $94, $A0, $82, $8C, $95, $85
-
-
-strDescSetup2:		;SET START FUNDS
-			.byte $0F, $93, $85, $94, $A0, $93, $94, $81
-			.byte $92, $94, $A0, $86, $95, $8E, $84, $93
-			
-strOptn0Setup2:		;0 - 1000 LOW
-			.byte 	$0C, $B0, $A0, $AD, $A0, $B1, $B0, $B0
-			.byte 	$B0, $A0, $8C, $8F, $97
-strOptn1Setup2:		;1 - 1500 NORMAL
-			.byte 	$0F, $B1, $A0, $AD, $A0, $B1, $B5, $B0
-			.byte 	$B0, $A0, $8E, $8F, $92, $8D, $81, $8C
-strOptn2Setup2:		;2 - 2000 HIGH
-			.byte 	$0D, $B2, $A0, $AD, $A0, $B2, $B0, $B0
-			.byte 	$B0, $A0, $88, $89, $87, $88
-
-
-strHeaderSetup3:	;PLAY OPTIONS
-			.byte $0C, $90, $8C, $81, $99, $A0, $8F, $90
-			.byte $94, $89, $8F, $8E, $93
-
-strDescSetup3:		;WAIT FOR PLAYER
-			.byte $0F, $97, $81, $89, $94, $A0, $86, $8F
-			.byte $92, $A0, $90, $8C, $81, $99, $85, $92
-			
-strText0Setup3:		;PROMPT FOR EACH
-			.byte $0F, $90, $92, $8F, $8D, $90, $94, $A0
-			.byte $86, $8F, $92, $A0, $85, $81, $83, $88
-strText1Setup3:		;PLAYER?
-			.byte $07, $90, $8C, $81, $99, $85, $92, $BF
-			
-strOptn0Setup3:		;Y - YES
-			.byte $07, $99, $A0, $AD, $A0, $99, $85, $93
-strOptn1Setup3:		;N - NO
-			.byte $06, $8E, $A0, $AD, $A0, $8E, $8F
-			
-	
-strDescSetup4:		;ROLL FOR FIRST
-			.byte $0E, $92, $8F, $8C, $8C, $A0, $86, $8F
-			.byte $92, $A0, $86, $89, $92, $93, $94
-			
-strOptn0Setup4:		;B - BEGIN GAME
-			.byte $0E, $82, $A0, $AD, $A0, $82, $85, $87
-			.byte $89, $8E, $A0, $87, $81, $8D, $85
-
-		
-strDescSetup5:		;JUMP TO NEXT
-			.byte $0C, $8A, $95, $8D, $90, $A0, $94, $8F
-			.byte $A0, $8E, $85, $98, $94
-			
-strText0Setup5:		;ALWAYS JUMP TO 
-			.byte $0F, $81, $8C, $97, $81, $99, $93, $A0
-			.byte $8A, $95, $8D, $90, $A0, $94, $8F, $A0
-strText1Setup5:		;THE NEXT SQUARE?
-			.byte $10, $94, $88, $85, $A0, $8E, $85, $98
-			.byte $94, $A0, $93, $91, $95, $81, $92, $85
-			.byte $BF
-		
-		
-strDescSetup6:		;HOUSE RULES
-			.byte $0B, $88, $8F, $95, $93, $85, $A0, $92
-			.byte $95, $8C, $85, $93
-		
-strOptn0Setup6:		;F - FPRKING TAX
-			.byte $0F, $86, $A0, $AD, $A0, $86, $90, $92
-			.byte $8B, $89, $8E, $87, $A0, $94, $81, $98
-strOptn1Setup6:		;G - LAND DBLS GO
-			.byte $10, $87, $A0, $AD, $A0, $8C, $81, $8E
-			.byte $84, $A0, $84, $82, $8C, $93, $A0, $87
-			.byte $8F
-strOptn2Setup6:		;M - LMTD MONEY
-			.byte $0E, $8D, $A0, $AD, $A0, $8C, $8D, $94
-			.byte $84, $A0, $8D, $8F, $8E, $85, $99
-		
-strText0Setup6:		;  NO
-			.byte $04, $A0, $A0, $8E, $8F
-strText1Setup6:		;  YES
-			.byte $05, $A0, $A0, $99, $85, $93
-			
-
-strHeaderSetup7:	;INPUT CONFIG
-			.byte $0C, $89, $8E, $90, $95, $94, $A0, $83
-			.byte $8F, $8E, $86, $89, $87
-strDescSetup7:		;SELECT DEVICES
-			.byte $0E, $93, $85, $8C, $85, $83, $94, $A0
-			.byte $84, $85, $96, $89, $83, $85, $93
-
-strOptn0Setup7:		;K - KEYS ONLY
-			.byte $0D, $8B, $A0, $AD, $A0, $8B, $85, $99
-			.byte $93, $A0, $8F, $8E, $8C, $99
-strOptn1Setup7:		;J - AND JOYSTICK
-			.byte $10, $8A, $A0, $AD, $A0, $81, $8E, $84
-			.byte $A0, $8A, $8F, $99, $93, $94, $89, $83
-			.byte $8B
-strOptn2Setup7:		;M - OR MOUSE
-			.byte $0C, $8D, $A0, $AD, $A0, $8F, $92, $A0
-			.byte $8D, $8F, $95, $93, $85
-	
-strDescSetup8:		;INPUT SENSE
-			.byte $0B, $89, $8E, $90, $95, $94, $A0, $93
-			.byte $85, $8E, $93, $85
-			
-strOptn0Setup8:		;L - LOW
-			.byte $07, $8C, $A0, $AD, $A0, $8C, $8F, $97
-strOptn1Setup8:		;M - MEDIUM
-			.byte $0A, $8D, $A0, $AD, $A0, $8D, $85, $84
-			.byte $89, $95, $8D
-strOptn2Setup8:		;H - HIGH
-			.byte $08, $88, $A0, $AD, $A0, $88, $89, $87
-			.byte $88
-
-
-strHeaderStart0:	;GAME STARTING
-			.byte $0D, $87, $81, $8D, $85, $A0, $93, $94
-			.byte $81, $92, $94, $89, $8E, $87
-			
-strText0Start0:		;PLAYER_1 GOES FIRST
-			.byte $13, $90, $8C, $81, $99, $85, $92, $E4
-			.byte $B1, $A0, $87, $8F, $85, $93, $A0, $86
-			.byte $89, $92, $93, $94
-			
-
-strHeaderWaitFor0:	;PLAYER CHANGED
-			.byte $0E, $90, $8C, $81, $99, $85, $92, $A0
-			.byte $83, $88, $81, $8E, $87, $85, $84
-
-strText0WaitFor0:	;PLAYER_1, IT IS NOW
-			.byte $13, $90, $8C, $81, $99, $85, $92, $E4
-			.byte $B1, $AC, $A0, $89, $94, $A0, $89, $93
-			.byte $A0, $8E, $8F, $97
-strText1WaitFor0:	;YOUR TURN!
-			.byte $0A, $99, $8F, $95, $92, $A0, $94, $95
-			.byte $92, $8E, $A1
-			
-
-strHeaderPlay0:		;PLAYER'S TURN
-			.byte $0D, $90, $8C, $81, $99, $85, $92, $A7
-			.byte $93, $A0, $94, $95, $92, $8E
-			
-strDescPlay0:		;DOUBLES
-			.byte $07, $84, $8F, $95, $82, $8C, $85, $93
-
-strOptn0Play0:		;R - ROLL
-			.byte $08, $92, $A0, $AD, $A0, $92, $8F, $8C
-			.byte $8C
-strOptn1Play0:		;N - NEXT TURN
-			.byte $0D, $8E, $A0, $AD, $A0, $8E, $85, $98
-			.byte $94, $A0, $94, $95, $92, $8E
-strOptn2Play0:		;M - MANAGE
-			.byte $0A, $8D, $A0, $AD, $A0, $8D, $81, $8E
-			.byte $81, $87, $85
-strOptn3Play0:		;T - TRADE
-			.byte $09, $94, $A0, $AD, $A0, $94, $92, $81
-			.byte $84, $85
-strOptn4Play0:		;V - OVERVIEW
-			.byte $0C, $96, $A0, $AD, $A0, $8F, $96, $85
-			.byte $92, $96, $89, $85, $97
-strOptn5Play0:		;S - STATISTICS
-			.byte $0E, $93, $A0, $AD, $A0, $93, $94, $81
-			.byte $94, $89, $93, $94, $89, $83, $93			
-strOptn6Play0:		;O - GAME OPTIONS
-			.byte $10, $8F, $A0, $AD, $A0, $87, $81, $8D
-			.byte $85, $A0, $8F, $90, $94, $89, $8F, $8E
-			.byte $93
-strOptn7Play0:		;C - INPUT CONFIG
-			.byte $10, $83, $A0, $AD, $A0, $89, $8E, $90
-			.byte $95, $94, $A0, $83, $8F, $8E, $86, $89
-			.byte $87
-strOptn8Play0:		;Q - QUIT
-			.byte $08, $91, $A0, $AD, $A0, $91, $95, $89
-			.byte $94
-			
-strOptn0Ftr0:		;F5-QUAD3
-			.byte $08, $86, $B5, $AD, $91, $95, $81, $84
-			.byte $B3
-strOptn1Ftr0:		;F7-QUAD4
-			.byte $08, $86, $B7, $AD, $91, $95, $81, $84
-			.byte $B4
-strOptn2Ftr0:		;F3-QUAD2
-			.byte $08, $86, $B3, $AD, $91, $95, $81, $84
-			.byte $B2
-strOptn3Ftr0:		;F1-QUAD1
-			.byte $08, $86, $B1, $AD, $91, $95, $81, $84
-			.byte $B1		
-
-
-strHeaderPlay1:		;UNOWNED DEED
-			.byte $0C, $95, $8E, $8F, $97, $8E, $85, $84
-			.byte $A0, $84, $85, $85, $84
-
-strOptn0Play1:		;B - BUY
-			.byte $07, $82, $A0, $AD, $A0, $82, $95, $99
-strOptn1Play1:		;P - PASS
-			.byte $08, $90, $A0, $AD, $A0, $90, $81, $93
-			.byte $93
-			
-			
-strHeaderAuctn0:	;DEED AUCTION
-			.byte $0C, $84, $85, $85, $84, $A0, $81, $95
-			.byte $83, $94, $89, $8F, $8E
-
-strOptn0Auctn0:		;+           UIO
-			.byte $0F, $AB, $A0, $A0, $A0, $A0, $A0, $A0
-			.byte $A0, $A0, $A0, $A0, $A0, $95, $89, $8F
-
-strOptn1Auctn0:		;AMT    $
-			.byte $08, $81, $8D, $94, $A0, $A0, $A0, $A0
-			.byte $A4
-
-strOptn2Auctn0:		;-           JKL
-			.byte $0F, $AD, $A0, $A0, $A0, $A0, $A0, $A0
-			.byte $A0, $A0, $A0, $A0, $A0, $8A, $8B, $8C
-	
-strOptn3Auctn0:		;B - BID
-			.byte $07, $82, $A0, $AD, $A0, $82, $89, $84
-strOptn4Auctn0:		;P - PASS
-			.byte $08, $90, $A0, $AD, $A0, $90, $81, $93
-			.byte $93			
-strOptn5Auctn0:		;F - FORFEIT
-			.byte $0B, $86, $A0, $AD, $A0, $86, $8F, $92
-			.byte $86, $85, $89, $94
-
-			
-strHeaderGaol0:		;GONE TO GAOL
-			.byte $0C, $87, $8F, $8E, $85, $A0, $94, $8F
-			.byte $A0, $87, $81, $8F, $8C
-
-strDescGaol0:		;THREE DOUBLES
-			.byte $0D, $94, $88, $92, $85, $85, $A0, $84
-			.byte $8F, $95, $82, $8C, $85, $93
-						
-strHeaderGaol1:		;IN GAOL
-			.byte $07, $89, $8E, $A0, $87, $81, $8F, $8C
-strDescGaol1:		;PG 1/2
-			.byte $06, $90, $87, $A0, $B1, $AF, $B2
-
-strOptn0Gaol1:		;P - POST BAIL
-			.byte $0D, $90, $A0, $AD, $A0, $90, $8F, $93
-			.byte $94, $A0, $82, $81, $89, $8C
-strOptn1Gaol1:		;F - GET OUT FREE
-			.byte $10, $86, $A0, $AD, $A0, $87, $85, $94
-			.byte $A0, $8F, $95, $94, $A0, $86, $92, $85
-			.byte $85
-strOptn2Gaol1:		;. - NEXT PAGE
-			.byte $0D, $AE, $A0, $AD, $A0, $8E, $85, $98
-			.byte $94, $A0, $90, $81, $87, $85	
-
-
-strDescGaol2:		;PG 2/2
-			.byte $06, $90, $87, $A0, $B2, $AF, $B2
-			
-
-strHeaderGaol3:		;MUST POST BAIL
-			.byte $0E, $8D, $95, $93, $94, $A0, $90, $8F
-			.byte $93, $94, $A0, $82, $81, $89, $8C
-
-
-strHeaderMustPay0:	;PLAYER MUST PAY
-			.byte $0F, $90, $8C, $81, $99, $85, $92, $A0
-			.byte $8D, $95, $93, $94, $A0, $90, $81, $99
-strDescMustPay0:	;IN DEBT
-			.byte $07, $89, $8E, $A0, $84, $85, $82, $94
-			
-strOptn0MustPay0:	;C - CONTINUE
-			.byte $0C, $83, $A0, $AD, $A0, $83, $8F, $8E
-			.byte $94, $89, $8E, $95, $85
-
-
-strHeaderMng0:		;MANAGE OPTIONS
-			.byte $0E, $8D, $81, $8E, $81, $87, $85, $A0
-			.byte $8F, $90, $94, $89, $8F, $8E, $93
-			
-strOptn0Mng0:		;F - MOVE FWRD
-			.byte $0D, $86, $A0, $AD, $A0, $8D, $8F
-			.byte $96, $85, $A0, $86, $97, $92, $84
-strOptn1Mng0:		;B - MOVE BACK
-			.byte $0D, $82, $A0, $AD, $A0, $8D, $8F
-			.byte $96, $85, $A0, $82, $81, $83, $8B
-strOptn2Mng0:		;M - UN/MORTGAGE
-			.byte $0F, $8D, $A0, $AD, $A0, $95, $8E
-			.byte $AF, $8D, $8F, $92, $94, $87, $81, $87
-			.byte $85
-strOptn3Mng0:		;C - CONSTRUCT
-			.byte $0D, $83, $A0, $AD, $A0, $83, $8F
-			.byte $8E, $93, $94, $92, $95, $83, $94
-strOptn4Mng0:		;S - SELL
-			.byte $08, $93, $A0, $AD, $A0, $93, $85
-			.byte $8C, $8C
-strOptn5Mng0:		;I - INFO
-			.byte $08, $89, $A0, $AD, $A0, $89, $8E, $86
-			.byte $8F
-strOptn6Mng0:		;D - DONE
-			.byte $08, $84, $A0, $AD, $A0, $84, $8F
-			.byte $8E, $85
-			
-
-strHeaderTrade0:	;TRADE INITIATION
-			.byte $10, $94, $92, $81, $84, $85, $A0, $89
-			.byte $8E, $89, $94, $89, $81, $94, $89, $8F
-			.byte $8E
-
-strOptn0Trade0:		;P - PLAYER
-			.byte $0A, $90, $A0, $AD, $A0, $90, $8C, $81
-			.byte $99, $85, $92
-strOptn1Trade0:		;W - WANTED
-			.byte $0A, $97, $A0, $AD, $A0, $97, $81, $8E
-			.byte $94, $85, $84
-strOptn2Trade0:		;O - OFFERING
-			.byte $0C, $8F, $A0, $AD, $A0, $8F, $86, $86
-			.byte $85, $92, $89, $8E, $87
-strOptn3Trade0:		;C - CONFIRM
-			.byte $0B, $83, $A0, $AD, $A0, $83, $8F, $8E
-			.byte $86, $89, $92, $8D
-strOptn4Trade0:		;X - CANCEL
-			.byte $0A, $98, $A0, $AD, $A0, $83, $81, $8E
-			.byte $83, $85, $8C
-
-
-strHeaderTrade1:	;TRADE APPROVAL
-			.byte $0E, $94, $92, $81, $84, $85, $A0, $81
-			.byte $90, $90, $92, $8F, $96, $81, $8C
-
-
-strHeaderTrade2:	;INVALID TRADE!
-			.byte $0E, $89, $8E, $96, $81, $8C, $89, $84
-			.byte $A0, $94, $92, $81, $84, $85, $A1
-			
-strDescTrade2:		;CANNOT INITIATE
-			.byte $0F, $83, $81, $8E, $8E, $8F, $94, $A0
-			.byte $89, $8E, $89, $94, $89, $81, $94, $85
-			
-strText0Trade2:		;YOUR REMAINING WEALTH
-			.byte $15, $99, $8F, $95, $92, $A0, $92, $85
-			.byte $8D, $81, $89, $8E, $89, $8E, $87, $A0
-			.byte $97, $85, $81, $8C, $94, $88
-strText1Trade2:		;IS INVALID.
-			.byte $0B, $89, $93, $A0, $89, $8E, $96, $81
-			.byte $8C, $89, $84, $AE
-			
-
-strText0Trade3:		;THEIR REMAINING WEALTH
-			.byte $16, $94, $88, $85, $89, $92, $A0, $92
-			.byte $85, $8D, $81, $89, $8E, $89, $8E, $87
-			.byte $A0, $97, $85, $81, $8C, $94, $88
-strText1Trade3 	=	strText1Trade2
-
-
-strDescTrade4:		;CANNOT APPROVE
-			.byte $0E, $83, $81, $8E, $8E, $8F, $94, $A0
-			.byte $81, $90, $90, $92, $8F, $96, $85
-			
-
-strHeaderTrade5:	;WARNING!
-			.byte $08, $97, $81, $92, $8E, $89, $8E, $87
-			.byte $A1
-
-strDescTrade5:		;WILL NOT SHOW AGAIN
-			.byte $13, $97, $89, $8C, $8C, $A0, $8E, $8F
-			.byte $94, $A0, $93, $88, $8F, $97, $A0, $81
-			.byte $87, $81, $89, $8E
-		
-strText0Trade5:		;THERE ARE MORTGAGED
-			.byte $13, $94, $88, $85, $92, $85, $A0, $81
-			.byte $92, $85, $A0, $8D, $8F, $92, $94, $87
-			.byte $81, $87, $85, $84
-strText1Trade5:		;DEEDS THAT YOU WILL
-			.byte $13, $84, $85, $85, $84, $93, $A0, $94
-			.byte $88, $81, $94, $A0, $99, $8F, $95, $A0
-			.byte $97, $89, $8C, $8C
-strText2Trade5:		;PAY FEES FOR.
-			.byte $0D, $90, $81, $99, $A0, $86, $85, $85
-			.byte $93, $A0, $86, $8F, $92, $AE
-			
-			
-strHeaderTrade6:	;TRADE PROCESSING
-			.byte $10, $94, $92, $81, $84, $85, $A0, $90
-			.byte $92, $8F, $83, $85, $93, $93, $89, $8E
-			.byte $87
-
-strText0Trade6:		;YOU MAY COMPLETE
-			.byte $10, $99, $8F, $95, $A0, $8D, $81, $99
-			.byte $A0, $83, $8F, $8D, $90, $8C, $85, $94
-			.byte $85
-strText1Trade6:		;IMMEDIATELY.
-			.byte $0C, $89, $8D, $8D, $85, $84, $89, $81
-			.byte $94, $85, $8C, $99, $AE
-
-
-strHeaderTrade7:	;TRADE PLAYER
-			.byte $0C, $94, $92, $81, $84, $85, $A0, $90
-			.byte $8C, $81, $99, $85, $92
-			
-strText0Trade7:		;TRADE INITIATED BY:
-			.byte $13, $94, $92, $81, $84, $85, $A0, $89
-			.byte $8E, $89, $94, $89, $81, $94, $85, $84
-			.byte $A0, $82, $99, $BA
-
-
-strHeaderPSel0:		;SELECT PLAYER
-			.byte $0D, $93, $85, $8C, $85, $83, $94, $A0
-			.byte $90, $8C, $81, $99, $85, $92
-
-
-strOptn0PSel0:		;1 -
-			.byte $03, $B1, $A0, $AD
-strOptn1PSel0:		;2 -
-			.byte $03, $B2, $A0, $AD
-strOptn2PSel0:		;3 -
-			.byte $03, $B3, $A0, $AD
-strOptn3PSel0:		;4 -
-			.byte $03, $B4, $A0, $AD
-strOptn4PSel0:		;5 -
-			.byte $03, $B5, $A0, $AD
-strOptn5PSel0:		;6 -
-			.byte $03, $B6, $A0, $AD
-
-			
-strOptn0TrdSel0:	;FORWARD
-			.byte $07, $86, $0F, $12, $17, $01, $12, $04
-strOptn1TrdSel0:	;BACK
-			.byte $04, $82, $01, $03, $0B
-strOptn2TrdSel0:	;SELECT
-			.byte $06, $93, $05, $0C, $05, $03, $14
-strOptn3TrdSel0:	;ACCEPT
-			.byte $06, $81, $03, $03, $05, $10, $14
-strOptn4TrdSel0:	;DISMISS
-			.byte $07, $84, $09, $13, $0D, $09, $13, $13
-strOptn5TrdSel0:	;REPAY
-			.byte $05, $92, $05, $10, $01, $19
-
-strText0TrdSel0:	;GOFREE
-			.byte $06, $07, $0F, $06, $12, $05, $05
-strText1TrdSel0:	;+  UIO
-			.byte $06, $2B, $20, $20, $95, $89, $8F
-strText2TrdSel0:	;-  JKL
-			.byte $06, $2D, $20, $20, $8A, $8B, $8C
-strText3TrdSel0:	;CASH
-			.byte $04, $03, $01, $13, $08
-strText4TrdSel0:	;R.WLTH
-			.byte $06, $12, $2E, $17, $0C, $14, $08
-strText5TrdSel0:	;INVLD!
-			.byte $06, $09, $0E, $16, $0C, $04, $21
-strText6TrdSel0:	;OVRFLW
-			.byte $06, $0F, $16, $12, $06, $0C, $17
-			
-
-strHeaderJump0:		;PLAYER MOVING
-			.byte $0D, $90, $8C, $81, $99, $85, $92, $A0
-			.byte $8D, $8F, $96, $89, $8E, $87
-
-strText0Jump0:		;YOU MAY JUMP TO
-			.byte $0F, $99, $8F, $95, $A0, $8D, $81, $99
-			.byte $A0, $8A, $95, $8D, $90, $A0, $94, $8F
-strText1Jump0:		;THE DESTINATION
-			.byte $0F, $94, $88, $85, $A0, $84, $85, $93
-			.byte $94, $89, $8E, $81, $94, $89, $8F, $8E
-
-
-strText0PStats0:	;MONEY......$
-			.byte $0C, $8D, $8F, $8E, $85, $99, $AE, $AE
-			.byte $AE, $AE, $AE, $AE, $A4
-strText1PStats0:	;EQUITY.....$
-			.byte $0C, $85, $91, $95, $89, $94, $99, $AE
-			.byte $AE, $AE, $AE, $AE, $A4
-strText2PStats0:	;GOFREE.....#
-			.byte $0C, $87, $8F, $86, $92, $85, $85, $AE
-			.byte $AE, $AE, $AE, $AE, $A3
-strText3PStats0:	;HOUSES.....#
-			.byte $0C, $88, $8F, $95, $93, $85, $93, $AE
-			.byte $AE, $AE, $AE, $AE, $A3
-strText4PStats0:	;HOTELS.....#
-			.byte $0C, $88, $8F, $94, $85, $8C, $93, $AE
-			.byte $AE, $AE, $AE, $AE, $A3
-strText5PStats0:	;DEEDS......#
-			.byte $0C, $84, $85, $85, $84, $93, $AE, $AE
-			.byte $AE, $AE, $AE, $AE, $A3
-strText6PStats0:	;STATIONS...#
-			.byte $0C, $93, $94, $81, $94, $89, $8F, $8E
-			.byte $93, $AE, $AE, $AE, $A3
-strText7PStats0:	;UTILITIES..#
-			.byte $0C, $95, $94, $89, $8C, $89, $94, $89
-			.byte $85, $93, $AE, $AE, $A3
-strText8PStats0:	;FULL GRPS..#
-			.byte $0C, $86, $95, $8C, $8C, $A0, $87, $92
-			.byte $90, $93, $AE, $AE, $A3
-strText9PStats0:	;SCORE......*
-			.byte $0C, $93, $83, $8F, $92, $85, $AE, $AE
-			.byte $AE, $AE, $AE, $AE, $AA
-
-
-strHeaderElimin0:	;PLAYER ELIMINATED
-			.byte $11, $90, $8C, $81, $99, $85, $92, $A0
-			.byte $85, $8C, $89, $8D, $89, $8E, $81, $94
-			.byte $85, $84
-			
-strText0Elimin0:	;PLAYER_1 ELIMINATED!
-			.byte $14, $90, $8C, $81, $99, $85, $92, $E4
-			.byte $B1, $A0, $85, $8C, $89, $8D, $89, $8E
-			.byte $81, $94, $85, $84, $A1
-			
-strHeaderElimin1:	;ERROR!
-			.byte $06, $85, $92, $92, $8F, $92, $A1
-
-strDescElimin1:		;CANNOT CONFIRM
-			.byte $0E, $83, $81, $8E, $8E, $8F, $94, $A0
-			.byte $83, $8F, $8E, $86, $89, $92, $8D
-			
-strText0Elimin1:	;YOU MUST REVIEW THE
-			.byte $13, $99, $8F, $95, $A0, $8D, $95, $93
-			.byte $94, $A0, $92, $85, $96, $89, $85, $97
-			.byte $A0, $94, $88, $85
-strText1Elimin1:	;ELIMINATION OFFER.
-			.byte $12, $85, $8C, $89, $8D, $89, $8E, $81
-			.byte $94, $89, $8F, $8E, $A0, $8F, $86, $86
-			.byte $85, $92, $AE
-			
-
-strHeaderGameOver0:	;GAME OVER
-			.byte $09, $87, $81, $8D, $85, $A0, $8F, $96
-			.byte $85, $92
-
-strText0GameOver0:	;PLAYER_1 WINS!
-			.byte $0E, $90, $8C, $81, $99, $85, $92, $E4
-			.byte $B1, $A0, $97, $89, $8E, $93, $A1
-
-
-strHeaderQuit0:		;QUIT INITIATION
-			.byte $0F, $91, $95, $89, $94, $A0, $89, $8E
-			.byte $89, $94, $89, $81, $94, $89, $8F, $8E
-
-strText0Quit0:		;DO YOU WISH TO
-			.byte $0E, $84, $8F, $A0, $99, $8F, $95, $A0
-			.byte $97, $89, $93, $88, $A0, $94, $8F
-
-strText1Quit0:		;QUIT THE GAME?
-			.byte $0E, $91, $95, $89, $94, $A0, $94, $88
-			.byte $85, $A0, $87, $81, $8D, $85, $BF
-			
-
-strDescQuit1:		;CONFIRM REQUEST
-			.byte $0F, $83, $8F, $8E, $86, $89, $92, $8D
-			.byte $A0, $92, $85, $91, $95, $85, $93, $94
-			
-strText0Quit1:		;ARE YOU SURE?
-			.byte $0D, $81, $92, $85, $A0, $99, $8F, $95
-			.byte $A0, $93, $95, $92, $85, $BF
-			
-
-strHeaderQuit2:		;QUIT REQUESTED
-			.byte $0E, $91, $95, $89, $94, $A0, $92, $85
-			.byte $91, $95, $85, $93, $94, $85, $84
-
-
-strHeaderCCCCard0:	;COMMUNITY CHEST
-			.byte $0F, $83, $8F, $8D, $8D, $95, $8E, $89
-			.byte $94, $99, $A0, $83, $88, $85, $93, $94
-			
-			
-strText0CCCCard0:	;COLLECT
-			.byte $07, $83, $8F, $8C, $8C, $85, $83, $94
-strText1CCCCard0:	;PAY
-			.byte $07, $A0, $A0, $A0, $A0, $90, $81, $99
-strText2CCCCard0:	;HOUSES
-			.byte $07, $A0, $88, $8F, $95, $93, $85, $93
-strText3CCCCard0:	;HOTELS
-			.byte $07, $A0, $88, $8F, $94, $85, $8C, $93
-strText4CCCCard0:	;FROM ALL
-			.byte $08, $86, $92, $8F, $8D, $A0, $81, $8C
-			.byte $8C
-strText5CCCCard0:	;PAY ALL
-			.byte $07, $90, $81, $99, $A0, $81, $8C, $8C
-			
-			
-strHeaderCCCCard1:	;CHANCE
-			.byte $06, $83, $88, $81, $8E, $83, $85
-
-
-;***dengland		These should actually be strTextNChestN... doh
-
-strDesc0Chest0:		;BANK ERROR
-			.byte $0A, $82, $81, $8E, $8B, $A0, $85, $92
-			.byte $92, $8F, $92
-strDesc1Chest0:		;IN YOUR FAVOUR.
-			.byte $0F, $89, $8E, $A0, $99, $8F, $95, $92
-			.byte $A0, $86, $81, $96, $8F, $95, $92, $AE
-strDesc0Chest1:		;ADVANCE TO GO
-			.byte $0D, $81, $84, $96, $81, $8E, $83, $85
-			.byte $A0, $94, $8F, $A0, $87, $8F
-strDesc1Chest1:		;(COLLECT $200)
-			.byte $0E, $A8, $83, $8F, $8C, $8C, $85, $83
-			.byte $94, $A0, $A4, $B2, $B0, $B0, $A9
-strDesc0Chest2:		;YOU ARE ASSESSED
-			.byte $10, $99, $8F, $95, $A0, $81, $92, $85
-			.byte $A0, $81, $93, $93, $85, $93, $93, $85
-			.byte $84
-strDesc1Chest2:		;FOR STREET REPAIRS:
-			.byte $13, $86, $8F, $92, $A0, $93, $94, $92
-			.byte $85, $85, $94, $A0, $92, $85, $90, $81
-			.byte $89, $92, $93, $BA
-strDesc0Chest3:		;YOU HAVE WON SECOND
-			.byte $13, $99, $8F, $95, $A0, $88, $81, $96
-			.byte $85, $A0, $97, $8F, $8E, $A0, $93, $85
-			.byte $83, $8F, $8E, $84
-strDesc1Chest3:		;PRIZE IN A BEAUTY
-			.byte $11, $90, $92, $89, $9A, $85, $A0, $89
-			.byte $8E, $A0, $81, $A0, $82, $85, $81, $95
-			.byte $94, $99
-strDesc2Chest3:		;CONTEST.
-			.byte $08, $83, $8F, $8E, $94, $85, $93, $94
-			.byte $AE
-strDesc0Chest4:		;SALE OF STOCK.
-			.byte $0E, $93, $81, $8C, $85, $A0, $8F, $86
-			.byte $A0, $93, $94, $8F, $83, $8B, $AE
-strDesc0Chest5:		;INHERITANCE.
-			.byte $0C, $89, $8E, $88, $85, $92, $89, $94
-			.byte $81, $8E, $83, $85, $AE
-strDesc0Chest6:		;ITS YOUR BIRTHDAY.
-			.byte $12, $89, $94, $93, $A0, $99, $8F, $95
-			.byte $92, $A0, $82, $89, $92, $94, $88, $84
-			.byte $81, $99, $AE
-strDesc0Chest7:		;CONSULTANCY FEE.
-			.byte $10, $83, $8F, $8E, $93, $95, $8C, $94
-			.byte $81, $8E, $83, $99, $A0, $86, $85, $85
-			.byte $AE
-strDesc0Chest8:		;GO DIRECTLY TO GAOL.
-			.byte $14, $87, $8F, $A0, $84, $89, $92, $85
-			.byte $83, $94, $8C, $99, $A0, $94, $8F, $A0
-			.byte $87, $81, $8F, $8C, $AE
-strDesc1Chest8:		;DO NOT PASS GO.
-			.byte $0F, $84, $8F, $A0, $8E, $8F, $94, $A0
-			.byte $90, $81, $93, $93, $A0, $87, $8F, $AE
-strDesc2Chest8:		;DO NOT COLLECT $200.
-			.byte $14, $84, $8F, $A0, $8E, $8F, $94, $A0
-			.byte $83, $8F, $8C, $8C, $85, $83, $94, $A0
-			.byte $A4, $B2, $B0, $B0, $AE
-strDesc0Chest9:		;HOSPITAL FEES.
-			.byte $0E, $88, $8F, $93, $90, $89, $94, $81
-			.byte $8C, $A0, $86, $85, $85, $93, $AE
-strDesc0ChestA:		;INCOME TAX REFUND.
-			.byte $12, $89, $8E, $83, $8F, $8D, $85, $A0
-			.byte $94, $81, $98, $A0, $92, $85, $86, $95
-			.byte $8E, $84, $AE
-strDesc0ChestB:		;SCHOOL FEES.
-			.byte $0C, $93, $83, $88, $8F, $8F, $8C, $A0
-			.byte $86, $85, $85, $93, $AE
-strDesc0ChestC:		;LIFE INSURANCE MATURES.
-			.byte $17, $8C, $89, $86, $85, $A0, $89, $8E
-			.byte $93, $95, $92, $81, $8E, $83, $85, $A0
-			.byte $8D, $81, $94, $95, $92, $85, $93, $AE
-strDesc1ChestC	=	strDummyDummy0
-strDesc0ChestD:		;HOLIDAY FUND MATURES.
-			.byte $15, $88, $8F, $8C, $89, $84, $81, $99
-			.byte $A0, $86, $95, $8E, $84, $A0, $8D, $81
-			.byte $94, $95, $92, $85, $93, $AE
-strDesc1ChestD	=	strDummyDummy0
-strDesc0ChestE:		;DOCTORS'S FEES.
-			.byte $0F, $84, $8F, $83, $94, $8F, $92, $93
-			.byte $A7, $93, $A0, $86, $85, $85, $93, $AE
-strDesc0ChestF:		;GET OUT OF GAOL FREE.
-			.byte $15, $87, $85, $94, $A0, $8F, $95, $94
-			.byte $A0, $8F, $86, $A0, $87, $81, $8F, $8C
-			.byte $A0, $86, $92, $85, $85, $AE
-strDesc1ChestF:		;MAY BE KEPT UNTIL
-			.byte $11, $8D, $81, $99, $A0, $82, $85, $A0
-			.byte $8B, $85, $90, $94, $A0, $95, $8E, $94
-			.byte $89, $8C
-strDesc2ChestF:		;NEEDED OR TRADED.
-			.byte $11, $8E, $85, $85, $84, $85, $84, $A0
-			.byte $8F, $92, $A0, $94, $92, $81, $84, $85
-			.byte $84, $AE
-
-
-;***dengland		These should actually be strTextNChanceN... doh
-
-strDesc0Chance0:	;ADVANCE TO THE
-			.byte $0E, $81, $84, $96, $81, $8E, $83, $85
-			.byte $A0, $94, $8F, $A0, $94, $88, $85
-strDesc1Chance0:	;NEAREST STATION.
-			.byte $10, $8E, $85, $81, $92, $85, $93, $94
-			.byte $A0, $93, $94, $81, $94, $89, $8F, $8E
-			.byte $AE			
-strDesc2Chance0:	;IF OWNED, PAY DOUBLE.
-			.byte $15, $89, $86, $A0, $8F, $97, $8E, $85
-			.byte $84, $AC, $A0, $90, $81, $99, $A0, $84
-			.byte $8F, $95, $82, $8C, $85, $AE
-strDesc0Chance1 =	strDesc0Chance0
-strDesc1Chance1 =	strDesc1Chance0
-strDesc2Chance1 =	strDesc2Chance0
-strDesc0Chance2:	;SPEEDING FINE.
-			.byte $0E, $93, $90, $85, $85, $84, $89, $8E
-			.byte $87, $A0, $86, $89, $8E, $85, $AE
-strDesc0Chance3:	;GO BACK THREE SPACES.
-			.byte $15, $87, $8F, $A0, $82, $81, $83, $8B
-			.byte $A0, $94, $88, $92, $85, $85, $A0, $93
-			.byte $90, $81, $83, $85, $93, $AE
-strDesc1Chance3	=	strDummyDummy0
-strDesc0Chance4:	;YOU HAVE BEEN ELECTED
-			.byte $15, $99, $8F, $95, $A0, $88, $81, $96
-			.byte $85, $A0, $82, $85, $85, $8E, $A0, $85
-			.byte $8C, $85, $83, $94, $85, $84
-strDesc1Chance4:	;CHAIRMAN OF THE BOARD.
-			.byte $16, $83, $88, $81, $89, $92, $8D, $81
-			.byte $8E, $A0, $8F, $86, $A0, $94, $88, $85
-			.byte $A0, $82, $8F, $81, $92, $84, $AE
-strDesc0Chance5:	;ADVANCE TO:
-			.byte $0B, $81, $84, $96, $81, $8E, $83, $85
-			.byte $A0, $94, $8F, $BA
-strDesc1Chance5:	;  PALL MALL.
-			.byte $0C, $A0, $A0, $90, $81, $8C, $8C, $A0
-			.byte $8D, $81, $8C, $8C, $AE
-;strDesc2Chance5:	;YOU MAY COLLECT SALARY.
-;			.byte $17, $99, $8F, $95, $A0, $8D, $81, $99
-;			.byte $A0, $83, $8F, $8C, $8C, $85, $83, $94
-;			.byte $A0, $93, $81, $8C, $81, $92, $99, $AE
-strDesc0Chance6	=	strDesc0ChestF
-strDesc1Chance6	=	strDesc1ChestF
-strDesc2Chance6	=	strDesc2ChestF
-strDesc0Chance7:	;MAKE GENERAL REPAIRS
-			.byte $14, $8D, $81, $8B, $85, $A0, $87, $85
-			.byte $8E, $85, $92, $81, $8C, $A0, $92, $85
-			.byte $90, $81, $89, $92, $93
-strDesc1Chance7:	;ON ALL YOUR PROPERTY:
-			.byte $15, $8F, $8E, $A0, $81, $8C, $8C, $A0
-			.byte $99, $8F, $95, $92, $A0, $90, $92, $8F
-			.byte $90, $85, $92, $94, $99, $BA
-strDesc0Chance8:	;BANK DIVIDEND.
-			.byte $0E, $82, $81, $8E, $8B, $A0, $84, $89
-			.byte $96, $89, $84, $85, $8E, $84, $AE
-strDesc0Chance9	=	strDesc0Chest1
-strDesc1Chance9 =	strDesc1Chest1
-strDesc0ChanceA	=	strDesc0Chest8
-strDesc1ChanceA	=	strDesc1Chest8
-strDesc2ChanceA	=	strDesc2Chest8
-strDesc0ChanceB	=	strDesc0Chance0
-strDesc1ChanceB:	;NEAREST UTILITY.
-			.byte $10, $8E, $85, $81, $92, $85, $93, $94
-			.byte $A0, $95, $94, $89, $8C, $89, $94, $99
-			.byte $AE
-strDesc2ChanceB:	;IF OWNED, PAY 10* DICE.
-			.byte $17, $89, $86, $A0, $8F, $97, $8E, $85
-			.byte $84, $AC, $A0, $90, $81, $99, $A0, $B1
-			.byte $B0, $AA, $A0, $84, $89, $83, $85, $AE
-strDesc0ChanceC =	strDesc0Chance5
-strDesc1ChanceC:	;  TRAFALGAR SQUARE.
-			.byte $13, $A0, $A0, $94, $92, $81, $86, $81
-			.byte $8C, $87, $81, $92, $A0, $93, $91, $95
-			.byte $81, $92, $85, $AE
-;strDesc2ChanceC = 	strDesc2Chance5
-strDesc0ChanceD:	;YOUR BUILDING LOAN
-			.byte $12, $99, $8F, $95, $92, $A0, $82, $95
-			.byte $89, $8C, $84, $89, $8E, $87, $A0, $8C
-			.byte $8F, $81, $8E
-strDesc1ChanceD:	;MATURES.
-			.byte $08, $8D, $81, $94, $95, $92, $85, $93
-			.byte $AE
-strDesc0ChanceE:	;TAKE A TRIP TO
-			.byte $0E, $94, $81, $8B, $85, $A0, $81, $A0
-			.byte $94, $92, $89, $90, $A0, $94, $8F
-strDesc1ChanceE:	;KINGS CROSS STATION.
-			.byte $14, $8B, $89, $8E, $87, $93, $A0, $83
-			.byte $92, $8F, $93, $93, $A0, $93, $94, $81
-			.byte $94, $89, $8F, $8E, $AE
-;strDesc2ChanceE = 	strDesc2Chance5
-strDesc0ChanceF =	strDesc0Chance5
-strDesc1ChanceF:	;  MAYFAIR.
-			.byte $0A, $A0, $A0, $8D, $81, $99, $86, $81
-			.byte $89, $92, $AE
-
-
-strTitle0Brown0:	;OLD KENT ROAD
-			.byte $0D, $8F, $8C, $84, $A0, $8B, $85, $8E
-			.byte $94, $A0, $92, $8F, $81, $84
-strTitle0Brown1:	;WHITECHAPEL ROAD
-			.byte $10, $97, $88, $89, $94, $85, $83, $88
-			.byte $81, $90, $85, $8C, $A0, $92, $8F, $81
-			.byte $84
-strTitle0LBlue0:	;THE ANGEL,
-			.byte $0A, $94, $88, $85, $A0, $81, $8E, $87
-			.byte $85, $8C, $AC
-strTitle1LBlue0:	;ISLINGTON
-			.byte $09, $89, $93, $8C, $89, $8E, $87, $94
-			.byte $8F, $8E
-strTitle0LBlue1:	;EUSTON ROAD
-			.byte $0B, $85, $95, $93, $94, $8F, $8E, $A0
-			.byte $92, $8F, $81, $84
-strTitle0LBlue2:	;PENTOVILLE ROAD
-			.byte $0F, $90, $85, $8E, $94, $8F, $96, $89
-			.byte $8C, $8C, $85, $A0, $92, $8F, $81, $84
-strTitle0Prple0:	;PALL MALL
-			.byte $09, $90, $81, $8C, $8C, $A0, $8D, $81
-			.byte $8C, $8C
-strTitle0Prple1:	;WHITEHALL
-			.byte $09, $97, $88, $89, $94, $85, $88, $81
-			.byte $8C, $8C
-strTitle0Prple2:	;NORTHUMBERLAND
-			.byte $0E, $8E, $8F, $92, $94, $88, $95, $8D
-			.byte $82, $85, $92, $8C, $81, $8E, $84
-strTitle1Prple2:	;AVENUE
-			.byte $06, $81, $96, $85, $8E, $95, $85
-strTitle0Ornge0:	;BOW STREET
-			.byte $0A, $82, $8F, $97, $A0, $93, $94, $92
-			.byte $85, $85, $94
-strTitle0Ornge1:	;MARLBOROUGH STREET
-			.byte $12, $8D, $81, $92, $8C, $82, $8F, $92
-			.byte $8F, $95, $87, $88, $A0, $93, $94, $92
-			.byte $85, $85, $94
-strTitle0Ornge2:	;VINE STREET
-			.byte $0B, $96, $89, $8E, $85, $A0, $93, $94
-			.byte $92, $85, $85, $94
-strTitle0Red0:		;STRAND
-			.byte $06, $93, $94, $92, $81, $8E, $84
-strTitle0Red1:		;FLEET STREET
-			.byte $0C, $86, $8C, $85, $85, $94, $A0, $93
-			.byte $94, $92, $85, $85, $94
-strTitle0Red2:		;TRAFALGAR SQUARE
-			.byte $10, $94, $92, $81, $86, $81, $8C, $87
-			.byte $81, $92, $A0, $93, $91, $95, $81, $92
-			.byte $85
-strTitle0Yellw0:	;LEICESTER SQUARE
-			.byte $10, $8C, $85, $89, $83, $85, $93, $94
-			.byte $85, $92, $A0, $93, $91, $95, $81, $92
-			.byte $85
-strTitle0Yellw1:	;COVENTRY STREET
-			.byte $0F, $83, $8F, $96, $85, $8E, $94, $92
-			.byte $99, $A0, $93, $94, $92, $85, $85, $94
-strTitle0Yellw2:	;PICCADILLY
-			.byte $0A, $90, $89, $83, $83, $81, $84, $89
-			.byte $8C, $8C, $99
-strTitle0Green0:	;REGENT STREET
-			.byte $0D, $92, $85, $87, $85, $8E, $94, $A0
-			.byte $93, $94, $92, $85, $85, $94
-strTitle0Green1:	;OXFORD STREET
-			.byte $0D, $8F, $98, $86, $8F, $92, $84, $A0
-			.byte $93, $94, $92, $85, $85, $94
-strTitle0Green2:	;BOND STREET
-			.byte $0B, $82, $8F, $8E, $84, $A0, $93, $94
-			.byte $92, $85, $85, $94
-strTitle0Blue0:		;PARK LANE
-			.byte $09, $90, $81, $92, $8B, $A0, $8C, $81
-			.byte $8E, $85
-strTitle0Blue1:		;MAYFAIR
-			.byte $07, $8D, $81, $99, $86, $81, $89, $92
-strTitle0Stn0:		;KINGS CROSS
-			.byte $0B, $8B, $89, $8E, $87, $93, $A0, $83
-			.byte $92, $8F, $93, $93
-strTitle1Stn0:		;STATION
-			.byte $07, $93, $94, $81, $94, $89, $8F, $8E
-strTitle0Stn1:		;MARYLEBONE STATION
-			.byte $12, $8D, $81, $92, $99, $8C, $85, $82
-			.byte $8F, $8E, $85, $A0, $93, $94, $81, $94
-			.byte $89, $8F, $8E
-strTitle0Stn2:		;FENCHURCH STREET
-			.byte $10, $86, $85, $8E, $83, $88, $95, $92
-			.byte $83, $88, $A0, $93, $94, $92, $85, $85
-			.byte $94
-strTitle1Stn2	= 	strTitle1Stn0
-strTitle0Stn3:		;LIVERPOOL STREET
-			.byte $10, $8C, $89, $96, $85, $92, $90, $8F
-			.byte $8F, $8C, $A0, $93, $94, $92, $85, $85
-			.byte $94
-strTitle1Stn3 	=	strTitle1Stn0
-strTitle0Util0:		;ELECTRIC COMPANY
-			.byte $10, $85, $8C, $85, $83, $94, $92, $89
-			.byte $83, $A0, $83, $8F, $8D, $90, $81, $8E
-			.byte $99
-strTitle0Util1:		;WATER WORKS
-			.byte $0B, $97, $81, $94, $85, $92, $A0, $97
-			.byte $8F, $92, $8B, $93
-strTitle0Crnr0:		;GO
-			.byte $02, $87, $8F
-strTitle0Crnr1:		;GAOL/JUST VISITING
-			.byte $12, $87, $81, $8F, $8C, $AF, $8A, $95
-			.byte $93, $94, $A0, $96, $89, $93, $89, $94
-			.byte $89, $8E, $87
-strTitle0Crnr2:		;FREE PARKING
-			.byte $0C, $86, $92, $85, $85, $A0, $90, $81
-			.byte $92, $8B, $89, $8E, $87
-strTitle0Crnr3:		;GO TO GAOL
-			.byte $0A, $87, $8F, $A0, $94, $8F, $A0, $87
-			.byte $81, $8F, $8C
-strTitle0Tax0:		;INCOME TAX
-			.byte $0A, $89, $8E, $83, $8F, $8D, $85, $A0
-			.byte $94, $81, $98
-strTitle0Tax1:		;LUXURY TAX
-			.byte $0A, $8C, $95, $98, $95, $92, $99, $A0
-			.byte $94, $81, $98
-			
-			
-strText0Street0:	;RENT.........$
-			.byte $0E, $92, $85, $8E, $94, $AE, $AE, $AE
-			.byte $AE, $AE, $AE, $AE, $AE, $AE, $A4
-strText1Street0:	;1 HOUSE......$
-			.byte $0E, $B1, $A0, $88, $8F, $95, $93, $85
-			.byte $AE, $AE, $AE, $AE, $AE, $AE, $A4
-strText2Street0:	;2 HOUSES.....$
-			.byte $0E, $B2, $A0, $88, $8F, $95, $93, $85
-			.byte $93, $AE, $AE, $AE, $AE, $AE, $A4
-strText3Street0:	;3 HOUSES.....$
-			.byte $0E, $B3, $A0, $88, $8F, $95, $93, $85
-			.byte $93, $AE, $AE, $AE, $AE, $AE, $A4
-strText4Street0:	;4 HOUSES.....$
-			.byte $0E, $B4, $A0, $88, $8F, $95, $93, $85
-			.byte $93, $AE, $AE, $AE, $AE, $AE, $A4
-strText5Street0:	;1 HOTEL......$
-			.byte $0E, $B1, $A0, $88, $8F, $94, $85, $8C
-			.byte $AE, $AE, $AE, $AE, $AE, $AE, $A4
-strText6Street0:	;MARKET.......$
-			.byte $0E, $8D, $81, $92, $8B, $85, $94, $AE
-			.byte $AE, $AE, $AE, $AE, $AE, $AE, $A4
-strText7Street0:	;MORTGAGE.....$
-			.byte $0E, $8D, $8F, $92, $94, $87, $81, $87
-			.byte $85, $AE, $AE, $AE, $AE, $AE, $A4
-strText8Street0:	;REPAY........$
-			.byte $0E, $92, $85, $90, $81, $99, $AE, $AE
-			.byte $AE, $AE, $AE, $AE, $AE, $AE, $A4
-strText9Street0:	;IMPRV. ......$
-			.byte $0E, $89, $8D, $90, $92, $96, $AE, $A0
-			.byte $AE, $AE, $AE, $AE, $AE, $AE, $A4
-			
-			
-strText0Stn0:		;2 STATIONS...$
-			.byte $0E, $B2, $A0, $93, $94, $81, $94, $89
-			.byte $8F, $8E, $93, $AE, $AE, $AE, $A4
-strText1Stn0:		;3 STATIONS...$
-			.byte $0E, $B3, $A0, $93, $94, $81, $94, $89
-			.byte $8F, $8E, $93, $AE, $AE, $AE, $A4
-strText2Stn0:		;4 STATIONS...$
-			.byte $0E, $B4, $A0, $93, $94, $81, $94, $89
-			.byte $8F, $8E, $93, $AE, $AE, $AE, $A4
-			
-			
-strText0Util0:		;ONE UTILITY OWNED:
-			.byte $12, $8F, $8E, $85, $A0, $95, $94, $89
-			.byte $8C, $89, $94, $99, $A0, $8F, $97, $8E
-			.byte $85, $84, $BA
-strText1Util0:		;RENT IS  4 * DICE
-			.byte $11, $92, $85, $8E, $94, $A0, $89, $93
-			.byte $A0, $A0, $B4, $A0, $AA, $A0, $84, $89
-			.byte $83, $85
-strText2Util0:		;TWO OWNED:
-			.byte $0A, $94, $97, $8F, $A0, $8F, $97, $8E
-			.byte $85, $84, $BA
-strText3Util0:		;RENT IS 10 * DICE
-			.byte $11, $92, $85, $8E, $94, $A0, $89, $93
-			.byte $A0, $B1, $B0, $A0, $AA, $A0, $84, $89
-			.byte $83, $85
-			
-			
-strText0Crnr0:		;THE START POINT.
-			.byte $10, $94, $88, $85, $A0, $93, $94, $81
-			.byte $92, $94, $A0, $90, $8F, $89, $8E, $94
-			.byte $AE
-strText1Crnr0	=	strDummyDummy0
-strText2Crnr0:		;ALSO, GAIN $200
-			.byte $0F, $81, $8C, $93, $8F, $AC, $A0, $87
-			.byte $81, $89, $8E, $A0, $A4, $B2, $B0, $B0
-strText3Crnr0:		;SALARY WHEN LANDED
-			.byte $12, $93, $81, $8C, $81, $92, $99, $A0
-			.byte $97, $88, $85, $8E, $A0, $8C, $81, $8E
-			.byte $84, $85, $84
-strText4Crnr0:		;ON OR PASSING.
-			.byte $0E, $8F, $8E, $A0, $8F, $92, $A0, $90
-			.byte $81, $93, $93, $89, $8E, $87, $AE
-
-
-strText0Crnr1:		;THE GAOL HOUSE.
-			.byte $0F, $94, $88, $85, $A0, $87, $81, $8F
-			.byte $8C, $A0, $88, $8F, $95, $93, $85, $AE
-strText1Crnr1	=	strDummyDummy0
-strText2Crnr1:		;YOU ARE EITHER
-			.byte $0E, $99, $8F, $95, $A0, $81, $92, $85
-			.byte $A0, $85, $89, $94, $88, $85, $92
-strText3Crnr1:		;HELD HERE OR JUST
-			.byte $11, $88, $85, $8C, $84, $A0, $88, $85
-			.byte $92, $85, $A0, $8F, $92, $A0, $8A, $95
-			.byte $93, $94
-strText4Crnr1:		;VISITING.
-			.byte $09, $96, $89, $93, $89, $94, $89, $8E
-			.byte $87, $AE
-
-
-strText0Crnr2:		;A SPACE FOR YOU TO
-			.byte $12, $81, $A0, $93, $90, $81, $83, $85
-			.byte $A0, $86, $8F, $92, $A0, $99, $8F, $95
-			.byte $A0, $94, $8F
-strText1Crnr2:		;WHILE AWAY YOUR
-			.byte $0F, $97, $88, $89, $8C, $85, $A0, $81
-			.byte $97, $81, $99, $A0, $99, $8F, $95, $92
-strText2Crnr2:		;WORRIES.
-			.byte $08, $97, $8F, $92, $92, $89, $85, $93
-			.byte $AE
-strText3Crnr2	=	strDummyDummy0
-strText4Crnr2:		;ITS FREE!
-			.byte $09, $89, $94, $93, $A0, $86, $92, $85
-			.byte $85, $A1
-
-
-strText0Crnr3:		;YOU WILL BE SENT
-			.byte $10, $99, $8F, $95, $A0, $97, $89, $8C
-			.byte $8C, $A0, $82, $85, $A0, $93, $85, $8E
-			.byte $94
-strText1Crnr3:		;DIRECTLY TO GAOL.
-			.byte $11, $84, $89, $92, $85, $83, $94, $8C
-			.byte $99, $A0, $94, $8F, $A0, $87, $81, $8F
-			.byte $8C, $AE
-strText2Crnr3:		;NO FURTHER ACTION
-			.byte $11, $8E, $8F, $A0, $86, $95, $92, $94
-			.byte $88, $85, $92, $A0, $81, $83, $94, $89
-			.byte $8F, $8E
-strText3Crnr3:		;POSSIBLE UNTIL
-			.byte $0E, $90, $8F, $93, $93, $89, $82, $8C
-			.byte $85, $A0, $95, $8E, $94, $89, $8C
-strText4Crnr3:		;YOUR NEXT TURN.
-			.byte $0F, $99, $8F, $95, $92, $A0, $8E, $85
-			.byte $98, $94, $A0, $94, $95, $92, $8E, $AE
-
-
-;***dengland		These should actually be strTextNChest10... doh
-
-strText0Chest0:		;A TREASURE TROVE
-			.byte $10, $81, $A0, $94, $92, $85, $81, $93
-			.byte $95, $92, $85, $A0, $94, $92, $8F, $96
-			.byte $85
-strText1Chest0:		;BUT BEWARE!
-			.byte $0B, $82, $95, $94, $A0, $82, $85, $97
-			.byte $81, $92, $85, $A1
-strText2Chest0	=	strDummyDummy0
-strText3Chest0:		;A DECK OF 16 CARDS
-			.byte $12, $81, $A0, $84, $85, $83, $8B, $A0
-			.byte $8F, $86, $A0, $B1, $B6, $A0, $83, $81
-			.byte $92, $84, $93
-strText4Chest0:		;RANDOMLY SHUFFLED.
-			.byte $12, $92, $81, $8E, $84, $8F, $8D, $8C
-			.byte $99, $A0, $93, $88, $95, $86, $86, $8C
-			.byte $85, $84, $AE
-
-
-;***dengland		These should actually be strTextNChance10... doh
-
-strText0Chance0:	;A MYSTERY BOX OF
-			.byte $10, $81, $A0, $8D, $99, $93, $94, $85
-			.byte $92, $99, $A0, $82, $8F, $98, $A0, $8F
-			.byte $86
-strText1Chance0:	;DIFFERENT EVENTS.
-			.byte $11, $84, $89, $86, $86, $85, $92, $85
-			.byte $8E, $94, $A0, $85, $96, $85, $8E, $94
-			.byte $93, $AE
-strText2Chance0	=	strDummyDummy0
-strText3Chance0	=	strText3Chest0
-strText4Chance0	=	strText4Chest0
-
-
-strText0Tax0:		;YOU MUST PAY THE
-			.byte $10, $99, $8F, $95, $A0, $8D, $95, $93
-			.byte $94, $A0, $90, $81, $99, $A0, $94, $88
-			.byte $85
-strText1Tax0:		;BANK THE AMOUNT OF
-			.byte $12, $82, $81, $8E, $8B, $A0, $94, $88
-			.byte $85, $A0, $81, $8D, $8F, $95, $8E, $94
-			.byte $A0, $8F, $86
-strText2Tax0:		;$200.
-			.byte $05, $A4, $B2, $B0, $B0, $AE
-strText3Tax0	=	strDummyDummy0
-strText4Tax0	=	strDummyDummy0
-
-
-strText0Tax1	=	strText0Tax0
-strText1Tax1	=	strText1Tax0
-strText2Tax1:		;$100.
-			.byte $05, $A4, $B1, $B0, $B0, $AE
-strText3Tax1	=	strDummyDummy0
-strText4Tax1	=	strDummyDummy0
-
-
 ;===============================================================================
 ;FOR INIT.S
 ;===============================================================================
@@ -26744,6 +26404,8 @@ initNew:
 		LDA	#$06
 		STA	game + GAME::pCount
 
+		JSR	uiInitQueue		
+
 		LDA	#$00			;init game
 		STA	game + GAME::qVis		
 		STA	game + GAME::pActive
@@ -26773,9 +26435,6 @@ initNew:
 		
 		JSR	screenPerformList
 		
-		JSR	statsClear
-		JSR	prmptClear
-		
 		RTS
 
 
@@ -26786,6 +26445,9 @@ initScreen:
 		STA	button0
 		STA	ui + UI::fBtUpd0
 		STA	ui + UI::fBtUpd1 
+		
+		JSR	statsClear
+		JSR	prmptClear
 		
 		RTS
 
@@ -26920,8 +26582,8 @@ plrDefName:
 			.byte 	$08, $90, $8C, $81, $99, $85, $92, $E4, $B0
 
 uiActnCache:
-	.repeat		264, I
-			.byte	$00
+	.repeat		256, I
+			.byte	$FF, $00, $00, $00
 	.endrep
 
 heap0:
