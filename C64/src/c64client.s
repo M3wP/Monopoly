@@ -31,7 +31,7 @@
 ;defs
 ;-------------------------------------------------------------------------------
 	.define	DEBUG_IRQ	0
-	.define DEBUG_KEYS	1
+	.define DEBUG_KEYS	0
 
 spriteMemD	=	$0340
 spriteMemE	=	$0380
@@ -195,7 +195,7 @@ JSTKSENS_HIGH	=	9
 		fBtUpd1 .byte
 		fBtSta1 .byte
 		
-		cActns	.word
+		cActns	.byte
 		gMdAct	.byte
 		pActBak .byte
 		fActTyp .byte			;type (regular, elimin)
@@ -322,6 +322,8 @@ JSTKSENS_HIGH	=	9
 		varN	.byte
 		varO	.byte
 		varP	.byte
+		varQ	.byte
+		varR	.byte
 	.endstruct
 	
 	
@@ -6166,12 +6168,13 @@ statsDisplay:
 uiActionCallsLo:
 		.byte	<(uiActionNull), <(uiActionTrade - 1)
 		.byte	<(uiActionRepay - 1), <(uiActionFee - 1)
-		.byte	<(uiActionAuction - 1)
+		.byte	<(uiActionAuction - 1), <(uiActionMrtg - 1)
+		.byte	<(uiActionSell - 1)
 uiActionCallsHi:
 		.byte	>(uiActionNull), >(uiActionTrade - 1)
 		.byte	>(uiActionRepay - 1), >(uiActionFee - 1)
-		.byte	>(uiActionAuction - 1)
-
+		.byte	>(uiActionAuction - 1), >(uiActionMrtg - 1)
+		.byte	>(uiActionSell - 1)
 
 ;-------------------------------------------------------------------------------
 uiInitQueue:
@@ -6180,6 +6183,9 @@ uiInitQueue:
 		STA	$6D
 		LDA	#>uiActnCache
 		STA	$6E
+
+		LDA	#$00
+		STA	ui + UI::cActns
 
 ;		LDA	#$FF
 ;		STA	($6D), Y
@@ -6200,13 +6206,15 @@ uiDequeueAction:
 ;-------------------------------------------------------------------------------
 		LDY	#$00
 		
-		SEC
-		LDA	ui + UI::cActns
-		SBC	#$01
-		STA	ui + UI::cActns
-		LDA	ui + UI::cActns + 1
-		SBC	#$00
-		STA	ui + UI::cActns + 1
+;		SEC
+;		LDA	ui + UI::cActns
+;		SBC	#$01
+;		STA	ui + UI::cActns
+;		LDA	ui + UI::cActns + 1
+;		SBC	#$00
+;		STA	ui + UI::cActns + 1
+		
+;		DEC	ui + UI::cActns
 		
 		LDA	($6D), Y
 		STA	$68
@@ -6249,14 +6257,16 @@ uiEnqueueAction:
 		LDA	$6B
 		STA	($6D), Y
 		
-		CLC
-		LDA	ui + UI::cActns
-		ADC	#$01
-		STA	ui + UI::cActns
-		LDA	ui + UI::cActns + 1
-		ADC	#$00
-		STA	ui + UI::cActns + 1
-		
+;		CLC
+;		LDA	ui + UI::cActns
+;		ADC	#$01
+;		STA	ui + UI::cActns
+;		LDA	ui + UI::cActns + 1
+;		ADC	#$00
+;		STA	ui + UI::cActns + 1
+
+		INC	ui + UI::cActns
+
 		CLC
 		LDA	$6D
 		ADC	#$04
@@ -6673,6 +6683,39 @@ uiActionAuction:
 		
 		RTS
 
+
+uiActionMrtg:
+		LDA	$69
+
+		STA	game + GAME::pActive
+		STA	game + GAME::pLast
+		
+		LDA	$6A
+		JSR	uiActionFocusSquare
+		
+;		LDA	$6A
+;		ASL
+;		TAX
+;		JSR	rulesMortgageImmed
+
+		JSR	rulesToggleMrtg
+
+		RTS
+
+
+uiActionSell:
+		LDA	$69
+
+		STA	game + GAME::pActive
+		STA	game + GAME::pLast
+		
+		LDA	$6A
+		JSR	uiActionFocusSquare
+		
+		LDA	$6A
+		JSR	rulesPriorImprv
+
+		RTS
 
 ;==============================================================================
 ;FOR MENU.S
@@ -8263,6 +8306,13 @@ menuPagePlay0DefKeys:
 
 
 menuPagePlay0StdKeys:
+		CMP	#'A'
+		BNE	@keysQ
+		
+		JSR	rulesAutoSell
+		JMP	@keysDing
+		
+@keysQ:
 		CMP	#'Q'			
 		BNE	@keysN			
 						
@@ -11757,6 +11807,7 @@ gameGetCardPtrForSquare:
 		ASL
 		TAX
 		
+gameGetCardPtrForSquareImmed:
 		LDA	rulesSqr0 + 1, X
 		STA	game + GAME::varC	;index
 		
@@ -12455,7 +12506,7 @@ gameCheckGaolFree:
 		
 		LDA	game + GAME::pGF1Crd
 		CMP	game + GAME::pActive
-		BNE	@exit
+		BNE	@fail
 		
 @canfree:
 		LDA	#$FF
@@ -12496,8 +12547,15 @@ gameCheckGaolFree:
 		LDA	#$02
 		ORA	game + GAME::dirty
 		STA	game + GAME::dirty
-		
-@exit:
+	
+		RTS
+
+@fail:
+		LDA	#<SFXBUZZ
+		LDY	#>SFXBUZZ
+		LDX	#$07
+		JSR	SNDBASE + 6
+
 		RTS
 
 
@@ -14252,13 +14310,6 @@ dialogDefWindow0:
 			
 			.byte	$00
 
-dialogKeyHandler:
-			.word	dialogDefKeys
-dialogDrawDefDraw:
-			.byte	$00
-dialogDrawHandler:
-			.word	dialogDefDraw
-			
 dialogDlgTitles0:
 		.word	dialogDlgTitles0Keys
 		.word	dialogDlgTitles0Draw
@@ -14344,6 +14395,14 @@ dialogDlgNull0:
 		.word	dialogDlgNull0Draw
 		.byte	$01
 
+
+dialogKeyHandler:
+			.word	dialogDefKeys
+dialogDrawHandler:
+			.word	dialogDefDraw
+dialogDrawDefDraw:
+			.byte	$00
+			
 ;-------------------------------------------------------------------------------
 dialogSetDialog:
 ;-------------------------------------------------------------------------------
@@ -16448,27 +16507,12 @@ dialogWindowTrdSel0:
 			.byte	$2B, $04, $15, $20
 			.byte	$3B, $23, $03, $12
 
-			.byte	$90, $05, $05		;Cash lbls
-			.word		strText3TrdSel0
-			
+	
 			.byte	$90, $05, $0A		;Rem wealth lbls
 			.word		strText4TrdSel0	
+			.byte	$2C, $05, $0A, $06	;RWealth lbl + $
+			.byte	$2F, $05, $0B, $06	
 
-
-;***TODO:		Move these into another display data
-							;Cash btns
-			.byte	$A4, $07, $08, $09, $55, $08, $07
-			.word		strDummyDummy0
-			.byte	$A4, $07, $09, $0A, $49, $09, $07
-			.word		strDummyDummy0
-			.byte	$A4, $07, $0A, $0B, $4F, $0A, $07
-			.word		strDummyDummy0
-			.byte	$A4, $08, $08, $09, $4A, $08, $08
-			.word		strDummyDummy0
-			.byte	$A4, $08, $09, $0A, $4B, $09, $08
-			.word		strDummyDummy0
-			.byte	$A4, $08, $0A, $0B, $4C, $0A, $08
-			.word		strDummyDummy0
 
 			.byte	$90, $1D, $05		;GO Free
 			.word		strText0TrdSel0
@@ -16480,18 +16524,7 @@ dialogWindowTrdSel0:
 			.word		strOptn0TrdSel0
 			.byte	$AE, $0D, $1C, $20, $42, $1C, $0D
 			.word		strOptn1TrdSel0
-			.byte	$AE, $12, $1C, $22, $41, $1C, $12
-			.word		strOptn3TrdSel0
-			.byte	$AE, $13, $1C, $23, $44, $1C, $13
-			.word		strOptn4TrdSel0
 
-
-;***TODO:		Move these into other display data
-			.byte	$2C, $05, $05, $06	;Cash lbl + $ 
-			.byte	$2F, $05, $06, $06	
-			
-			.byte	$2C, $05, $0A, $06	;RWealth lbl + $
-			.byte	$2F, $05, $0B, $06	
 			
 ;***TODO:		Make colours configurable in order to indicate
 ;			which are available
@@ -16525,7 +16558,37 @@ dialogWindowTrdSel2:
 			.byte	$8F, $05, $08
 			
 			.byte	$00
-			
+
+
+dialogWindowTrdSel3:
+			.byte	$90, $05, $05		;Cash lbls
+			.word		strText3TrdSel0
+			.byte	$2C, $05, $05, $06	;Cash lbl + $ 
+			.byte	$2F, $05, $06, $06	
+							;Cash btns
+			.byte	$A4, $07, $08, $09, $55, $08, $07
+			.word		strDummyDummy0
+			.byte	$A4, $07, $09, $0A, $49, $09, $07
+			.word		strDummyDummy0
+			.byte	$A4, $07, $0A, $0B, $4F, $0A, $07
+			.word		strDummyDummy0
+			.byte	$A4, $08, $08, $09, $4A, $08, $08
+			.word		strDummyDummy0
+			.byte	$A4, $08, $09, $0A, $4B, $09, $08
+			.word		strDummyDummy0
+			.byte	$A4, $08, $0A, $0B, $4C, $0A, $08
+			.word		strDummyDummy0
+
+			.byte	$00
+
+dialogWindowTrdSel4:
+			.byte	$AE, $12, $1C, $22, $41, $1C, $12
+			.word		strOptn3TrdSel0
+			.byte	$AE, $13, $1C, $23, $44, $1C, $13
+			.word		strOptn4TrdSel0
+
+			.byte	$00
+
 
 dialogAddrTrdSelCash=	$04F5
 dialogAddrTrdSelRWealth=$05BD
@@ -17064,6 +17127,7 @@ doDialogTrdSelToggle:
 
 		LDA	rulesSqr0, X		;Get square group ptr
 		TAX
+		LDY	#$FF
 		JSR 	rulesDoCollateImprv	;Get improvement stats
 
 		LDA	game + GAME::varB	;Has improvements?
@@ -17980,6 +18044,13 @@ dialogDlgTrdSel0Draw:
 		JSR	screenPerformList
 
 @approv:
+		LDA	#<dialogWindowTrdSel4
+		STA	$FD
+		LDA	#>dialogWindowTrdSel4
+		STA	$FE
+		
+		JSR	screenPerformList
+
 		LDA	#<heap0
 		STA	$A3
 		LDA	#>heap0
@@ -17997,6 +18068,17 @@ dialogDlgTrdSel0Draw:
 		
 		JSR	screenPerformList
 		
+		LDA	dialogTrdSelDoElimin
+		BNE	@skipcash
+
+		LDA	#<dialogWindowTrdSel3
+		STA	$FD
+		LDA	#>dialogWindowTrdSel3
+		STA	$FE
+		
+		JSR	screenPerformList
+		
+@skipcash:
 		LDA	#$01
 		STA	ui + UI::fWntJFB
 		
@@ -20513,6 +20595,21 @@ boardQ3VSqr23:
 ;FOR RULES.S
 ;==============================================================================
 
+rulesPriMrtg:
+		.byte	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+rulesPriAll:
+		.byte	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+rulesSqrImprv:
+	.repeat	40, I
+		.byte	$00
+	.endrep
+
+;***TODO:		Put all of this constant data up high, too.
+
+rulesGrpPriority:
+		.byte	$01, $02, $03, $0A, $04, $05, $06, $07, $08, $09
+
+
 rulesScore0:	
 			.byte	1, 2, 5, 7, 15
 rulesScore1:
@@ -20659,6 +20756,18 @@ rulesGrpHi:		.byte	>rulesGrp0, >rulesGrp1, >rulesGrp2, >rulesGrp3
 			.byte	>rulesGrp4, >rulesGrp5, >rulesGrp6, >rulesGrp7
 			.byte	>rulesGrp8, >rulesGrp9, >rulesGrpA, >rulesGrpB
 			.byte	>rulesGrpC, >rulesGrpD
+
+
+rulesGrpSqrs0:
+			.byte	$FF, $01, $06, $0B, $10, $15, $1A, $1F
+			.byte	$25, $FF, $FF, $FF, $FF, $FF
+rulesGrpSqrs1:
+			.byte	$FF, $03, $08, $0D, $12, $17, $1B, $20
+			.byte	$27, $FF, $FF, $FF, $FF, $FF
+			
+rulesGrpSqrs2:
+			.byte	$FF, $FF, $09, $0E, $13, $18, $1D, $22
+			.byte	$FF, $FF, $FF, $FF, $FF, $FF
 
 
 rulesCrdCrnr0:
@@ -21649,7 +21758,7 @@ rulesChanceIdx:
 rulesGenRnd0F:
 ;***FIXME:  I can't quite recall how I came up with the algorythm used 
 ;	here.  It attempts to divide the random value (0-255) down to the range 
-;	(0-15).  There seems to be an issue, however.  Values above 15 are being
+;	(0-15).  There was an issue, however.  Values above 15 were being
 ;	generated.  Initially I expected only 16 however 17 seems to occur.  I
 ;	think this may be bad.
 
@@ -21811,17 +21920,6 @@ rulesShuffleChance:
 		LDX	#$00
 		STX	rulesChanceIdx
 
-;		LDX	game + GAME::pActive
-;		LDA	plrLo, X
-;		STA	$FB
-;		LDA	plrHi, X
-;		STA	$FC
-;		
-;		LDY	#PLAYER::colour
-;		LDA	($FB), Y
-;		TAX
-;		JSR	prmptClearOrRoll
-		
 		JSR	prmptDisplay
 		
 		RTS
@@ -24193,15 +24291,15 @@ rulesDoCollateImprv:
 		LDA	#$00
 		STA	game + GAME::varB
 		STA	game + GAME::varC
-		STA	game + GAME::varD
+		STA	game + GAME::varQ
 
-		STY	game + GAME::varF
-		STX	game + GAME::varE
+		STY	game + GAME::varF	
+		STX	game + GAME::varR
 		
 		LDX	#$4E
 @loop0:	
 		LDA	rulesSqr0, X
-		CMP	game + GAME::varE
+		CMP	game + GAME::varR
 		BNE	@next0
 
 		LDY	#$80
@@ -24210,7 +24308,7 @@ rulesDoCollateImprv:
 		BIT	$A3
 		BEQ	@tstprep
 			
-		INC	game + GAME::varD
+		INC	game + GAME::varQ
 		
 @tstprep:
 		LDY	#$08
@@ -24242,6 +24340,9 @@ rulesDoCollateImprv:
 		BPL	@loop0
 
 		LDA	game + GAME::varF
+		CMP	#$FF
+		BEQ	@exit
+		
 		ASL
 		TAX
 		LDA	sqr00 + 1, X
@@ -24260,6 +24361,7 @@ rulesDoCollateImprv:
 @curr:
 		STA	game + GAME::varC
 		
+@exit:
 		RTS
 
 
@@ -24742,7 +24844,8 @@ rulesMortgageFeeImmed:
 		
 		LDA	rulesSqr0, X		
 		STA	game + GAME::varB	;group
-
+		TAX
+		
 		LDA	game + GAME::varC	;group index
 		ASL
 		CLC
@@ -24779,6 +24882,63 @@ rulesMortgageFeeImmed:
 	
 		RTS
 		
+		
+rulesMortgageImmed:
+		LDA	sqr00 + 1, X
+		EOR	#$80
+		STA	game + GAME::varA	;imprv
+
+;***TODO:	Test for improvements here, too.
+
+		STA	sqr00 + 1, X
+
+		JSR	gameGetCardPtrForSquareImmed
+
+		LDA	game + GAME::varA
+		AND	#$80
+		BNE	@mrtg
+
+		RTS
+
+@mrtg:
+		LDY	#DEED::mValue
+		LDA	($FD), Y
+		STA	game + GAME::varD
+		INY
+		LDA	($FD), Y
+		STA	game + GAME::varE
+
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+
+		JSR	rulesAddCash
+		
+		JSR	rulesSubEquity
+
+		LDA	#<SFXSLIDELOW
+		LDY	#>SFXSLIDELOW
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
+		LDY	#PLAYER::colour
+		LDA	($FB), Y
+		TAX
+		JSR	prmptMortgage
+		
+@toggle:
+		LDX	game + GAME::varG
+		LDA	game + GAME::varA
+		STA	sqr00 + 1, X
+		
+		LDA	#$01
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+@exit:
+		RTS
 
 ;-------------------------------------------------------------------------------
 rulesToggleMrtg:
@@ -24844,6 +25004,8 @@ rulesToggleMrtg:
 		JMP	@buzz
 		
 @begin:
+;***TODO:	Link into action code instead.
+
 		LDA	sqr00 + 1, X
 		EOR	#$80
 		STA	game + GAME::varA	;imprv
@@ -25617,6 +25779,539 @@ rulesNextTurn:
 		RTS
 		
 		
+rulesDoTestAllOwned:
+;***FIXME:	I'm doing this group lookup a lot now.  I should optimise it
+;		by indexing the squares for the groups.
+
+		LDX	#$00
+@loop:		
+		LDA	rulesSqr0, X
+		CMP	game + GAME::varA
+		BNE	@next
+		
+		LDA	sqr00, X
+		CMP	game + GAME::varK
+		BNE	@next
+		
+		LDA	sqr00 + 1, X
+		AND	#$40
+		BEQ	@next
+		
+		LDA	#$01
+		RTS
+		
+@next:
+		INX
+		INX
+		CPX 	#$50
+		BNE	@loop
+		
+		LDA	#$00
+		RTS
+	
+	
+rulesDoSetPriority:
+		LDX	#$00
+@loop0:
+		STX	game + GAME::varG		;varC = group index
+		
+		LDA	rulesGrpPriority, X	
+		STA	game + GAME::varA		;varA = group
+		
+		JSR	rulesDoTestAllOwned
+		BNE	@setall
+		
+		LDA	#$01
+		LDX	game + GAME::varG
+		STA	rulesPriMrtg, X
+		LDA	#$00
+		STA	rulesPriAll, X
+		
+		JMP	@next0
+		
+@setall:
+		LDA	#$00
+		LDX	game + GAME::varG
+		STA	rulesPriMrtg, X
+		LDA	#$01
+		STA	rulesPriAll, X
+		
+@next0:
+		INX
+		CPX	#$0A
+		BNE	@loop0
+
+		RTS
+	
+
+rulesDoCommitMrtg:
+;		varJ	= group
+;		varK	= player
+
+		LDX	#$00
+		STX	game + GAME::varI
+@loop:		
+		STX	game + GAME::varH
+		
+		LDA	rulesSqr0, X
+		CMP	game + GAME::varJ
+		BNE	@next
+		
+		LDA	sqr00, X
+		CMP	game + GAME::varK
+		BNE	@next
+		
+		LDX	game + GAME::varI
+		LDA	rulesSqrImprv, X
+		AND	#$80
+		BNE	@next
+		
+		LDA	rulesSqrImprv, X
+		AND	#$7F
+		STA	rulesSqrImprv, X
+		
+		LDA	#$05
+		STA	$68
+		LDA	game + GAME::varK
+		STA	$69
+		LDA	game + GAME::varI
+		STA	$6A
+		
+		JSR	uiEnqueueAction
+		
+		LDA	game + GAME::varI
+		JSR	gameGetCardPtrForSquare
+		
+		LDY	#DEED::mValue
+		
+		CLC
+		LDA	($FD), Y
+		ADC	game + GAME::varD
+		STA	game + GAME::varD
+		INY
+		LDA	($FD), Y
+		ADC	game + GAME::varE
+		STA	game + GAME::varE
+		
+		JSR	gameAmountIsLessDirect
+		BCC	@complete
+		
+@next:
+		LDX	game + GAME::varH
+		
+		INC	game + GAME::varI
+		
+		INX
+		INX
+		CPX 	#$50
+		BNE	@loop
+		
+		LDA	#$00
+		RTS
+		
+@complete:
+		LDA	#$01
+		
+		RTS
+
+
+rulesDoProcessMrtg:
+		LDX	#$00
+@loop0:
+		STX	game + GAME::varG		;varG = group index
+		
+		LDA	rulesGrpPriority, X	
+		STA	game + GAME::varJ		;varJ = group
+
+		LDA	rulesPriMrtg, X
+		BEQ	@next0
+		
+		JSR	rulesDoCommitMrtg
+		BNE	@complete
+				
+@next0:
+		LDX	game + GAME::varG
+
+		INX
+		CPX	#$0A
+		BNE	@loop0
+		
+		LDA	#$00
+		RTS
+		
+@complete:
+		LDA	#$01
+		RTS
+	
+
+rulesDoCommitSellAtLevel:
+;		For each square in group, sell improvements at level 
+;		until sold enough or positive houses?
+
+;		Must return not handled if negative houses at end
+
+;		Update level when cleared
+
+;		Update house count if level is 5 or below
+;		Update hotel count if level is 5
+
+;		game + GAME::varJ = group
+;		game + GAME::varB = level
+;		game + GAME::varH = house count
+;		game + game::varI = hotel count
+;		game + GAME::varK = player
+;		rulesSqrImprv for improvement information
+
+;		until (sold enough and pos houses) or none found
+;			find next matching square (has count)
+;				
+;			check varI for 5 else varH
+;				sell improvement
+;				check complete
+;				complete, exit
+;				else next
+;			none found at level?
+;				decrement level
+;				not complete
+;
+;		game + GAME::varA = group square idx
+;		game + GAME::varF = square 
+;		game + GAME::varL = new imprv
+
+		LDX	game + GAME::varJ
+		
+		LDA	rulesGrpLo, X
+		STA	$FD
+		LDA	rulesGrpHi, X
+		STA	$FE
+		
+		LDA	#$00
+		STA	game + GAME::varA
+		
+@loop0:
+		LDA	#$00
+		LDX	game + GAME::varA
+@loop1:
+		DEX
+		BMI	@cont0
+		CLC
+		ADC	#$0E
+		JMP	@loop1
+		
+@cont0:
+		CLC
+		ADC	game + GAME::varJ
+		
+		TAX
+		LDA	rulesGrpSqrs0, X
+		STA	game + GAME::varF
+		
+		CMP	#$FF
+		BNE	@begin0
+		
+		JMP	@incompletedn
+
+@begin0:
+		ASL
+		TAX
+		LDA	sqr00, X
+		CMP	game + GAME::varK
+		BEQ	@begin1
+		
+		JMP	@incompletedn
+		
+@begin1:
+		LDX	game + GAME::varF
+		LDA	rulesSqrImprv, X
+		AND	#$08
+		BEQ	@houses0
+		
+		LDA	#$05
+		JMP	@cont1
+		
+@houses0:
+		LDA	rulesSqrImprv, X
+		AND	#$07
+		
+@cont1:
+
+		CMP	game + GAME::varB
+		BNE	@donext
+
+		LDA	#$06
+		STA	$68
+		LDA	game + GAME::varK
+		STA	$69
+		LDA	game + GAME::varF
+		STA	$6A
+		
+		JSR	uiEnqueueAction
+		
+		LDA	game + GAME::varB
+		CMP	#$05
+		BNE	@houses1
+		
+		INC	game + GAME::varI
+		LDA	game + GAME::varH
+		SEC
+		SBC	#$04
+		STA	game + GAME::varH
+	
+		LDX	game + GAME::varF
+		LDA	rulesSqrImprv, X
+		
+		AND	#$F0
+		ORA	#$04
+		STA	rulesSqrImprv, X
+	
+		JMP	@cont2
+	
+@houses1:	
+		CLC
+		LDA	game + GAME::varH
+		ADC	#$01
+		STA	game + GAME::varH
+		
+		LDX	game + GAME::varB
+		DEX
+		STX	game + GAME::varL
+		
+		LDX	game + GAME::varF
+		LDA	rulesSqrImprv, X
+		
+		AND	#$F0
+		ORA	game + GAME::varL
+		STA	rulesSqrImprv, X
+		
+@cont2:
+		LDY	#GROUP::pImprv
+		LDA	($FD), Y
+		LSR
+		CLC
+		ADC	game + GAME::varD
+		STA	game + GAME::varD
+		INY
+		LDA	#$00
+		ADC	game + GAME::varE
+		STA	game + GAME::varE
+		
+@tstnext:
+		LDA	game + GAME::varH
+		BMI	@donext
+		
+		JSR	gameAmountIsLessDirect
+		BCS	@donext
+		
+@complete:
+		LDA	#$01
+		RTS
+		
+@donext:
+		INC	game + GAME::varA
+		LDA	game + GAME::varA
+		CMP	#$03
+		BEQ	@incompletedn
+		
+		JMP	@loop0
+		
+@incompletedn:
+		DEC	game + GAME::varB
+@incomplete:
+		LDA	#$00
+		
+		RTS
+		
+
+rulesDoCommitSellHotels:
+		JSR	rulesDoCommitSellAtLevel
+		RTS
+	
+	
+rulesDoCommitSellHouses:
+;		Must continue to break down houses while negative houses
+;		game + GAME::varB = level
+;		game + GAME::varH = house count
+
+@loop:
+		JSR	rulesDoCommitSellAtLevel
+		BNE	@complete
+		
+		LDA	game + GAME::varB
+		BEQ	@incomplete
+
+		LDA	game + GAME::varH
+		BMI	@loop
+
+		JSR	gameAmountIsLessDirect
+		BCS	@loop
+
+@complete:
+		LDA	#$01
+		RTS
+
+@incomplete:
+		LDA	#$00
+		RTS
+		
+	
+rulesDoCopyImprv:
+		LDX	#$00
+		LDY	#$00
+@loop:
+		LDA	sqr00 + 1, X
+		STA	rulesSqrImprv, Y		
+
+		INX
+		INX
+		INY
+		
+		CPX	#$50
+		BNE	@loop
+		
+		RTS
+		
+	
+rulesDoProcessAll:
+;		For each group in the priority lists do
+;			Is it in this list? 
+
+;				Is group 09/0A?  goto handle mortgage
+
+;				rulesDoCollateImprv
+
+;				has improvements?
+
+;					no - handle mortgage
+
+;					yes - handle hotels?
+
+;						handle houses
+		LDA	game + GAME::cntHs
+		STA	game + GAME::varH
+		LDA	game + GAME::cntHt
+		STA	game + GAME::varI
+		
+		
+		LDX	#$00
+@loop0:
+		STX	game + GAME::varG		;varG = group index
+		
+		LDA	rulesGrpPriority, X	
+		STA	game + GAME::varJ		;varJ = group
+
+		LDA	rulesPriAll, X
+		BEQ	@next0
+		
+		LDA	game + GAME::varJ
+		CMP	#$09
+		BEQ	@handleMrtg
+		
+		LDA	game + GAME::varJ
+		CMP	#$0A
+		BEQ	@handleMrtg
+
+		LDX	game + GAME::varJ
+		LDY	#$FF
+
+		JSR	rulesDoCollateImprv
+		
+		LDA	game + GAME::varB
+		BEQ	@handleMrtg
+		
+		CMP	#$05
+		BNE	@handleHouses
+		
+		JSR	rulesDoCommitSellHotels
+		BNE	@complete
+		
+@handleHouses:
+		JSR	rulesDoCommitSellHouses
+		BNE	@complete
+
+@handleMrtg:
+		JSR	rulesDoCommitMrtg
+		BNE	@complete
+				
+@next0:
+		LDX	game + GAME::varG
+
+		INX
+		CPX	#$0A
+		BNE	@loop0
+		
+		LDA	#$00
+		RTS
+		
+@complete:		
+		RTS
+	
+	
+rulesAutoRecover:
+		STA	game + GAME::varO		;varO,P = amount
+		STY	game + GAME::varP
+		STX	game + GAME::varK		;varF = player
+		
+		JSR	rulesDoCopyImprv
+		
+		LDA	#$00
+		STA	game + GAME::varD		;varD,E = recovered amt
+		STA	game + GAME::varE
+		
+		JSR	rulesDoSetPriority
+
+		JSR	rulesDoProcessMrtg
+		BNE	@complete
+		
+		JSR	rulesDoProcessAll
+		
+@complete:
+		RTS
+
+
+rulesAutoSell:
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDY	#PLAYER::money + 1
+		LDA	($FB), Y
+		BPL	@exit
+		
+		DEY
+		LDA	($FB), Y
+		STA	game + GAME::varD
+		INY
+		LDA	($FB), Y
+		STA	game + GAME::varE
+		
+		SEC
+		LDA	#$00
+		SBC	game + GAME::varD
+		STA	game + GAME::varD
+		LDA	#$00
+		SBC	game + GAME::varE
+		
+		TAY
+		LDA	game + GAME::varD
+		
+		JSR	rulesAutoRecover
+		
+		LDA	ui + UI::cActns
+		BEQ	@exit
+		
+@doProcess:
+		LDA	#$01
+		STA	ui + UI::fActInt
+		LDA	#$00
+		STA	ui + UI::fActTyp
+		
+		JSR	uiProcessInit
+		
+@exit:
+		RTS
+
 ;==============================================================================
 ;FOR NUMCONV.S
 ;==============================================================================

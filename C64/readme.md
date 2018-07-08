@@ -420,9 +420,6 @@ NTSC/PAL-N version in the future.
 
 ## TODO
 
-* Fix order of buttons on trdsel0 dialog - f, b, select, repay, accept, dismiss, 
-  money
-* Buzz for more of the failures (gaol, auction, management).  Must do.
 * Statistics/Overview from trade approval, must pay.  They should work now.
 
 * Should be able to do beta release state after above
@@ -431,7 +428,6 @@ NTSC/PAL-N version in the future.
 * Backup/retrieve menu button selection going to/returning from dialogs when
   the menu hasn't changed?  Would be nice...
   
-* Implement autosell?  Complicated.
 * Allow players to input name?
 * Trim down key scan routine.
 * Get exmomiser working.
@@ -469,6 +465,9 @@ NTSC/PAL-N version in the future.
 
 ## Change History (Since Version 0.01.99A)
 * 08JUL208
+	* Buzz when fail get out free.
+	* Fix order of buttons on trdsel0 dialog.
+	* Autosell feature.  Still not properly incorporated into menus.
 	* Load strings resource.  This is still very slow. *sigh*
 	* Rip out strings and put in separate files.  I have built a strings.prg
 	  file out of the process but I can't get exomiser to work yet so the
