@@ -32,6 +32,7 @@
 ;-------------------------------------------------------------------------------
 	.define	DEBUG_IRQ	0
 	.define DEBUG_KEYS	0
+	.define DEBUG_CPU	0
 
 spriteMemD	=	$0340
 spriteMemE	=	$0380
@@ -200,6 +201,8 @@ JSTKSENS_HIGH	=	9
 		pActBak .byte
 		fActTyp .byte			;type (regular, elimin)
 		fActInt .byte			;interactive
+		
+		fInjKey .byte
 	.endstruct
 
 
@@ -264,6 +267,7 @@ JSTKSENS_HIGH	=	9
 		sStpDst .byte
 		fStpPsG .byte
 		fPayDbl .byte
+		gMdStep .byte
 		
 		fTrdSlM .byte
 		fTrdSlL .byte
@@ -282,6 +286,7 @@ JSTKSENS_HIGH	=	9
 		gMdTrdI .byte			;Back up gmode for trade intrpt
 		pTrdICP	.byte			;Back up player for trade intrpt
 		
+		
 		fTrdStg .byte			;stage
 		iTrdStp .byte			;step
 		fTrdPhs .byte			;phase
@@ -298,7 +303,7 @@ JSTKSENS_HIGH	=	9
 						;5:  Game Over
 						;6:  Player stepping (f/e)
 						;7:  Trade selection (f/e)
-						;8:  Trade stepping (f/e)
+						;8:  Action stepping (f/e)
 						;9:  Quit request
 		
 		tPrmT0	.tag	TOKEN
@@ -324,6 +329,12 @@ JSTKSENS_HIGH	=	9
 		varP	.byte
 		varQ	.byte
 		varR	.byte
+		varS	.byte
+		varT	.byte
+		varU	.byte
+		varV	.byte
+		varW	.byte
+		varX	.byte
 	.endstruct
 	
 	
@@ -341,6 +352,8 @@ JSTKSENS_HIGH	=	9
 						;Bit 2: 
 						;Bit 1: Losing
 						;Bit 0: Alive
+		fCPU	.byte
+		
 		nGRls	.byte
 
 		name	.tag	SHRTSTR
@@ -509,9 +522,10 @@ JSTKSENS_HIGH	=	9
 	
 	
 	.struct	MENUPAGE
-		fKeys	.word
-		fDraw	.word
+		aKeys	.word
+		aDraw	.word
 		bDef	.byte
+		aCPU	.word
 	.endstruct
 
 
@@ -882,12 +896,21 @@ finMem:
 ;handleUpdates
 ;-------------------------------------------------------------------------------
 handleUpdates:
-		LDA	game + GAME::pActive
-		CMP	game + GAME::pLast
+		LDX	game + GAME::pActive
+		CPX	game + GAME::pLast
 		BEQ	@tststep
 		
 		LDA	game + GAME::fShwNxt
 		BEQ	@tststep
+		
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDY	#PLAYER::fCPU
+		LDA	($FB), Y
+		BNE	@tststep
 		
 		JSR	gameShowPlayerDlg
 	
@@ -1004,18 +1027,49 @@ handleUpdates:
 		
 @updTstCont1:
 		LDA	game + GAME::dlgVis
-		BEQ	@noDialog
+		BEQ	@tstcpu
 		
 @updDialog:
 		JSR	dialogDisplay
-
-@noDialog:
-
 		LDA	#$00
 		STA	game+GAME::dirty
 
 		JMP	updatesExit
+
+@tstcpu:
+		LDA	#$00
+		STA	game+GAME::dirty
 		
+		LDA	game + GAME::gMode
+		CMP	#$09
+		BEQ	@tstcpu1
+		
+		CMP	#$05
+		BPL	@human
+		
+@tstcpu1:
+		LDA	keyQueueEnPos
+		BNE	@human
+		
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDY	#PLAYER::fCPU
+		LDA	($FB), Y
+		BEQ	@human
+		
+		LDA	menuActivePage0 + MENUPAGE::aCPU
+		STA	cpuThisPerform
+		LDA	menuActivePage0 + MENUPAGE::aCPU + 1
+		STA	cpuThisPerform + 1
+		
+		JSR	cpuEngageBehaviour
+
+@human:
+		JMP	updatesExit
 		
 @updSelOnly:
 	.if	DEBUG_IRQ
@@ -1147,6 +1201,16 @@ gameRebuildScreen:
 ;FOR KEYS.S
 ;==============================================================================
 
+keyQueue0:
+		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+		.byte	$00, $00, $00, $00
+
+keyQueueDePos:	
+		.byte	$00
+keyQueueEnPos:
+		.byte	$00
+
+
 keyInit:
 		LDA	#<keyEvaluateSpecial
 		STA	$028F
@@ -1154,6 +1218,49 @@ keyInit:
 		STA	$0290
 		
 		RTS
+
+keyEnqueueKey:
+		LDX	keyQueueEnPos
+		STA	keyQueue0, X
+		
+		INC	keyQueueEnPos
+		
+		RTS
+
+keyDequeueKeys:
+		LDA	ui + UI::fInjKey
+		BEQ	@exit
+
+@loop:
+		LDX	keyQueueDePos
+		CPX	keyQueueEnPos
+		BEQ	@normalise
+		
+		LDA	keyQueue0, X
+		JSR	keyInjectKey
+		
+		INC	keyQueueDePos
+		
+		JMP	@loop
+		
+@normalise:
+		LDA	#$00
+		STA	keyQueueDePos
+		STA	keyQueueEnPos
+	
+@exit:
+		RTS
+
+
+;-------------------------------------------------------------------------------
+keyInjectKey:	
+;-------------------------------------------------------------------------------
+		LDX	$C6			;Put a key into the buffer
+		STA	$0277, X
+		INC	$C6
+		
+		RTS
+
 
 keyScanKey:
 ;.,EA87 A9 00    clear A
@@ -1641,8 +1748,11 @@ screenTestSelBtn:
 ;-------------------------------------------------------------------------------
 screenResetSelBtn:
 ;-------------------------------------------------------------------------------
+		LDA	ui + UI::fJskEnb
+		BNE	@joystick
+		
 		LDA	ui + UI::fMseEnb
-		BEQ	@joystick
+		BEQ	@exit
 
 		LDA	#$01
 		STA	mouseCheck
@@ -3130,19 +3240,31 @@ plyrIRQ:
 		STA	vicBrdrClr
 	.endif
 	
-;dengland
-;		I seem to need to call this regularly or else there is a jam for 
-;		some reason???
-;		JSR	krnlScnKey
-		JSR	keyScanKey
-
-		LDA	game + GAME::sig	;Don't process the mouse click
-		BNE	@skipKeys		;or keys if the FrontEnd is busy
 		
+		LDA	game + GAME::sig	;Don't process the mouse click
+		BNE	@skipThis		;or keys if the FrontEnd is busy
+;
 	.if	DEBUG_IRQ
 		LDA	#$02
 		STA	vicBrdrClr
 	.endif
+	
+		JSR	keyDequeueKeys
+
+	.if 	DEBUG_CPU
+	.else
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDY	#PLAYER::fCPU
+		LDA	($FB), Y
+		BNE	@skipJstk
+	.endif
+
+		JSR	keyScanKey
 
 		LDA	ui + UI::fMseEnb	
 		BEQ	@skipMouse
@@ -3164,9 +3286,9 @@ plyrIRQ:
 @skipJstk:
 		JSR	handleKeys
 
-@skipKeys:
 		JSR	handleHotBlink
 
+@skipThis:
 		LDA	#$00			;IRQ done now and not busy until
 		STA	game + GAME::lock	;last phase
 							
@@ -3796,11 +3918,6 @@ handleKeyInput:
 ;handleKeys
 ;-------------------------------------------------------------------------------
 handleKeys:
-;dengland	We have done these already elsewhere or are copying them
-;		JSR	$EA87			;scan keyboard **NOT REQ'D**
-;		JSR 	$FFE4			;call get character from input
-		
-		
 						;We have a pretty waiting
 						;indicator.  Count down to update.
 		DEC	irqglob + IRQGLOBS::keyDly	
@@ -3839,7 +3956,7 @@ handleKeys:
 		BNE	@dialog			;Yes - pass keys to it
 		
 		PLA				;No - pass keys to menu
-		JMP	(menuActivePage0 + MENUPAGE::fKeys)
+		JMP	(menuActivePage0 + MENUPAGE::aKeys)
 		
 @dialog:	
 		PLA				;Pass keys to dialog
@@ -4182,7 +4299,7 @@ handleJoystick:
 		BEQ	@tstClick
 		
 		LDA	#$46
-		JSR	doInjectKey
+		JSR	keyInjectKey
 		
 		RTS
 		
@@ -4201,7 +4318,7 @@ handleJoystick:
 		BEQ	@tstClick
 
 		LDA	#$42
-		JSR	doInjectKey
+		JSR	keyInjectKey
 		
 		RTS
 		
@@ -4222,7 +4339,7 @@ handleJoystick:
 		LDY	#BUTTON::cKey
 		LDA	($32), Y
 		
-		JSR	doInjectKey
+		JSR	keyInjectKey
 
 @exit:
 		RTS
@@ -4454,6 +4571,7 @@ handleMouse:
 @exit:
 		RTS
 
+
 ;-------------------------------------------------------------------------------
 handleMouseClick:
 ;-------------------------------------------------------------------------------
@@ -4474,23 +4592,12 @@ handleMouseClick:
 		LDY	#BUTTON::cKey
 		LDA	($32), Y
 		
-		JSR	doInjectKey
+		JSR	keyInjectKey
 		
 @exit:
 		RTS
 		
 		
-;-------------------------------------------------------------------------------
-;doInjectKey:
-;-------------------------------------------------------------------------------
-doInjectKey:	
-		LDX	$C6			;Put a key into the buffer
-		STA	$0277, X
-		INC	$C6
-		
-		RTS
-
-
 ;-------------------------------------------------------------------------------
 ;plyrMinimapBlink
 ;-------------------------------------------------------------------------------
@@ -6165,16 +6272,37 @@ statsDisplay:
 ;FOR UI.S
 ;==============================================================================
 
+UI_ACT_FALT	=	0
+UI_ACT_TRDE	=	1
+UI_ACT_REPY	=	2
+UI_ACT_PFEE	=	3
+UI_ACT_AUCN	=	4
+UI_ACT_MRTG	=	5
+UI_ACT_SELL	=	6
+UI_ACT_BUYD	=	7
+UI_ACT_BUYI	=	8
+UI_ACT_GOFR	=	9
+UI_ACT_POST	=	10
+UI_ACT_ROLL	=	11
+UI_ACT_SKEY	=	12
+
+
 uiActionCallsLo:
-		.byte	<(uiActionNull), <(uiActionTrade - 1)
+		.byte	<(uiActionFault - 1), <(uiActionTrade - 1)
 		.byte	<(uiActionRepay - 1), <(uiActionFee - 1)
 		.byte	<(uiActionAuction - 1), <(uiActionMrtg - 1)
-		.byte	<(uiActionSell - 1)
+		.byte	<(uiActionSell - 1), <(uiActionBuy - 1)
+		.byte	<(uiActionImprv - 1), <(uiActionGOFree - 1)
+		.byte	<(uiActionPost - 1), <(uiActionRoll - 1)
+		.byte	<(uiActionSendKey - 1)
 uiActionCallsHi:
-		.byte	>(uiActionNull), >(uiActionTrade - 1)
+		.byte	>(uiActionFault - 1), >(uiActionTrade - 1)
 		.byte	>(uiActionRepay - 1), >(uiActionFee - 1)
 		.byte	>(uiActionAuction - 1), >(uiActionMrtg - 1)
-		.byte	>(uiActionSell - 1)
+		.byte	>(uiActionSell - 1), >(uiActionBuy - 1)
+		.byte	>(uiActionImprv - 1), >(uiActionGOFree - 1)
+		.byte	>(uiActionPost - 1), >(uiActionRoll - 1)
+		.byte	>(uiActionSendKey - 1)
 
 ;-------------------------------------------------------------------------------
 uiInitQueue:
@@ -6214,7 +6342,7 @@ uiDequeueAction:
 ;		SBC	#$00
 ;		STA	ui + UI::cActns + 1
 		
-;		DEC	ui + UI::cActns
+		DEC	ui + UI::cActns
 		
 		LDA	($6D), Y
 		STA	$68
@@ -6275,6 +6403,7 @@ uiEnqueueAction:
 		ADC	#$00
 		STA	$6E
 		
+		LDY	#$00
 		LDA	#$FF
 		STA	($6D), Y
 
@@ -6304,9 +6433,15 @@ uiPerformAction:
 ;-------------------------------------------------------------------------------
 uiProcessInit:
 ;-------------------------------------------------------------------------------
-		JSR	uiInitQueue
+		LDA	#<uiActnCache
+		STA	$6D
+		LDA	#>uiActnCache
+		STA	$6E
 		
-		LDA	#$60
+		LDA	#$00
+		STA	ui + UI::fInjKey
+		
+		LDA	#$17
 		STA	game + GAME::iStpCnt
 		LDA	#$00			
 		STA	game + GAME::fStpSig
@@ -6335,6 +6470,9 @@ uiProcessInit:
 ;-------------------------------------------------------------------------------
 uiProcessActions:
 ;-------------------------------------------------------------------------------
+		LDA	ui + UI::cActns
+		BEQ	@terminate
+		
 		LDA	game + GAME::fStpSig
 		BNE	@proc
 
@@ -6348,17 +6486,22 @@ uiProcessActions:
 		
 		JSR	uiDequeueAction
 		
-		LDA	$68
-		CMP	#$FF
-		BEQ	@terminate
-		
 		JSR	uiPerformAction
+		
+;		DEC	ui + UI::cActns
+;		LDA	ui + UI::cActns
+;		BNE	@exit
 		JMP	@exit
 		
 @terminate:
-		JSR	uiProcessTerminate
 		JSR	uiInitQueue
+		
+		LDY	#$00
+		LDA	#$FF
+		STA	($6D), Y
 
+		JSR	uiProcessTerminate
+		
 @exit:
 		LDA	#$00
 		STA	game + GAME::fStpSig
@@ -6460,6 +6603,8 @@ uiProcessTerminate:
 		JSR	gameUpdateMenu
 
 		LDA	#$01
+		STA	ui + UI::fInjKey
+		
 		ORA	game + GAME::dirty
 		STA	game + GAME::dirty
 
@@ -6563,14 +6708,21 @@ uiActionFocusSquare:
 		RTS
 
 ;-------------------------------------------------------------------------------
-uiActionNull:
+uiActionFault:
 ;-------------------------------------------------------------------------------
-		LDA 	#<dialogDlgNull0
-		LDY	#>dialogDlgNull0
+		LDA	#$01
+		STA	cpuHaveFault
+		STA	cpuFlagFault
 		
-		JSR	dialogSetDialog
-		JSR	dialogDispDefDialog
+		LDA	$69
+		STA	cpuFaultPlayer
 		
+		LDA	$6A
+		STA	cpuFaultAddr
+		LDA	$6B
+		STA	cpuFaultAddr + 1
+		
+
 		RTS
 
 
@@ -6717,6 +6869,417 @@ uiActionSell:
 
 		RTS
 
+
+uiActionBuy:
+		LDA	$69
+
+		STA	game + GAME::pActive
+		STA	game + GAME::pLast
+		
+		TAX
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDA	$6A
+		JSR	uiActionFocusSquare
+
+;	IN:	.X	=	square * 2
+		LDA	$6A
+		ASL
+		TAX
+		
+;		varB 	=	group
+		LDA	rulesSqr0, X
+		STA	game + GAME::varB
+		
+;		varC	= 	group index
+		LDA	rulesSqr0 + 1, X
+		STA	game + GAME::varC
+		
+;		varH	=	flag sub cash (0 = do it)
+		LDA	#$00
+		STA	game + GAME::varH
+
+		JSR	rulesDoPurchDeed
+	
+		RTS
+		
+
+uiActionImprv:
+		
+		RTS
+		
+
+uiActionGOFree:
+		LDA	$69
+
+		STA	game + GAME::pActive
+		STA	game + GAME::pLast
+		
+		JSR	gameCheckGaolFree
+
+		RTS
+		
+
+uiActionPost:
+		LDA	$69
+
+		STA	game + GAME::pActive
+		STA	game + GAME::pLast
+		
+		LDX	#$01
+		JSR	gameToggleGaol
+
+		RTS
+		
+
+uiActionRoll:
+		LDA	game + GAME::fMBuy
+		BNE	@fault
+
+		LDA	$69
+
+		STA	game + GAME::pActive
+		STA	game + GAME::pLast
+		
+		JSR	gameRollDice
+
+		RTS
+		
+@fault:
+		LDA	#<uiActionRoll
+		STA	$6A
+		LDA	#>uiActionRoll
+		STA	$6B
+
+		JSR	uiActionFault
+		
+		RTS
+		
+		
+uiActionSendKey:
+		LDA	$69
+		JSR	keyEnqueueKey
+		RTS
+
+
+;==============================================================================
+;FOR CPU.S
+;==============================================================================
+cpuLastActCnt:
+		.byte	$00
+cpuHaveMenuUpdate:
+		.byte	$00
+		
+cpuLastPerform:	
+		.word	$0000
+cpuThisPerform:
+		.word	cpuPerformIdle
+
+cpuIsIdle:
+		.byte	$00
+cpuHaveFault:
+		.byte	$00
+cpuFaultPlayer:
+		.byte	$00
+cpuFaultAddr:
+		.word	$0000
+cpuFlagFault:
+		.byte	$00
+		
+
+cpuEngageBehaviour:
+		LDA	cpuHaveFault
+		BNE	@havefault
+		
+		LDA	cpuHaveMenuUpdate
+		BEQ	@update
+		
+		LDA	#>(@farreturn - 1)
+		PHA
+		LDA	#<(@farreturn - 1)
+		PHA
+		
+		JMP	(cpuThisPerform)
+@farreturn:
+		LDA	cpuIsIdle
+		BNE	@update
+
+		LDA	ui + UI::cActns
+		STA	cpuLastActCnt
+		BEQ	@tstfault
+		
+		LDA	#$01
+		STA	ui + UI::fActInt
+		LDA	#$00
+		STA	ui + UI::fActTyp
+		
+		JSR	uiProcessInit
+		
+@tstfault:		
+		LDA	cpuLastActCnt
+		BNE	@update
+		
+		LDA	cpuLastPerform
+		CMP	cpuThisPerform 
+		BNE	@update
+		
+		LDA	cpuLastPerform + 1
+		CMP	cpuThisPerform + 1
+		BNE	@update
+		
+		LDA	#$01
+		STA	cpuHaveFault
+		STA	cpuFlagFault
+		
+		JMP	@exit
+		
+@update:
+		LDA	cpuThisPerform
+		STA	cpuLastPerform
+		LDA	cpuThisPerform + 1
+		STA	cpuLastPerform + 1
+		
+@exit:
+		LDA	#$00
+		STA	cpuIsIdle
+		
+		RTS
+
+@havefault:
+		LDA	cpuFlagFault
+		BEQ	@exit
+		
+		LDA	#$00
+		STA	cpuFlagFault
+		
+		LDA 	#<dialogDlgNull0
+		LDY	#>dialogDlgNull0
+		
+		JSR	dialogSetDialog
+		JSR	dialogDispDefDialog
+		
+		RTS
+		
+
+cpuPerformFault:
+		LDA	#$01
+		STA	cpuHaveFault
+		STA	cpuFlagFault
+		
+		LDA	game + GAME::pActive
+		STA	cpuFaultPlayer
+		
+		RTS
+		
+		
+cpuPerformIdle:
+		LDA	#$01
+		STA	cpuIsIdle
+		
+		RTS
+		
+cpuPerformPlay:
+		LDA	game + GAME::fMBuy
+		BEQ	@continue
+		
+		
+		LDA	#UI_ACT_FALT
+		STA	$68
+		LDA	game + GAME::pActive
+		STA	$69
+		LDA	#<cpuPerformPlay
+		STA	$6A
+		LDA	#>cpuPerformPlay
+		STA	$6B
+		
+		JSR	uiEnqueueAction
+		
+		RTS
+		
+@continue:
+		JSR	rulesAutoPlay
+		BNE	@exit
+		
+		LDA	#UI_ACT_SKEY
+		STA	$68
+		LDA	#'N'
+		STA	$69
+		
+		JSR	uiEnqueueAction
+		
+@exit:
+		RTS
+
+
+cpuPerformBuy:
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDY	#PLAYER::square
+		LDA	($FB), Y
+		TAX
+
+		JSR	rulesAutoBuy
+		BEQ	@passed
+		
+		RTS
+		
+@passed:
+		LDA	#UI_ACT_SKEY
+		STA	$68
+		LDA	#'P'
+		STA	$69
+		
+		JSR	uiEnqueueAction
+		
+		RTS
+
+
+cpuPerformAuction:
+;***TODO:	Try to participate
+
+		LDA	#UI_ACT_SKEY
+		STA	$68
+		LDA	#'F'
+		STA	$69
+		
+		JSR	uiEnqueueAction
+		
+		RTS
+
+
+cpuPerformTrade:
+;***TODO:	Try to evaluate and accept
+
+		LDA	#UI_ACT_SKEY
+		STA	$68
+		LDA	#'X'
+		STA	$69
+		
+		JSR	uiEnqueueAction
+		
+		RTS
+		
+
+cpuPerformElimin:
+;***TODO:	Select as many big name deeds and repay as you can
+
+		LDA	#UI_ACT_SKEY
+		STA	$68
+		LDA	#'C'
+		STA	$69
+		
+		JSR	uiEnqueueAction
+		
+		RTS
+		
+		
+cpuPerformGoneGaol:
+		LDA	#UI_ACT_SKEY
+		STA	$68
+		LDA	#'N'
+		STA	$69
+		
+		JSR	uiEnqueueAction
+		
+		RTS
+		
+		
+cpuPerformInGaol:
+		JSR	rulesAutoGaol
+
+		RTS
+		
+		
+cpuPerformGaolMustPost:
+		LDA	#UI_ACT_SKEY
+		STA	$68
+		LDA	#'P'
+		STA	$69
+		
+		JSR	uiEnqueueAction
+		
+		RTS
+		
+		
+cpuPerformMustPay:
+		JSR	rulesAutoSell
+
+		RTS
+
+
+cpuPerformQuit:
+		LDA	#UI_ACT_SKEY
+		STA	$68
+		LDA	#'Y'
+		STA	$69
+		
+		JSR	uiEnqueueAction
+		
+		RTS
+		
+
+cpuPerformColourSelect:
+		LDA	sidV2EnvOu
+		LSR
+		LSR
+		LSR
+		LSR
+		LSR
+		STA	game + GAME::varA
+		
+		LDX	#$00
+@loop:
+		LDA	menuWindowSetup1Btns, X
+		TAY
+		LDA	menuWindowSetup1B0, Y
+		CMP	#$AC
+		BNE	@next
+		
+		LDA	game + GAME::varA
+		BNE	@cont
+		
+		JMP	@select
+		
+@cont:
+		DEC	game + GAME::varA
+		
+@next:
+		INX
+		CPX	#$0A
+		BNE	@loop
+		
+		LDX	#$00
+		BEQ	@loop
+		
+@select:
+		TXA
+		CLC
+		ADC	#$30
+		JSR	keyEnqueueKey
+		
+		LDA	#$01
+		STA	ui + UI::fInjKey
+
+		RTS
+
+
+cpuPerformStartRoll:
+		LDA	#'R'
+		JSR	keyEnqueueKey
+		
+		LDA	#$01
+		STA	ui + UI::fInjKey
+		
+		RTS
+
+
 ;==============================================================================
 ;FOR MENU.S
 ;==============================================================================
@@ -6732,6 +7295,9 @@ menuTemp9:
 menuTempF:
 			.byte	$00
 
+menuLastDrawFunc:
+		.word	$0000
+		
 menuDefWindow0:		
 			.byte	$12, $01, $07, $11, $11
 			.byte	$46, $00, $06, $12
@@ -6748,173 +7314,206 @@ menuDefWindow0:
 
 			.byte	$00
 
-menuActivePage0:
-		.word	menuPageBlank0Keys
-		.word	menuDefDraw
-		.byte	$00
-menuActivePage1:
-		.word	menuPageBlank0Keys
-		.word	menuDefDraw
-		.byte	$00
-menuActivePage2:
-		.word	menuPageBlank0Keys
-		.word	menuDefDraw
-		.byte	$00
 		
-		
-menuLastDrawFunc:
-		.word	$0000
-
-
 menuPageBlank0:
 		.word	menuPageBlank0Keys
 		.word	menuDefDraw
 		.byte	$00			;Have to say 0 so not drawn
 						;twice.
-
+		.word	cpuPerformIdle
+		
+menuActivePage0:
+		.word	menuPageBlank0Keys
+		.word	menuDefDraw
+		.byte	$00
+		.word	cpuPerformFault
+		
+menuActivePage1:
+		.word	menuPageBlank0Keys
+		.word	menuDefDraw
+		.byte	$00
+		.word	cpuPerformFault
+		
+menuActivePage2:
+		.word	menuPageBlank0Keys
+		.word	menuDefDraw
+		.byte	$00
+		.word	cpuPerformFault
+	
 menuPagePlay0:
 		.word	menuPagePlay0Keys
 		.word	menuPagePlay0Draw
 		.byte	$01
+		.word	cpuPerformPlay
 		
 menuPagePlay1:
 		.word	menuPagePlay1Keys
 		.word	menuPagePlay1Draw
 		.byte	$01
+		.word	cpuPerformBuy
 		
 menuPagePlay2:
 		.word	menuPagePlay2Keys
 		.word	menuPagePlay2Draw
 		.byte	$01
+		.word	cpuPerformFault
 		
 menuPageAuctn0:
 		.word	menuPageAuctn0Keys
 		.word	menuPageAuctn0Draw
 		.byte	$01
+		.word	cpuPerformAuction
 		
 menuPageAuctn1:
 		.word	menuPageAuctn1Keys
 		.word	menuPageAuctn1Draw
 		.byte	$01
+		.word	cpuPerformFault
 		
 menuPageManage0:
 		.word	menuPageManage0Keys
 		.word	menuPageManage0Draw
 		.byte	$01
+		.word	cpuPerformFault
 		
 menuPageTrade0:
 		.word	menuPageTrade0Keys
 		.word	menuPageTrade0Draw
 		.byte	$01
+		.word	cpuPerformFault
 		
 menuPageTrade1:
 		.word	menuPageTrade1Keys
 		.word	menuPageTrade1Draw
 		.byte	$01
+		.word	cpuPerformTrade
 		
+;***TODO:	Rename and retext this menu
 menuPageTrade6:
 		.word	menuPageTrade6Keys
 		.word	menuPageTrade6Draw
 		.byte	$01
+		.word	cpuPerformIdle
 		
 menuPageElimin0:
 		.word	menuPageElimin0Keys
 		.word	menuPageElimin0Draw
 		.byte	$01
+		.word	cpuPerformElimin
 		
 menuPagePlyrSel0:
 		.word	menuPagePlyrSel0Keys
 		.word	menuPagePlyrSel0Draw
 		.byte	$01
+		.word	cpuPerformFault
 		
 menuPageGaol0:
 		.word	menuPageGaol0Keys
 		.word	menuPageGaol0Draw
 		.byte	$01
+		.word	cpuPerformGoneGaol
 		
 menuPageGaol1:
 		.word	menuPageGaol1Keys
 		.word	menuPageGaol1Draw
 		.byte	$01
+		.word	cpuPerformInGaol
+		
 menuPageGaol2:
 		.word	menuPageGaol2Keys
 		.word	menuPageGaol2Draw
 		.byte	$01
+		.word	cpuPerformFault
+		
 menuPageGaol3:
 		.word	menuPageGaol3Keys
 		.word	menuPageGaol3Draw
 		.byte	$01
+		.word	cpuPerformGaolMustPost
 		
 menuPageSetup0:
 		.word	menuPageSetup0Keys
 		.word	menuPageSetup0Draw
 		.byte	$01
+		.word	cpuPerformIdle
 
 menuPageSetup1:
 		.word	menuPageSetup1Keys
 		.word	menuPageSetup1Draw
 		.byte	$01
+		.word	cpuPerformColourSelect
 
 menuPageSetup2:
 		.word	menuPageSetup2Keys
 		.word	menuPageSetup2Draw
 		.byte	$01
+		.word	cpuPerformIdle
 		
 menuPageSetup3:
 		.word	menuPageSetup3Keys
 		.word	menuPageSetup3Draw
 		.byte	$01
+		.word	cpuPerformIdle
 		
 menuPageSetup4:
 		.word	menuPageSetup4Keys
 		.word	menuPageSetup4Draw
 		.byte	$01
+		.word	cpuPerformStartRoll
 		
 menuPageSetup5:
 		.word	menuPageSetup5Keys
 		.word	menuPageSetup5Draw
 		.byte	$01
+		.word	cpuPerformIdle
 		
 menuPageSetup6:
 		.word	menuPageSetup6Keys
 		.word	menuPageSetup6Draw
 		.byte	$01
+		.word	cpuPerformIdle
 		
 menuPageSetup7:
 		.word	menuPageSetup7Keys
 		.word	menuPageSetup7Draw
 		.byte	$01
+		.word	cpuPerformIdle
 		
 menuPageSetup8:
 		.word	menuPageSetup8Keys
 		.word	menuPageSetup8Draw
 		.byte	$01
-		
+		.word	cpuPerformIdle
 		
 menuPageMustPay0:
 		.word	menuPageMustPay0Keys
 		.word	menuPageMustPay0Draw
 		.byte	$01
+		.word	cpuPerformMustPay
 		
 menuPageJump0:
 		.word	menuPageJump0Keys
 		.word	menuPageJump0Draw
 		.byte	$01
+		.word	cpuPerformIdle
 
 menuPageQuit0:
 		.word	menuPageQuit0Keys
 		.word	menuPageQuit0Draw
 		.byte	$01
+		.word	cpuPerformFault
 
 menuPageQuit1:
 		.word	menuPageQuit1Keys
 		.word	menuPageQuit1Draw
 		.byte	$01
+		.word	cpuPerformFault
 
 menuPageQuit2:
 		.word	menuPageQuit2Keys
 		.word	menuPageQuit2Draw
 		.byte	$01
+		.word	cpuPerformQuit
 
 
 ;-------------------------------------------------------------------------------
@@ -6933,21 +7532,46 @@ menuDefDraw:
 ;-------------------------------------------------------------------------------
 menuDisplay:
 ;-------------------------------------------------------------------------------
+		LDA	#$00
+		STA	cpuHaveMenuUpdate
+		
+		LDA	#$00
+		STA	ui + UI::fWntJFB
+		
+		JSR	screenBeginButtons
+		
 		LDA	#$01
 		CMP	menuActivePage0 + MENUPAGE::bDef
 		BNE	@cont
 		
 		JSR	menuDefDraw
 @cont:
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDY	#PLAYER::fCPU
+		LDA	($FB), Y
+		BEQ	@disp
+		
+		LDA	game + GAME::gMode
+		CMP	#$08
+		BEQ	@disp
+		
+		CMP	#$06
+		BEQ	@disp
+		
+		JMP	@farreturn
+
+@disp:
 		LDA	#>(@farreturn - 1)
 		PHA
 		LDA	#<(@farreturn - 1)
 		PHA
 
-		LDA	#$00
-		STA	ui + UI::fWntJFB
-		
-		JMP	(menuActivePage0 + MENUPAGE::fDraw)
+		JMP	(menuActivePage0 + MENUPAGE::aDraw)
 		
 @farreturn:
 		LDA	ui + UI::fMseEnb
@@ -6971,18 +7595,21 @@ menuDisplay:
 		CMP	game + GAME::pLast
 		BNE	@havedraw
 
-		LDA	menuActivePage0 + MENUPAGE::fDraw
+		LDA	menuActivePage0 + MENUPAGE::aDraw
 		CMP	menuLastDrawFunc
 		BNE	@havedraw
 		
-		LDA	menuActivePage0 + MENUPAGE::fDraw + 1
+		LDA	menuActivePage0 + MENUPAGE::aDraw + 1
 		CMP	menuLastDrawFunc + 1
 		BEQ	@exit
 
 @havedraw:
-		LDA	menuActivePage0 + MENUPAGE::fDraw
+		LDA	#$01
+		STA	cpuHaveMenuUpdate
+		
+		LDA	menuActivePage0 + MENUPAGE::aDraw
 		STA	menuLastDrawFunc
-		LDA	menuActivePage0 + MENUPAGE::fDraw + 1
+		LDA	menuActivePage0 + MENUPAGE::aDraw + 1
 		STA	menuLastDrawFunc + 1
 		
 @reset:
@@ -7002,24 +7629,48 @@ menuSetPage:
 		STA	$FD
 		STY	$FE
 		
-		LDY	#MENUPAGE::fKeys
+		LDY	#MENUPAGE::aKeys
 		LDA	($FD), Y
-		STA	menuActivePage0 + MENUPAGE::fKeys
+		STA	menuActivePage0 + MENUPAGE::aKeys
 		INY
 		LDA	($FD), Y
-		STA	menuActivePage0 + MENUPAGE::fKeys + 1
+		STA	menuActivePage0 + MENUPAGE::aKeys + 1
 
-		LDY	#MENUPAGE::fDraw
+		LDA	#$00
+		STA	cpuHaveMenuUpdate
+
+		LDY	#MENUPAGE::aDraw
 		LDA	($FD), Y
-		STA	menuActivePage0 + MENUPAGE::fDraw
+		CMP	menuActivePage0 + MENUPAGE::aDraw
+		BNE	@havedraw
+
 		INY
 		LDA	($FD), Y
-		STA	menuActivePage0 + MENUPAGE::fDraw + 1
+		CMP	menuActivePage0 + MENUPAGE::aDraw + 1
+		BEQ	@cont
+
+@havedraw:
+		LDA	#$01
+		STA	cpuHaveMenuUpdate
+
+@cont:
+		LDY	#MENUPAGE::aDraw
+		LDA	($FD), Y
+		STA	menuActivePage0 + MENUPAGE::aDraw
+		INY
+		LDA	($FD), Y
+		STA	menuActivePage0 + MENUPAGE::aDraw + 1
 
 		LDY	#MENUPAGE::bDef
 		LDA	($FD), Y
 		STA	menuActivePage0 + MENUPAGE::bDef
 		
+		LDY	#MENUPAGE::aCPU
+		LDA	($FD), Y
+		STA	menuActivePage0 + MENUPAGE::aCPU
+		INY
+		LDA	($FD), Y
+		STA	menuActivePage0 + MENUPAGE::aCPU + 1
 		RTS
 
 
@@ -7029,7 +7680,7 @@ menuPushPage:
 		STA	$FD
 ;		STY	$FE
 
-		LDX	#$04
+		LDX	#.SIZEOF(MENUPAGE) - 1
 @loop:
 		LDA	menuActivePage1, X
 		STA	menuActivePage2, X
@@ -7049,7 +7700,7 @@ menuPushPage:
 ;-------------------------------------------------------------------------------
 menuPopPage:
 ;-------------------------------------------------------------------------------
-		LDX	#$04
+		LDX	#.SIZEOF(MENUPAGE) - 1
 @loop:
 		LDA	menuActivePage1, X
 		STA	menuActivePage0, X
@@ -7155,8 +7806,6 @@ menuWindowSetup0:
 			
 			
 menuPageSetup0Draw:
-		JSR	screenBeginButtons
-		
 		LDA	#<menuWindowSetup0
 		STA	$FD
 		LDA	#>menuWindowSetup0
@@ -7165,7 +7814,6 @@ menuPageSetup0Draw:
 		JSR	screenPerformList
 
 		RTS
-
 
 menuWindowSetup1Btns:
 		.byte	(menuWindowSetup1B0 - menuWindowSetup1)
@@ -7335,8 +7983,6 @@ menuPageSetup1Keys:
 
 
 menuPageSetup1Draw:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowSetup1
 		STA	$FD
 		LDA	#>menuWindowSetup1
@@ -7438,8 +8084,6 @@ menuPageSetup2Keys:
 
 
 menuPageSetup2Draw:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowSetup2
 		STA	$FD
 		LDA	#>menuWindowSetup2
@@ -7514,8 +8158,6 @@ menuPageSetup3Keys:
 		
 
 menuPageSetup3Draw:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowSetup3
 		STA	$FD
 		LDA	#>menuWindowSetup3
@@ -7651,6 +8293,10 @@ menuPageSetup4Keys:
 		CMP	menuTemp0
 		BNE	@cont
 		
+		LDA	#$00
+		STA	game + GAME::pActive
+		STA	game + GAME::pLast
+		
 		JSR	menuDoSetup4Highest
 		RTS
 
@@ -7760,8 +8406,6 @@ menuPageSetup4Draw:
 		STA	menuWindowSetup4O + 1
 
 @cont:
-		JSR	screenBeginButtons
-		
 		LDA	#<menuWindowSetup4
 		STA	$FD
 		LDA	#>menuWindowSetup4
@@ -7834,8 +8478,6 @@ menuPageSetup5Keys:
 		
 
 menuPageSetup5Draw:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowSetup5
 		STA	$FD
 		LDA	#>menuWindowSetup5
@@ -7941,8 +8583,6 @@ menuPageSetup6Keys:
 
 
 menuPageSetup6Draw:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowSetup6
 		STA	$FD
 		LDA	#>menuWindowSetup6
@@ -8052,8 +8692,6 @@ menuPageSetup7Draw:
 		LDA	#$00
 		STA	JoyUsed
 
-		JSR	screenBeginButtons
-
 		LDA	#$00
 		STA	ui + UI::iSelBtn
 
@@ -8126,8 +8764,6 @@ menuPageSetup8Keys:
 		
 
 menuPageSetup8Draw:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowSetup8
 		STA	$FD
 		LDA	#>menuWindowSetup8
@@ -8310,6 +8946,14 @@ menuPagePlay0StdKeys:
 		BNE	@keysQ
 		
 		JSR	rulesAutoSell
+		
+		LDA	#$01
+		STA	ui + UI::fActInt
+		LDA	#$00
+		STA	ui + UI::fActTyp
+		
+		JSR	uiProcessInit
+		
 		JMP	@keysDing
 		
 @keysQ:
@@ -8473,8 +9117,6 @@ menuPagePlay0Draw:
 		STA	menuWindowPlay0D + 1
 		
 @begin:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowPlay0
 		STA	$FD
 		LDA	#>menuWindowPlay0
@@ -8618,8 +9260,6 @@ menuPagePlay1Keys:
 		
 		
 menuPagePlay1Draw:
-		JSR	screenBeginButtons
-
 		LDA	#$A1
 		STA	menuWindowPlay1BuyB
 		
@@ -8755,8 +9395,6 @@ menuPagePlay2Draw:
 		STA	menuWindowPlay2D + 1
 		
 @begin:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowPlay2
 		STA	$FD
 		LDA	#>menuWindowPlay2
@@ -9082,13 +9720,15 @@ menuPageAuctn0Keys:
 		JSR	SNDBASE + 6
 		
 		LDA	game + GAME::dirty
-		ORA	#$01
+		ORA	#$08
 		STA	game + GAME::dirty
 
 		RTS
 
 @keysDefault:
 		JSR	menuPageAuctnDefKeys
+		
+		RTS
 
 
 menuPageAuctn0Draw:
@@ -9109,8 +9749,6 @@ menuPageAuctn0Draw:
 		STA	menuWindowAuctn0Bid
 
 @beginbid:
-		JSR	screenBeginButtons
-
 		LDA	game + GAME::mACurr
 		STA	Z:numConvVALUE
 		LDA	game + GAME::mACurr + 1
@@ -9197,8 +9835,6 @@ menuPageAuctn1Draw:
 		STA	menuWindowAuctn1Trd
 
 @cont:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowAuctn1
 		STA	$FD
 		LDA	#>menuWindowAuctn1
@@ -9269,8 +9905,6 @@ menuPageGaol0Draw:
 @cont:
 		LDA	#$00
 		STA	menuGaol0Dbls
-
-		JSR	screenBeginButtons
 
 		LDA	#<menuWindowGaol0
 		STA	$FD
@@ -9354,6 +9988,7 @@ menuPageGaol1DefKeys:
 		
 
 menuPageGaol1Keys:
+@keysNext:
 		CMP	#'.'
 		BNE	@keysOther
 
@@ -9402,8 +10037,6 @@ menuWindowGaol1FreeB:
 
 	
 menuPageGaol1Draw:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowGaol1
 		STA	$FD
 		LDA	#>menuWindowGaol1
@@ -9521,8 +10154,6 @@ menuPageGaol2Draw:
 		STA	menuWindowGaol2Trd
 
 @cont:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowGaol2
 		STA	$FD
 		LDA	#>menuWindowGaol2
@@ -9586,8 +10217,6 @@ menuPageGaol3Keys:
 		
 		
 menuPageGaol3Draw:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowGaol3
 		STA	$FD
 		LDA	#>menuWindowGaol3
@@ -9648,8 +10277,6 @@ menuPageMustPay0Keys:
 		
 		
 menuPageMustPay0Draw:
-		JSR	screenBeginButtons
-
 		LDX	game + GAME::pActive
 		LDA	plrLo, X
 		STA	$FB
@@ -9907,8 +10534,6 @@ menuWindowManage0:
 menuPageManage0Draw:
 		JSR	prmptManage
 		
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowManage0
 		STA	$FD
 		LDA	#>menuWindowManage0
@@ -10122,8 +10747,6 @@ menuPageTrade0Keys:
 		
 	
 menuPageTrade0Draw:
-		JSR	screenBeginButtons
-
 		LDX	#TRADE::player
 		LDA	menuPlyrSelSelect
 		
@@ -10482,8 +11105,6 @@ menuPageTrade1Keys:
 		
 	
 menuPageTrade1Draw:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowTrade1
 		STA	$FD
 		LDA	#>menuWindowTrade1
@@ -10531,8 +11152,6 @@ menuPageTrade6Keys:
 		
 
 menuPageTrade6Draw:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowTrade6
 		STA	$FD
 		LDA	#>menuWindowTrade6
@@ -10693,6 +11312,15 @@ menuPageElimin0Keys:
 		CMP	#'C'
 		BNE	@keysExit
 		
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDY	#PLAYER::fCPU
+		LDA	($FB), Y
+		BNE	@tstproc
+		
 		LDA	menuElimin0HaveOffer
 		BNE	@tstproc
 
@@ -10756,8 +11384,6 @@ menuPageElimin0Keys:
 
 
 menuPageElimin0Draw:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowElimin0
 		STA	$FD
 		LDA	#>menuWindowElimin0
@@ -10899,8 +11525,6 @@ menuPagePlyrSel0Keys:
 		
 
 menuPagePlyrSel0Draw:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowPlyrSel0
 		STA	$A3
 		LDA	#>menuWindowPlyrSel0
@@ -11040,6 +11664,8 @@ menuPageJump0Keys:
 		LDA	#$00
 		STA	game + GAME::fAmStep
 		STA	game + GAME::fStpSig
+		
+		LDA	game + GAME::gMdStep
 		STA	game + GAME::gMode
 
 		LDA	#$00
@@ -11060,8 +11686,6 @@ menuPageJump0Keys:
 		
 
 menuPageJump0Draw:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowJump0
 		STA	$FD
 		LDA	#>menuWindowJump0
@@ -11121,8 +11745,6 @@ menuPageQuit0Keys:
 		
 
 menuPageQuit0Draw:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowQuit0
 		STA	$FD
 		LDA	#>menuWindowQuit0
@@ -11185,8 +11807,6 @@ menuPageQuit1Keys:
 		
 
 menuPageQuit1Draw:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowQuit1
 		STA	$FD
 		LDA	#>menuWindowQuit1
@@ -11257,8 +11877,6 @@ menuPageQuit2Keys:
 		
 
 menuPageQuit2Draw:
-		JSR	screenBeginButtons
-
 		LDA	#<menuWindowQuit2
 		STA	$FD
 		LDA	#>menuWindowQuit2
@@ -11761,6 +12379,8 @@ gamePerfStepping:
 		LDA	#$00
 		STA	game + GAME::fAmStep
 		STA	game + GAME::fStpSig
+		
+		LDA	game + GAME::gMdStep
 		STA	game + GAME::gMode
 
 		LDA	#$00
@@ -13032,7 +13652,7 @@ gamePerfTradeStep:
 		LDA	game + GAME::fTrdPhs
 		BNE	@stage0phase1
 
-		LDA	#$01
+		LDA	#UI_ACT_TRDE
 		STA	$68
 
 		LDY	#TRADE::player
@@ -13090,7 +13710,7 @@ gamePerfTradeStep:
 		AND	#$01
 		BNE	@stage0ph1repay
 
-		LDA	#$03
+		LDA	#UI_ACT_PFEE
 		STA	$68
 
 		LDX	game + GAME::iTrdStp 
@@ -13112,7 +13732,7 @@ gamePerfTradeStep:
 		
 @stage0ph1repay:
 
-		LDA	#$02
+		LDA	#UI_ACT_REPY
 		STA	$68
 
 		LDX	game + GAME::iTrdStp 
@@ -13191,7 +13811,7 @@ gamePerfTradeStep:
 		LDA	game + GAME::fTrdPhs
 		BNE	@stage1phase1
 	
-		LDA	#$01
+		LDA	#UI_ACT_TRDE
 		STA	$68
 
 		LDY	#TRADE::player
@@ -13250,7 +13870,7 @@ gamePerfTradeStep:
 		AND	#$01
 		BNE	@stage1ph1repay
 
-		LDA	#$03
+		LDA	#UI_ACT_PFEE
 		STA	$68
 
 		LDX	game + GAME::iTrdStp 
@@ -13270,7 +13890,7 @@ gamePerfTradeStep:
 		JMP	@stage1nextdeed
 		
 @stage1ph1repay:
-		LDA	#$02
+		LDA	#UI_ACT_REPY
 		STA	$68
 
 		LDX	game + GAME::iTrdStp 
@@ -13316,7 +13936,7 @@ gamePerfTradeStep:
 		CMP	game + GAME::iTrdStp
 		BEQ	@stage2done	
 
-		LDA	#$04
+		LDA	#UI_ACT_AUCN
 		STA	$68
 
 		LDY	game + GAME::iTrdStp
@@ -22093,6 +22713,10 @@ rulesInitStepping:
 		LDA	#$00
 		STA	game + GAME::fAmStep
 		STA	game + GAME::fStpSig
+		
+		LDA	game + GAME::gMode
+		STA	game + GAME::gMdStep
+
 		LDA	#$06
 		STA	game + GAME::gMode
 		
@@ -24178,6 +24802,12 @@ rulesDoUnsetAllOwned:
 
 ;-------------------------------------------------------------------------------
 rulesDoPurchDeed:
+;	IN:	.X	=	square * 2
+;		varB 	=	group
+;		varC	=	group index for deed
+;		varH	=	flag sub cash (0 = do it)
+;	REQS	Z:FB,FC	=	player ptr
+;
 ;-------------------------------------------------------------------------------
 		TXA
 		PHA
@@ -24276,10 +24906,19 @@ rulesDoPurchDeed:
 @done:
 		PLA
 		JSR	SNDBASE + 0
+		
+		LDA	#$00
+		STA	game + GAME::fMBuy
 		RTS
 
 @skip:
 		PLA
+		
+		LDA	#<SFXBUZZ
+		LDY	#>SFXBUZZ
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
 		RTS
 
 
@@ -25870,7 +26509,7 @@ rulesDoCommitMrtg:
 		AND	#$7F
 		STA	rulesSqrImprv, X
 		
-		LDA	#$05
+		LDA	#UI_ACT_MRTG
 		STA	$68
 		LDA	game + GAME::varK
 		STA	$69
@@ -26038,7 +26677,7 @@ rulesDoCommitSellAtLevel:
 		CMP	game + GAME::varB
 		BNE	@donext
 
-		LDA	#$06
+		LDA	#UI_ACT_SELL
 		STA	$68
 		LDA	game + GAME::varK
 		STA	$69
@@ -26277,7 +26916,7 @@ rulesAutoSell:
 		
 		LDY	#PLAYER::money + 1
 		LDA	($FB), Y
-		BPL	@exit
+		BPL	@incomplete
 		
 		DEY
 		LDA	($FB), Y
@@ -26299,18 +26938,486 @@ rulesAutoSell:
 		JSR	rulesAutoRecover
 		
 		LDA	ui + UI::cActns
+		BEQ	@incomplete
+		
+@complete:
+		LDA	#$01
+		RTS
+		
+@incomplete:	
+		LDA	#$00
+		RTS
+		
+		
+rulesDoGetOwnCount:
+;	IN:	varU	=	square
+;	OUT:	varA	=	own count
+;	USES:	varB	=	player group own index
+
+		LDA	#$00
+		STA	game + GAME::varA
+		
+		LDA	game + GAME::varU
+		ASL
+		TAX
+		LDA	rulesSqr0, X
+		TAX
+		DEX
+		TXA
+		
+		CMP	#$FF
 		BEQ	@exit
 		
-@doProcess:
-		LDA	#$01
-		STA	ui + UI::fActInt
-		LDA	#$00
-		STA	ui + UI::fActTyp
+		CLC
+		ADC	#PLAYER::oGrp01
+		STA	game + GAME::varB
 		
-		JSR	uiProcessInit
+		LDX	#$00
+@loop:
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDY	#PLAYER::status
+		LDA	($FB), Y
+		AND	#$01
+		BEQ	@next
+		
+		LDY	game + GAME::varB
+		LDA	($FB), Y
+		BEQ	@next
+		
+		INC	game + GAME::varA
+		
+@next:
+		INX
+		CPX	#$06
+		BNE	@loop
+		
+@exit:
+		LDA	game + GAME::varA
+
+		RTS
+		
+		
+rulesDoGetLastOwn:
+;	IN:	varU	=	square
+;	OUT:	varA	=	last player owns
+;	USES:	varB	=	player group own index
+
+		LDA	#$FF
+		STA	game + GAME::varA
+		
+		LDA	game + GAME::varU
+		ASL
+		TAX
+		LDA	rulesSqr0, X
+		TAX
+		DEX
+		TXA
+		
+		CMP	#$FF
+		BEQ	@exit
+		
+		CLC
+		ADC	#PLAYER::oGrp01
+		STA	game + GAME::varB
+		
+		LDX	#$00
+@loop:
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDY	#PLAYER::status
+		LDA	($FB), Y
+		AND	#$01
+		BEQ	@next
+		
+		LDY	game + GAME::varB
+		LDA	($FB), Y
+		BEQ	@next
+		
+		STX	game + GAME::varA
+		
+@next:
+		INX
+		CPX	#$06
+		BNE	@loop
+		
+@exit:
+		LDA	game + GAME::varA
+		
+		RTS
+		
+		
+		
+rulesAutoBuy:
+;	IN:	.X	=	square
+;
+;	USED:	varU	=	square
+;		varV-X  =	wealth
+;		varD-E	=	temp calc
+;		varO-P 	=	temp calc
+;		varM-N	=	cost
+;		varS-T	=	player money
+
+;	Get cost for square
+		STX	game + GAME::varU
+		TXA
+		JSR	gameGetCardPtrForSquare
+	
+		LDY	#DEED::pPurch
+		LDA	($FD), Y
+		STA	game + GAME::varM
+		INY
+		LDA	($FD), Y
+		STA	game + GAME::varN
+	
+;	Get cash for player
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+	
+		LDY	#PLAYER::money
+		LDA	($FB), Y
+		STA	game + GAME::varS
+		INY
+		LDA	($FB), Y
+		STA	game + GAME::varT
+		
+;	Can afford to snap up?  299 < cash - cost
+		LDA	#<299
+		STA	game + GAME::varD
+		LDA	#>299
+		STA	game + GAME::varE
+		
+		SEC
+		LDA	game + GAME::varS
+		SBC	game + GAME::varM
+		STA	game + GAME::varO
+		LDA	game + GAME::varT
+		SBC	game + GAME::varN
+		STA	game + GAME::varP
+
+;		D, E < (O, P) -> SEC | CLC
+		JSR	gameAmountIsLessDirect
+		BCC	@tstwant
+		
+		JMP	@purchase
+
+@tstwant:
+		
+;	***TODO:  Check gambling on auction here?
+
+;	Have wealth at all?
+		LDY	#PLAYER::equity
+		CLC
+		LDA	($FB), Y
+		ADC	game + GAME::varS
+		STA	game + GAME::varV
+		INY
+		LDA	($FB), Y
+		ADC	game + GAME::varT
+		STA	game + GAME::varW
+		LDA	#$00
+		ADC	#$00
+		STA	game + GAME::varX
+		
+		SEC
+		LDA	game + GAME::varV
+		SBC	game + GAME::varM
+		STA	game + GAME::varV
+		LDA	game + GAME::varW
+		SBC	game + GAME::varN
+		STA	game + GAME::varW
+		LDA	game + GAME::varX
+		SBC	#$00
+		STA	game + GAME::varX
+		
+		BPL	@canwant
+		
+		JMP	@pass
+
+@canwant:
+		LDA	game + GAME::varS
+		STA	game + GAME::varO
+		LDA	game + GAME::varT
+		STA	game + GAME::varP
+
+;	Do I really want?  
+;		have cash >= 50% of cost and either no one owns group or
+;		only 2 or fewer do
+
+		LDA	game + GAME::varM
+		STA	game + GAME::varD
+		LDA	game + GAME::varN
+		STA	game + GAME::varE
+		
+		ASL
+		ROR	game + GAME::varE
+		ROR	game + GAME::varD
+		
+;		D, E < (O, P) -> SEC | CLC
+		JSR	gameAmountIsLessDirect
+		BCC	@tstplease
+	
+		JSR	rulesDoGetOwnCount
+		BEQ	@purchase
+		CMP	#$03
+		BMI	@purchase
+
+@tstplease:
+;	Do I really really want?
+;		have cash >= 25% of cost and is station or I own 1 or more and 
+;		no one else does or only 1 does
+
+		LDA	game + GAME::varE
+		ASL
+		ROR	game + GAME::varE
+		ROR	game + GAME::varD
+
+;		D, E < (O, P) -> SEC | CLC
+		JSR	gameAmountIsLessDirect
+		BCC	@pass
+
+		LDA	game + GAME::varU
+		ASL
+		TAX
+		LDA	rulesSqr0, X
+		CMP	#$09
+		BEQ	@purchase
+
+		JSR	rulesDoGetOwnCount
+		CMP	#$00
+		BNE	@pass
+		
+		CMP	#$02
+		BPL	@pass
+		
+;		JSR	rulesDoGetLastOwn
+;		CMP	game + GAME::pActive
+;		BNE	@pass
+
+@purchase:
+;	On purchase wanted
+;		Check cash (cost - cash > 0) is sufficient
+
+		SEC
+		LDA	game + GAME::varM
+		SBC	game + GAME::varS
+		STA	game + GAME::varD
+		LDA	game + GAME::varN
+		SBC	game + GAME::varT
+		STA	game + GAME::varE
+		
+		BMI	@cont
+		BNE	@recover
+	
+		LDA	game + GAME::varD
+		BEQ	@cont
+		
+@recover:
+;			Recover calculated amt
+		LDA	game + GAME::varD		;.A,.Y = amount
+		LDY	game + GAME::varE
+		LDX	game + GAME::pActive		;.X = player
+			
+		JSR	rulesAutoRecover
+			
+@cont:
+;		Buy deed
+		LDA	#UI_ACT_BUYD
+		STA	$68
+		LDA	game + GAME::pActive
+		STA	$69
+		LDA	game + GAME::varU
+		STA	$6A
+		
+		JSR	uiEnqueueAction
+
+;		Init Process
+		LDA	ui + UI::cActns
+		BEQ	@pass
+		
+@complete:
+;		Return 1
+		LDA	#$01
+		RTS
+
+@pass:
+;	On pass
+;	
+;		TODO:  Go to auction?
+;
+;		Return 0
+		LDA	#$00
+		RTS
+		
+
+rulesAutoImprove:
+		LDA	#$00
+		RTS
+
+
+rulesDoNudgeValue:
+		STY	game + GAME::varA
+		LDY	#$00
+		
+		DEX
+		BMI	@exit
+		
+@loop:
+		LDA	sidV2EnvOu
+		LSR
+		LSR
+		LSR
+		LSR
+		CLC
+		ADC	game + GAME::varD
+		STA	game + GAME::varD
+		LDA	#$00
+		ADC	game + GAME::varE
+		STA	game + GAME::varE
+		
+@next:
+		DEX
+
+		INY
+		CPY	game + GAME::varA
+		BMI	@loop
+		
+		CPX	#$FF
+		BNE	@loop
 		
 @exit:
 		RTS
+
+
+rulesAutoGaol:
+		LDA	#$00
+		
+;	if have go free, go free
+		LDA	game + GAME::pGF0Crd
+		CMP	game + GAME::pActive
+		BNE	@tstgof1
+		
+		JMP	@gofree
+		
+@tstgof1:
+		LDA	game + GAME::pGF1Crd
+		CMP	game + GAME::pActive
+		BNE	@tstpost
+
+@gofree:
+		LDA	#UI_ACT_GOFR
+		STA	$68
+		LDA	game + GAME::pActive
+		STA	$69
+		JSR	uiEnqueueAction
+		JMP	@complete
+
+@tstpost:
+;	if have $770+(2->5nudge), post
+		LDA	#<770
+		STA	game + GAME::varD
+		LDA	#>770
+		STA	game + GAME::varE
+
+		LDX	#$05
+		LDY	#$02
+		JSR	rulesDoNudgeValue
+		
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+	
+		LDY	#PLAYER::money
+		LDA	($FB), Y
+		STA	game + GAME::varO
+		INY
+		LDA	($FB), Y
+		STA	game + GAME::varP
+		
+;		D, E < (O, P) -> SEC | CLC
+		JSR	gameAmountIsLessDirect
+		BCC	@doroll
+
+		LDA	#UI_ACT_POST
+		STA	$68
+		LDA	game + GAME::pActive
+		STA	$69
+		JSR	uiEnqueueAction
+		JMP	@complete
+		
+@doroll:
+		LDA	#UI_ACT_ROLL
+		STA	$68
+		LDA	game + GAME::pActive
+		STA	$69
+		JSR	uiEnqueueAction
+		
+@complete:
+;		Return 1
+		LDA	#$01
+		RTS
+
+@pass:
+;	On pass when if ever??
+;	
+;		Return 0
+		LDA	#$00
+		RTS
+
+
+rulesAutoAuction:
+		LDA	#$00
+		RTS
+
+
+rulesAutoTradeTo:
+		LDA	#$00
+		RTS
+
+
+rulesAutoTradeWith:
+		LDA	#$00
+		RTS
+
+
+rulesAutoPlay:
+		JSR	rulesAutoSell
+		BNE	@complete
+
+		LDA	game + GAME::dieRld
+		BNE	@improve
+
+		LDA	#UI_ACT_ROLL
+		STA	$68
+		LDA	game + GAME::pActive
+		STA	$69
+		JSR	uiEnqueueAction
+		
+		JMP	@complete
+
+@improve:
+		JSR	rulesAutoImprove
+		BNE	@complete
+
+@incomplete:
+		LDA	#$00
+		RTS
+
+@complete:
+		LDA	#$01
+		RTS
+
 
 ;==============================================================================
 ;FOR NUMCONV.S
@@ -27012,6 +28119,9 @@ initPlayers:
 		LDY	#PLAYER::nGRls
 		STA	($FB), Y
 		
+		LDY	#PLAYER::fCPU
+		STA	($FB), Y
+		
 		LDY	#PLAYER::colour
 		LDA	plrColours, X
 		STA	($FB), Y
@@ -27061,6 +28171,17 @@ initPlayers:
 		BNE	@loop
 	
 		
+	.if	DEBUG_CPU
+		LDX	#$01
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDY	#PLAYER::fCPU
+		LDA	#$01
+		STA	($FB), Y
+	.endif
 		RTS
 		
 		
