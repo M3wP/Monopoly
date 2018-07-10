@@ -429,8 +429,17 @@ NTSC/PAL-N version in the future.
 * Backup/retrieve menu button selection going to/returning from dialogs when
   the menu hasn't changed?  Would be nice...
   
-* Change trade jump menu to action jump menu
+* Change trade jump menu naming and texts to action jump menu
 * Fix texts on action jump menu
+
+* CPU player still needs:  AutoRepay, AutoAuction, AutoTradeTo, AutoTradeWith,
+  AutoElimin
+* Will I need to load the rules constant data into high memory, too?
+* Fix issue with CPU player and setup1 chosing invalid option.
+* "Thinking" prompt when cpu engaged?  Its so fast anyway... 
+* AutoBuy - there is a bug when reclaiming equity in order to sell that
+  causes no money to be paid for sale
+* AutoGaol incorrectly chose roll over post?
 
 * Allow players to input name?
 * Trim down key scan routine.
@@ -438,12 +447,10 @@ NTSC/PAL-N version in the future.
 * Change "all" dirty to be just board dirty and req. individual flags?
 * Back-fit GoatTracker driver changes from version 2.74.
 * Player sprites on overview dialog.  Would look pretty.  IRQ is a mess.
-* Add CPU player.  Still need:  autoImprove, autoAuction, autoTradeTo, 
-  autoTradeWith
 * Put code into separate files as indicated.
 * Is rent3 SFX still a little lame?  Does it matter?  Are the sounds okay on 
   Android (where the emulation is terrible)?
-* Properly divide game and rule routines.  Finished yet?
+* Properly divide game and rule routines.  
 * Fix ZPage variable use, in particular active player pointer and IRQ.
 * Fix IRQ handler -- its gotten hacked to death.
 * Screen double buffering?  Is it required if the dirty/update code is 
@@ -462,13 +469,11 @@ NTSC/PAL-N version in the future.
 * Used GO Free cards prevented from appearing in deck until after 
   shuffle (and while owned by a player)
 * Ensure all options/pages are displayed for all menus.
-* AutoBuy - was there a bug when reclaiming equity in order to sell that
-  causes no money to be paid for sale?
-* Auto gaol incorrectly chose roll over post?
-* Draw a "thinking" menu when cpu engaged?  Flickering is disconcerting.
 
 ## Change History (Since Version 0.01.99A)
 * 10JUL2018
+	* Move rules constant data into high memory (and load at start).
+	* Implement AutoConstruct for AutoImprove (need AutoRepay).
 	* Fix spurious auctn0 menu redraws bug that is now causing crashes.
 	* Optimise some routines.
 	* CPU performs behaviour for setup (somewhat naughty).

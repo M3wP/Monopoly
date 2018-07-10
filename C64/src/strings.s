@@ -1187,3 +1187,5 @@ strText2Tax1:		;$100.
 			.byte $05, $A4, $B1, $B0, $B0, $AE
 strText3Tax1	=	strDummyDummy0
 strText4Tax1	=	strDummyDummy0
+
+	.assert	* < $F400, error, "Strings data too large for current allocation!"

@@ -1,0 +1,15 @@
+rulesGrpPriority =	$F400
+rulesGrpLo =		$F4D4
+rulesGrpHi =		$F4E2 
+rulesGrpSqrs0 =		$F4F0
+rulesGrpSqrs1 = 	$F4FE
+rulesGrpSqrs2 = 	$F50C
+rulesSqr0 = 		$F762
+rulesSqrStrsLo = 	$F7B2
+rulesSqrStrsHi =	$F7BA
+rulesChestStrsLo = 	$F812
+rulesChestStrsHi = 	$F822
+rulesChest0 = 		$F8F2
+rulesChanceStrsLo =	$F912
+rulesChanceStrsHi = 	$F922
+rulesChance0 =		$F9F2

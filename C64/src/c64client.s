@@ -31,8 +31,8 @@
 ;defs
 ;-------------------------------------------------------------------------------
 	.define	DEBUG_IRQ	0
-	.define DEBUG_KEYS	0
-	.define DEBUG_CPU	0
+	.define DEBUG_KEYS	1
+	.define DEBUG_CPU	1
 
 spriteMemD	=	$0340
 spriteMemE	=	$0380
@@ -497,12 +497,12 @@ JSTKSENS_HIGH	=	9
 		pPurch	.word
 		mValue	.word			;could be byte
 		mFee	.word			;could be byte
-		rRent	.word			;could be byte
-		r1Hse	.word
-		r2Hse	.word
-		r3Hse	.word
-		r4Hse	.word
-		rHotl	.word
+		mRent	.word			;could be byte
+		m1Hse	.word
+		m2Hse	.word
+		m3Hse	.word
+		m4Hse	.word
+		mHotl	.word
 	.endstruct
 	
 	.struct	STATION
@@ -6677,14 +6677,14 @@ uiActionFocusSquare:
 		TXA
 		PHA
 		
-		LDA	ui + UI::fActInt
-		BEQ	@exit
-		
 		JSR	uiActionDeselect
 		
 		LDA	game + GAME::varA
 		JSR	gameSelect
 
+		LDA	ui + UI::fActInt
+		BEQ	@exit
+		
 		LDA	game + GAME::varA
 		LDX	#$00
 		JSR	rulesCalcQForSquare
@@ -6881,7 +6881,14 @@ uiActionBuy:
 		STA	$FB
 		LDA	plrHi, X
 		STA	$FC
-		
+
+		LDY	#PLAYER::money
+		LDA	($FB), Y
+		STA	game + GAME::varM
+		INY
+		LDA	($FB), Y
+		STA	game + GAME::varN
+
 		LDA	$6A
 		JSR	uiActionFocusSquare
 
@@ -6903,11 +6910,39 @@ uiActionBuy:
 		STA	game + GAME::varH
 
 		JSR	rulesDoPurchDeed
-	
+
+;***TODO:	There is a bug somewhere causing this to go awry
+		LDY	#PLAYER::money
+		LDA	($FB), Y
+		CMP	game + GAME::varM
+		BNE	@exit
+		INY
+		LDA	($FB), Y
+		CMP	game + GAME::varN
+		BNE	@exit
+		
+		LDA	#<uiActionBuy
+		STA	$6A
+		LDA	#>uiActionBuy
+		STA	$6B
+
+		JSR	uiActionFault
+		
+@exit:
 		RTS
 		
 
 uiActionImprv:
+		LDA	$69
+
+		STA	game + GAME::pActive
+		STA	game + GAME::pLast
+		
+		LDA	$6A
+		JSR	uiActionFocusSquare
+
+		LDA	$6A
+		JSR	rulesNextImprv
 		
 		RTS
 		
@@ -7144,6 +7179,9 @@ cpuPerformBuy:
 cpuPerformAuction:
 ;***TODO:	Try to participate
 
+;***TODO:	I don't know if this works because of the way that the
+;		action processing changes the current player??
+
 		LDA	#UI_ACT_SKEY
 		STA	$68
 		LDA	#'F'
@@ -7159,11 +7197,14 @@ cpuPerformTrade:
 
 		LDA	#UI_ACT_SKEY
 		STA	$68
+	.if	DEBUG_KEYS
+		LDA	#'C'
+	.else
 		LDA	#'X'
+	.endif
 		STA	$69
-		
 		JSR	uiEnqueueAction
-		
+	
 		RTS
 		
 
@@ -8947,6 +8988,12 @@ menuPagePlay0StdKeys:
 		
 		JSR	rulesAutoSell
 		
+		LDA	ui + UI::cActns
+		BNE	@autosell
+		
+		JMP	@keysDing
+		
+@autosell:
 		LDA	#$01
 		STA	ui + UI::fActInt
 		LDA	#$00
@@ -8976,8 +9023,11 @@ menuPagePlay0StdKeys:
 
 		LDX	menuWindowPlay0NextB
 		CPX	#$A1
-		BNE	@keysBuzz
+		BEQ	@donext
 		
+		JMP	@keysBuzz
+		
+@donext:
 		JSR	rulesNextTurn
 		JMP	@keysDing
 		
@@ -9036,7 +9086,7 @@ menuPagePlay0StdKeys:
 	.if	DEBUG_KEYS
 @keysL:
 		CMP	#'L'
-		BNE	@keysOther
+		BNE	@keysI
 		
 		JSR	rulesLandOnSquare
 		LDA	#$01
@@ -9045,6 +9095,25 @@ menuPagePlay0StdKeys:
 
 		JSR	gameUpdateMenu
 		RTS
+		
+@keysI:
+		CMP	#'I'
+		BNE	@keysOther
+		
+		JSR	rulesAutoImprove
+		
+		LDA	ui + UI::cActns
+		BEQ	@keysDing
+		
+		LDA	#$01
+		STA	ui + UI::fActInt
+		LDA	#$00
+		STA	ui + UI::fActTyp
+		
+		JSR	uiProcessInit
+		
+		JMP	@keysDing
+		
 	.endif
 		
 @keysDing:
@@ -19099,7 +19168,7 @@ doDialogSqrInfoUtil:
 		
 		
 doDialogSqrInfoStn:
-		LDY	#STREET::rRent		;rent
+		LDY	#STREET::mRent		;rent
 		LDA	($FD), Y
 		STA	game + GAME::varD
 		
@@ -19212,7 +19281,7 @@ doDialogSqrInfoStn:
 		
 		
 doDialogSqrInfoStreet:
-		LDY	#STREET::rRent
+		LDY	#STREET::mRent
 		
 		JSR	doDialogSqrInfoGetVal	;rent
 
@@ -21224,10 +21293,23 @@ rulesSqrImprv:
 		.byte	$00
 	.endrep
 
+rulesChestCrds0:
+			.byte	$00, $00, $00, $00, $00, $00, $00, $00 
+			.byte	$00, $00, $00, $00, $00, $00, $00, $00
+rulesChanceCrds0:
+			.byte	$00, $00, $00, $00, $00, $00, $00, $00
+			.byte	$00, $00, $00, $00, $00, $00, $00, $00
+rulesChestIdx:
+			.byte	$00
+rulesChanceIdx:	
+			.byte	$00
+
+
+
 ;***TODO:		Put all of this constant data up high, too.
 
 rulesGrpPriority:
-		.byte	$01, $02, $03, $0A, $04, $05, $06, $07, $08, $09
+		.byte	$01, $02, $03, $0A, $04, $05, $06, $07, $09, $08
 
 
 rulesScore0:	
@@ -22360,17 +22442,6 @@ rulesChanceE:					;Advance Kings cross
 rulesChanceF:					;Advance Mayfair
 			.byte	$02	
 			.byte	$27
-
-rulesChestCrds0:
-			.byte	$00, $00, $00, $00, $00, $00, $00, $00 
-			.byte	$00, $00, $00, $00, $00, $00, $00, $00
-rulesChanceCrds0:
-			.byte	$00, $00, $00, $00, $00, $00, $00, $00
-			.byte	$00, $00, $00, $00, $00, $00, $00, $00
-rulesChestIdx:
-			.byte	$00
-rulesChanceIdx:	
-			.byte	$00
 
 ;-------------------------------------------------------------------------------
 ;rulesGenRnd0F
@@ -23573,7 +23644,7 @@ rulesDoDeedRent:
 		
 		ASL
 		CLC
-		ADC	#STREET::r1Hse - 2
+		ADC	#STREET::m1Hse - 2
 		TAY
 		LDA	($FD), Y
 		STA	game + GAME::varD
@@ -23584,7 +23655,7 @@ rulesDoDeedRent:
 		JMP	@rent
 		
 @unimprv:
-		LDY	#STREET::rRent
+		LDY	#STREET::mRent
 
 		LDA	($FD), Y
 		STA	game + GAME::varD
@@ -23601,7 +23672,7 @@ rulesDoDeedRent:
 		JMP	@rent
 
 @hotel:
-		LDY	#STREET::rHotl
+		LDY	#STREET::mHotl
 
 		LDA	($FD), Y
 		STA	game + GAME::varD
@@ -24844,8 +24915,7 @@ rulesDoPurchDeed:
 		STA	game + GAME::varE
 
 		LDA	game + GAME::varH	;Do we sub cash?
-		CMP	#$01
-		BEQ	@begin
+		BNE	@begin
 
 		SEC
 		LDY	#PLAYER::money
@@ -24854,7 +24924,7 @@ rulesDoPurchDeed:
 		INY	
 		LDA	($FB), Y
 		SBC	game + GAME::varE
-		BMI	@skip
+		BMI	@skip			;Can afford?
 
 		LDX	game + GAME::pActive
 		JSR	rulesSubCash
@@ -26554,7 +26624,7 @@ rulesDoCommitMrtg:
 		RTS
 
 
-rulesDoProcessMrtg:
+rulesDoProcRecoverMrtg:
 		LDX	#$00
 @loop0:
 		STX	game + GAME::varG		;varG = group index
@@ -26810,7 +26880,7 @@ rulesDoCopyImprv:
 		RTS
 		
 	
-rulesDoProcessAll:
+rulesDoProcRecoverAll:
 ;		For each group in the priority lists do
 ;			Is it in this list? 
 
@@ -26898,10 +26968,10 @@ rulesAutoRecover:
 		
 		JSR	rulesDoSetPriority
 
-		JSR	rulesDoProcessMrtg
+		JSR	rulesDoProcRecoverMrtg
 		BNE	@complete
 		
-		JSR	rulesDoProcessAll
+		JSR	rulesDoProcRecoverAll
 		
 @complete:
 		RTS
@@ -27259,12 +27329,686 @@ rulesAutoBuy:
 		RTS
 		
 
+rulesUpdateValueIfLess:
+;		D, E < (O, P) -> SEC | CLC
+		JSR	gameAmountIsLessDirect
+		BCC	@exit
+		
+		LDA	game + GAME::varO
+		STA	game + GAME::varD
+		LDA	game + GAME::varP
+		STA	game + GAME::varE
+		
+@exit:
+		RTS
+
+
+rulesSuggestBaseReserve:
+;		game + GAME::varD,E = value
+;
+;		game + GAME::varJ = group
+;		game + GAME::varU = square
+;		game + GAME::varH = improvements
+;		game + GAME::varO,P = temp value
+;		game + GAME::varM,N = temp value
+;
+		LDA	#$00
+		STA	game + GAME::varD
+		STA	game + GAME::varE
+
+;	Test all brown - orange street groups owned by other player
+		LDX	#$01
+@loop0:
+		STX	game + GAME::varJ
+		
+		LDA	rulesGrpSqrs2, X
+		CMP	#$FF
+		BNE	@havesqr0
+		
+		LDA	rulesGrpSqrs1, X
+		CMP	#$FF
+		BEQ	@next0
+		
+@havesqr0:
+		STA	game + GAME::varU
+		ASL
+		TAX
+		LDA	sqr00, X
+		CMP	game + GAME::pActive
+		BEQ	@next0
+		
+		LDA	sqr00 + 1, X
+		AND	#$08
+		BNE	@hotel0
+		
+		LDA	sqr00 + 1, X
+		AND	#$07
+	
+		JMP	@cont0
+		
+@hotel0:
+		LDA	#$05
+		
+@cont0:
+		STA	game + GAME::varH
+		
+;		If no houses set value to rent if lower
+;		Else set value to rent for improvement has if lower
+
+		JSR	gameGetCardPtrForSquareImmed
+		
+		CLC
+		LDA	game + GAME::varH
+		ASL
+		ADC	#STREET::mRent
+
+		TAY
+		LDA	($FD), Y
+		STA	game + GAME::varO
+		INY
+		LDA	($FD), Y
+		STA	game + GAME::varP
+		
+		JSR	rulesUpdateValueIfLess
+
+@next0:
+		LDX	game + GAME::varJ
+		
+		INX
+		CPX	#$05
+		BNE	@loop0
+
+
+;	Copy value to temp value
+		LDA	game + GAME::varD
+		STA	game + GAME::varM
+		LDA	game + GAME::varE
+		STA	game + GAME::varN
+		
+		LDA	#$00
+		STA	game + GAME::varD
+		STA	game + GAME::varE
+		
+
+;	Test all red - yellow street groups owned by other player
+		LDX	#$05
+@loop1:
+		STX	game + GAME::varJ
+		
+		LDA	rulesGrpSqrs2, X
+		CMP	#$FF
+		BEQ	@next1
+		
+		STA	game + GAME::varU
+		ASL
+		TAX
+
+		LDA	sqr00, X
+		CMP	game + GAME::pActive
+		BEQ	@next1
+		
+		LDA	sqr00 + 1, X
+		AND	#$08
+		BNE	@hotel1
+		
+		LDA	sqr00 + 1, X
+		AND	#$07
+	
+		JMP	@cont1
+		
+@hotel1:
+		LDA	#$05
+		
+@cont1:
+		STA	game + GAME::varH
+		
+;		If no houses set value to rent if lower
+;		Else set value to rent for improvement has if lower
+
+		JSR	gameGetCardPtrForSquareImmed
+		
+		CLC
+		LDA	game + GAME::varH
+		ASL
+		ADC	#STREET::mRent
+
+		TAY
+		LDA	($FD), Y
+		STA	game + GAME::varO
+		INY
+		LDA	($FD), Y
+		STA	game + GAME::varP
+		
+		JSR	rulesUpdateValueIfLess
+
+@next1:
+		LDX	game + GAME::varJ
+		
+		INX
+		CPX	#$07
+		BNE	@loop1
+		
+;	Add temp value to value
+		CLC
+		LDA	game + GAME::varD
+		ADC	game + GAME::varM
+
+;	Test all green - blue street groups owned by other player
+		LDX	#$07
+@loop2:
+		STX	game + GAME::varJ
+		
+		LDA	rulesGrpSqrs2, X
+		CMP	#$FF
+		BNE	@havesqr2
+		
+		LDA	rulesGrpSqrs1, X
+		CMP	#$FF
+		BEQ	@next2
+		
+@havesqr2:
+		STA	game + GAME::varU
+		ASL
+		TAX
+
+		LDA	sqr00, X
+		CMP	game + GAME::pActive
+		BEQ	@next2
+		
+		LDA	sqr00 + 1, X
+		AND	#$08
+		BNE	@hotel2
+		
+		LDA	sqr00 + 1, X
+		AND	#$07
+	
+		JMP	@cont2
+		
+@hotel2:
+		LDA	#$05
+		
+@cont2:
+		STA	game + GAME::varH
+		
+;		If no houses add rent * 2 to value
+;		Else add rent for improvement has / 4 to value
+
+		JSR	gameGetCardPtrForSquareImmed
+		
+		CLC
+		LDA	game + GAME::varH
+		ASL
+		ADC	#STREET::mRent
+
+		TAY
+		LDA	($FD), Y
+		STA	game + GAME::varO
+		INY
+		LDA	($FD), Y
+		STA	game + GAME::varP
+
+		LDA	game + GAME::varH
+		BEQ	@update2
+
+		LDA	game + GAME::varP
+		ASL
+		ROR	game + GAME::varP
+		ROR	game + GAME::varO
+
+		LDA	game + GAME::varP
+		ASL
+		ROR	game + GAME::varP
+		ROR	game + GAME::varO
+		
+@update2:
+		CLC
+		LDA	game + GAME::varD
+		ADC	game + GAME::varO
+		STA	game + GAME::varD
+		LDA	game + GAME::varE
+		ADC	game + GAME::varP
+		STA	game + GAME::varE
+
+@next2:
+		LDX	game + GAME::varJ
+		
+		INX
+		CPX	#$09
+		BNE	@loop2
+
+;	If all stations owned by other player 
+		LDX	#$0A
+		LDA	sqr00, X
+		CMP	game + GAME::pActive
+		BEQ	@utilities
+		
+		LDA	sqr00 + 1, X
+		AND	#$40
+		BEQ	@utilities
+		
+;		Add 250
+		CLC
+		LDA	game + GAME::varD
+		ADC	#250
+		STA	game + GAME::varD
+		LDA	game + GAME::varE
+		ADC	#$00
+		STA	game + GAME::varE
+
+@utilities:
+;	If all utilities owned by other player 
+		LDX	#$18
+		LDA	sqr00, X
+		CMP	game + GAME::pActive
+		BEQ	@exit
+		
+		LDA	sqr00 + 1, X
+		AND	#$40
+		BEQ	@exit
+		
+;		Add 75
+		CLC
+		LDA	game + GAME::varD
+		ADC	#75
+		STA	game + GAME::varD
+		LDA	game + GAME::varE
+		ADC	#$00
+		STA	game + GAME::varE
+
+@exit:
+		RTS
+
+
+rulesCountOwnedDeeds:
+;	Tally owned deeds
+		LDA	#$00
+		STA	game + GAME::varA
+
+		LDX	#$00
+@loop:
+		LDA	sqr00, X
+		CMP	#$FF
+		BEQ	@next
+		
+		INC	game + GAME::varA
+
+@next:
+		INX
+		INX
+		
+		CPX	#$50
+		BNE	@loop
+
+		RTS
+	
+
+rulesDoConstructAtLevel:
+;		For each square in group, backwards, buy improvements at level 
+;		until out of money or zero houses/hotels?
+
+;		Update level when all done at level
+
+;		game + GAME::varJ = group
+;		game + GAME::varB = level
+;		game + GAME::varH = house count
+;		game + game::varI = hotel count
+;		game + GAME::varK = player
+;		rulesSqrImprv for improvement information
+;
+;		game + GAME::varA = group square idx
+;		game + GAME::varF = square 
+		
+		LDX	game + GAME::varJ
+		
+		LDA	rulesGrpLo, X
+		STA	$FD
+		LDA	rulesGrpHi, X
+		STA	$FE
+		
+		LDA	#$02
+		STA	game + GAME::varA
+		
+@loop0:
+		LDA	#$1C
+		LDX	game + GAME::varA
+		BPL	@loop1
+		
+		JMP	@incomplete
+		
+		
+@loop1:
+		INX
+		CPX	#$03
+		BEQ	@cont0
+		
+		SEC
+		SBC	#$0E
+		JMP	@loop1
+		
+@cont0:
+		CLC
+		ADC	game + GAME::varJ
+		
+		TAX
+		LDA	rulesGrpSqrs0, X
+		STA	game + GAME::varF
+		
+		CMP	#$FF
+		BNE	@begin0
+		
+		DEC	game + GAME::varA
+		JMP	@loop0
+
+@begin0:
+		ASL
+		TAX
+		LDA	sqr00, X
+		CMP	game + GAME::varK
+		BEQ	@begin1
+		
+		JMP	@complete
+		
+@begin1:
+		LDX	game + GAME::varF
+		LDA	rulesSqrImprv, X
+		AND	#$08
+		BEQ	@houses0
+		
+		LDA	#$05
+		JMP	@cont1
+		
+@houses0:
+		LDA	rulesSqrImprv, X
+		AND	#$07
+		
+@cont1:
+		CMP	game + GAME::varB
+		BNE	@donext
+
+		LDA	game + GAME::varB
+		CMP	#$04
+		BEQ	@hotels1
+		
+		LDA	game + GAME::varH
+		BEQ	@complete
+
+		DEC	game + GAME::varH
+		
+		LDA	rulesSqrImprv, X
+		AND	#$F0
+		ORA	game + GAME::varB
+		STA	rulesSqrImprv, X
+		INC	rulesSqrImprv, X
+		
+		JMP	@improve
+		
+@hotels1:
+		LDA	game + GAME::varI
+		BEQ	@complete
+		
+		DEC	game + GAME::varI
+		
+		CLC
+		LDA	game + GAME::varH
+		ADC	#$04
+		STA	game + GAME::varH
+		
+		LDA	rulesSqrImprv, X
+		AND	#$F0
+		ORA	#$08
+		STA	rulesSqrImprv, X
+
+@improve:
+		LDA	#UI_ACT_BUYI
+		STA	$68
+		LDA	game + GAME::varK
+		STA	$69
+		LDA	game + GAME::varF
+		STA	$6A
+		
+		JSR	uiEnqueueAction
+		
+		SEC
+		LDY	#GROUP::pImprv
+		LDA	($FD), Y
+		STA	game + GAME::varO
+		LDA	#$00
+		STA	game + GAME::varP
+		
+		SEC
+		LDA	game + GAME::varD
+		SBC	game + GAME::varO
+		STA	game + GAME::varD
+		LDA	game + GAME::varE
+		SBC	#$00
+		STA	game + GAME::varE
+		
+@tstnext:
+;		D, E < (O, P) -> SEC | CLC
+		JSR	gameAmountIsLessDirect
+		BCC	@donext
+		
+@complete:
+		LDA	#$01
+		RTS
+		
+@donext:
+		DEC	game + GAME::varA
+		LDA	game + GAME::varA
+		CMP	#$FF
+		BEQ	@incomplete
+		
+		JMP	@loop0
+		
+@incomplete:
+		LDA	#$00
+		
+		RTS		
+	
+	
+rulesAutoConstruct:
+;		For each group in the priority lists backwards do
+;
+;				Is group 09/0A?  goto next
+;			
+;			for each level until run out of money
+;				
+;				construct at level
+;				
+
+		LDX	game + GAME::pActive
+		STX	game + GAME::varK		;varK = player
+
+		JSR	rulesDoCopyImprv
+		
+		LDA	game + GAME::cntHs
+		STA	game + GAME::varH
+		LDA	game + GAME::cntHt
+		STA	game + GAME::varI
+		
+		LDX	#$0A
+@loop0:
+		STX	game + GAME::varG		;varG = group index
+		
+		LDA	rulesGrpPriority, X	
+		STA	game + GAME::varJ		;varJ = group
+
+		CMP	#$09
+		BEQ	@next0
+		
+		CMP	#$0A
+		BEQ	@next0
+
+		TAX
+		LDA	rulesGrpSqrs0, X
+		ASL
+		TAX
+		
+		LDA	sqr00, X
+		CMP	game + GAME::pActive
+		BNE	@next0
+		
+		LDA	sqr00 + 1, X
+		AND	#$40
+		BEQ	@next0
+		
+		LDA	sqr00 + 1, X
+		AND	#$08
+		BNE	@next0
+
+		LDX	game + GAME::varJ
+		LDY	#$FF
+
+		JSR	rulesDoCollateImprv
+
+		LDA	game + GAME::varQ
+		BNE	@next0
+		
+		LDA	game + GAME::varA
+		STA	game + GAME::varB
+
+@loop1:
+		JSR	rulesDoConstructAtLevel
+		BNE	@complete
+		
+		INC	game + GAME::varB
+		LDA	game + GAME::varB
+		CMP	#$05
+		BNE	@loop1
+		
+@next0:
+		LDX	game + GAME::varG
+
+		DEX
+		BPL	@loop0
+		
+@complete:		
+		RTS
+		
+		
+rulesAutoRepay:
+		RTS
+
+
 rulesAutoImprove:
+;	USES:	varD,E	=	amount surplus and available
+
+;	Find base rent value needed
+		JSR	rulesSuggestBaseReserve
+		
+;	Find number deeds owned
+		JSR	rulesCountOwnedDeeds
+
+;	All 22
+		LDA	game + GAME::varA
+		CMP	#$16
+		BNE	@tst16
+		
+;		Increase value by 150
+		LDA	#<150
+		STA	game + GAME::varM
+		LDA	#>150
+		STA	game + GAME::varN
+		
+		JMP	@bump
+		
+@tst16:
+;	Or more than 16
+		CMP	#$10
+		BMI	@tst11
+
+;		Increase value by 200
+		LDA	#<200
+		STA	game + GAME::varM
+		LDA	#>200
+		STA	game + GAME::varN
+
+		JMP	@bump
+
+@tst11:
+;	Or more than 11
+		CMP	#$0B
+		BMI	@default
+		
+;		Increase value by 300
+		LDA	#<300
+		STA	game + GAME::varM
+		LDA	#>300
+		STA	game + GAME::varN
+
+		JMP	@bump
+
+@default:
+;	Or
+;		Increase value by 400
+		LDA	#<400
+		STA	game + GAME::varM
+		LDA	#>400
+		STA	game + GAME::varN
+
+@bump:
+		CLC
+		LDA	game + GAME::varD
+		ADC	game + GAME::varM
+		STA	game + GAME::varD
+		LDA	game + GAME::varE
+		ADC	game + GAME::varN
+		STA	game + GAME::varE
+
+;	Subtract value from money store as value
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDY	#PLAYER::money
+		SEC
+		LDA	($FB), Y
+		SBC	game + GAME::varD
+		STA	game + GAME::varD
+		INY
+		LDA	($FB), Y
+		SBC	game + GAME::varE
+		STA	game + GAME::varE
+		
+;	Have positive value, AutoConstruct
+		BMI	@incomplete
+
+		JSR	rulesAutoConstruct
+
+;	Still have positive value, AutoRepay
+		LDA	game + GAME::varE
+		BMI	@tstcomp
+		BNE	@repay
+		
+		LDA	game + GAME::varD
+		BEQ	@tstcomp
+		
+@repay:
+		JSR	rulesAutoRepay
+
+@tstcomp:
+;	Any actions added?
+		LDA	ui + UI::cActns
+		BEQ	@incomplete
+
+@complete:
+;		Return 1
+		LDA	#$01
+		RTS
+
+@incomplete:
+;	Else
+;		Return 0
 		LDA	#$00
 		RTS
 
 
 rulesDoNudgeValue:
+;		.Y = min # nudges (0 - 16 value increment)
+;		.X = max # nudges
+
 		STY	game + GAME::varA
 		LDY	#$00
 		
@@ -27290,9 +28034,12 @@ rulesDoNudgeValue:
 		INY
 		CPY	game + GAME::varA
 		BMI	@loop
-		
+
 		CPX	#$FF
-		BNE	@loop
+		BEQ	@exit
+		
+		LDA	sidV2EnvOu
+		BPL	@loop
 		
 @exit:
 		RTS
