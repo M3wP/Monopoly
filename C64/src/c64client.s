@@ -27,56 +27,108 @@
 ;C64CLIENT.S
 ;===============================================================================
 
+
 ;-------------------------------------------------------------------------------
-;defs
+;Compile switch definitions
 ;-------------------------------------------------------------------------------
 	.define	DEBUG_IRQ	0
 	.define DEBUG_KEYS	0
 	.define DEBUG_CPU	0
 
-spriteMemD	=	$0340
-spriteMemE	=	$0380
-spriteMemF	=	$03C0
+
+;-------------------------------------------------------------------------------
+;General definitions
+;-------------------------------------------------------------------------------
+;***	screendefs.inc
 spriteMem20	= 	$0800
 
 spritePtr0	=	$07F8
 spritePtr1	=	$07F9
 
+offsX		=	24
+offsY		=	50
+
+	.struct	BUTTON
+		fType	.byte			;0 = regular disabled 
+						;1 = regular enabled
+						;2 = regular hidden
+						;3 = footer (2 char ind, hacked)
+						;4 = single cell button
+						;C = colour visible
+						;D = colour hidden
+						;E = Simple (trd sel dialog)
+						;F = Full Screen
+						;FF = end of buttons
+		pY	.byte
+		pX1	.byte
+		pX2	.byte
+		wResv	.word
+		fColour	.byte
+		cKey	.byte
+	.endstruct
+
+	.struct	MENUPAGE
+		aKeys	.word
+		aDraw	.word
+		bDef	.byte
+		aCPU	.word
+	.endstruct
+
+	.struct	DIALOG
+		fKeys	.word
+		fDraw	.word
+		bDef	.byte
+	.endstruct
+	
+	.struct BQUADP
+		pPosHY	.byte
+		pPos0X	.word
+		pPos1X	.word
+		pPos2X	.word
+		pPos3X	.word
+		pPos4X	.word
+		pPos5X	.word
+		pPosVX	.word
+		pPos0Y	.byte
+		pPos1Y	.byte
+		pPos2Y	.byte
+		pPos3Y	.byte
+		pPos4Y	.byte
+	.endstruct
+	
+	.struct	SQRQUAD				;Currently must be 2 bytes
+		pSqrHY 	.byte
+		pSqrVX	.byte
+	.endstruct
+	
+	.struct	SQRQLOC				;Currently must be 2 bytes
+		pSqrA	.byte
+		pImprvA	.byte			;#$FF = none, else X or Y
+	.endstruct
+
+
+;***	machinedefs.inc
+VIC     	= 	$D000         		; VIC REGISTERS
 vicSprPos0	=	$D000
 vicSprPos1	=	$D002
-
+VICXPOS    	= 	VIC + $00      		; LOW ORDER X POSITION
+VICYPOS    	= 	VIC + $01      		; Y POSITION
+VICXPOSMSB 	=	VIC + $10      		; BIT 0 IS HIGH ORDER X POS
 vicSprPosM	=	$D010
-
+vicCtrlReg	=	$D011
+vicRstrVal	=	$D012
+vicSprEnab	= 	$D015
+vicSprExpY	=	$D017
+vicIRQFlgs	=	$D019
+vicIRQMask	=	$D01A
+vicSprCMod	= 	$D01C
+vicSprExpX	= 	$D01D
+vicBrdrClr	=	$D020
+vicBkgdClr	= 	$D021
 vicSprMCl0	= 	$D025
 vicSprMCl1	= 	$D026
 vicSprClr0	= 	$D027
 vicSprClr1	= 	$D028
-
-vicSprCMod	= 	$D01C
-
-vicSprExpX	= 	$D01D
-
-vicSprExpY	=	$D017
-
-vicSprEnab	= 	$D015
-
-vicBrdrClr	=	$D020
-vicBkgdClr	= 	$D021
-
-vicCtrlReg	=	$D011
-
-vicRstrVal	=	$D012
-
-vicIRQMask	=	$D01A
-
-vicIRQFlgs	=	$D019
-
-cia1IRQCtl	=	$DC0D
-
-VIC     	= 	$D000         		; VIC REGISTERS
-VICXPOS    	= 	VIC + $00      		; LOW ORDER X POSITION
-VICYPOS    	= 	VIC + $01      		; Y POSITION
-VICXPOSMSB 	=	VIC + $10      		; BIT 0 IS HIGH ORDER X POS
 
 SID     	= 	$D400         		; SID REGISTERS
 sidVoc2FLo	=	$D40E
@@ -86,22 +138,15 @@ sidV2EnvOu	=	$D41B
 SID_ADConv1    	= 	SID + $19
 SID_ADConv2    	= 	SID + $1A
 
+CIA1_PRA        = 	$DC00        ; Port A
+CIA1_PRB	=	$DC01
 CIA1_DDRA	=	$DC02
 CIA1_DDRB	=	$DC03
-CIA1_PRB	=	$DC01
-CIA1_PRA        = 	$DC00        ; Port A
+cia1IRQCtl	=	$DC0D
 
-offsX		=	24
-offsY		=	50
-buttonLeft	=	$10
-buttonRight	=	$01
-
-
-;krnlUsrIRQ	=	$0314
 cpuIRQ		=	$FFFE
 cpuRESET	=	$FFFC
 cpuNMI		=	$FFFA
-
 
 krnlOutChr	= 	$E716
 krnlLoad	=	$FFD5
@@ -109,71 +154,13 @@ krnlSetLFS	=	$FFBA
 krnlSetNam	=	$FFBD
 knrlClAll	=	$FFE7
 
-;krnlScnKey	=	$EA87
 
-musTuneIntro	=	$00
-musTuneSilence  =	$01
-musTuneDice0    =	$02
-musTuneDice1    =	$03
-musTuneDice2    =	$04
-musTuneDice3    =	$05
-musTuneDice4    =	$06
-musTuneDice5    =	$07
-musTuneGaol     =	$08
-musTuneBuy	=	$09
-musTuneBuyAll   =	$0A
-musTuneHouse    =	$0B
-musTuneHotel    =	$0C
-musTuneGameOver =	$0D
-musTunePlyrElim =	$0E
-musTuneStart	=	$0F
-
-
-keyF1		= 	$85
-keyF3		=	$86
-keyF5		=	$87
-keyF7		=	$88
-keyF2		=	$89
-keyF4		=	$8A
-keyF6		=	$8B
-keyF8		=	$8C
-
+;***	uidefs.inc
+buttonLeft	=	$10
+buttonRight	=	$01
 JSTKSENS_LOW	=	27
 JSTKSENS_MED	=	18
 JSTKSENS_HIGH	=	9
-
-
-	.struct SHRTSTR
-		_COUNT	.byte
-		_0	.byte
-		_1	.byte
-		_2	.byte
-		_3	.byte
-		_4	.byte
-		_5	.byte
-		_6	.byte
-		_7	.byte
-	.endstruct
-	
-	.struct TOKEN
-		_0	.byte
-		_1	.byte
-		_2	.byte
-		_3	.byte
-		_4	.byte
-		_5	.byte
-		_6	.byte
-		_7	.byte
-		_8	.byte
-		_9	.byte
-		_A	.byte
-		_B	.byte
-		_C	.byte
-		_D	.byte
-		_E	.byte
-		_F	.byte
-	.endstruct
-
 
 	.struct	UI
 		fHveInp .byte
@@ -205,6 +192,73 @@ JSTKSENS_HIGH	=	9
 		fInjKey .byte
 	.endstruct
 
+
+;***	musicdefs.inc
+musTuneIntro	=	$00
+musTuneSilence  =	$01
+musTuneDice0    =	$02
+musTuneDice1    =	$03
+musTuneDice2    =	$04
+musTuneDice3    =	$05
+musTuneDice4    =	$06
+musTuneDice5    =	$07
+musTuneGaol     =	$08
+musTuneBuy	=	$09
+musTuneBuyAll   =	$0A
+musTuneHouse    =	$0B
+musTuneHotel    =	$0C
+musTuneGameOver =	$0D
+musTunePlyrElim =	$0E
+musTuneStart	=	$0F
+
+
+;***	keydefs.inc
+keyF1		= 	$85
+keyF3		=	$86
+keyF5		=	$87
+keyF7		=	$88
+keyF2		=	$89
+keyF4		=	$8A
+keyF6		=	$8B
+keyF8		=	$8C
+
+keyZPKeyDown	=	$C5			;byte
+keyZPKeyCount	=	$C6			;byte
+keyZPKeyScan	= 	$CB			;byte
+keyZPDecodePtr	=	$F5			;word
+
+
+;***	gamedefs.inc
+	.struct SHRTSTR
+		_COUNT	.byte
+		_0	.byte
+		_1	.byte
+		_2	.byte
+		_3	.byte
+		_4	.byte
+		_5	.byte
+		_6	.byte
+		_7	.byte
+	.endstruct
+	
+	.struct TOKEN
+		_0	.byte
+		_1	.byte
+		_2	.byte
+		_3	.byte
+		_4	.byte
+		_5	.byte
+		_6	.byte
+		_7	.byte
+		_8	.byte
+		_9	.byte
+		_A	.byte
+		_B	.byte
+		_C	.byte
+		_D	.byte
+		_E	.byte
+		_F	.byte
+	.endstruct
 
 	.struct GAME
 		sig	.byte
@@ -306,11 +360,6 @@ JSTKSENS_HIGH	=	9
 						;8:  Action stepping (f/e)
 						;9:  Quit request
 		
-		tPrmT0	.tag	TOKEN
-		tPrmT1	.tag	TOKEN
-		tPrmC0	.tag	TOKEN
-		tPrmC1	.tag	TOKEN
-
 		varA	.byte
 		varB	.byte
 		varC	.byte
@@ -398,53 +447,8 @@ JSTKSENS_HIGH	=	9
 	.endstruct
 	
 	
-	.struct	BUTTON
-		fType	.byte			;0 = regular disabled 
-						;1 = regular enabled
-						;2 = regular hidden
-						;3 = footer (2 char ind, hacked)
-						;4 = single cell button
-						;C = colour visible
-						;D = colour hidden
-						;E = Simple (trd sel dialog)
-						;F = Full Screen
-						;FF = end of buttons
-		pY	.byte
-		pX1	.byte
-		pX2	.byte
-		wResv	.word
-		fColour	.byte
-		cKey	.byte
-	.endstruct
 
-
-	.struct BQUADP
-		pPosHY	.byte
-		pPos0X	.word
-		pPos1X	.word
-		pPos2X	.word
-		pPos3X	.word
-		pPos4X	.word
-		pPos5X	.word
-		pPosVX	.word
-		pPos0Y	.byte
-		pPos1Y	.byte
-		pPos2Y	.byte
-		pPos3Y	.byte
-		pPos4Y	.byte
-	.endstruct
-	
-	.struct	SQRQUAD				;Currently must be 2 bytes
-		pSqrHY 	.byte
-		pSqrVX	.byte
-	.endstruct
-	
-	.struct	SQRQLOC				;Currently must be 2 bytes
-		pSqrA	.byte
-		pImprvA	.byte			;#$FF = none, else X or Y
-	.endstruct
-
-
+;***	ruledefs.inc
 	.struct	SQRDEED
 		group	.byte
 		index	.byte
@@ -521,20 +525,38 @@ JSTKSENS_HIGH	=	9
 	.endstruct
 	
 	
-	.struct	MENUPAGE
-		aKeys	.word
-		aDraw	.word
-		bDef	.byte
-		aCPU	.word
-	.endstruct
+;-------------------------------------------------------------------------------
+;Global data defines
+;-------------------------------------------------------------------------------
+ui		=	$0200
+game		=	ui + .sizeof(UI)		
+plr0		=	game + .sizeof(GAME)
+plr1		=	plr0 + .sizeof(PLAYER)
+plr2		=	plr1 + .sizeof(PLAYER)
+plr3		=	plr2 + .sizeof(PLAYER)
+plr4		=	plr3 + .sizeof(PLAYER)
+plr5		=	plr4 + .sizeof(PLAYER)
+sqr00		=	plr5 + .sizeof(PLAYER)
+
+keyBuffer0	=	sqr00 + (.sizeof(SQUARE) * 40)
+keyBufferSize 	=	keyBuffer0 + 10
+keyRepeatFlag 	=	keyBufferSize + 1
+keyRepeatSpeed  =	keyRepeatFlag + 1
+keyRepeatDelay	=	keyRepeatSpeed + 1
+keyModifierFlag = 	keyRepeatDelay + 1
+keyModifierLast =	keyModifierFlag + 1
+keyModifierVect =	keyModifierLast + 1
+keyModifierLock =	keyModifierVect + 2
+
+	.assert keyModifierLock < $0400, error, "Global data space too large!"
 
 
-	.struct	DIALOG
-		fKeys	.word
-		fDraw	.word
-		bDef	.byte
-	.endstruct
-	
+
+;-------------------------------------------------------------------------------
+;String data defines
+;-------------------------------------------------------------------------------
+	.include 	"strings.inc"
+
 
 ;-------------------------------------------------------------------------------
 ;BASIC launcher
@@ -550,19 +572,129 @@ JSTKSENS_HIGH	=	9
 	.asciiz		"2061"			;2061 and line end
 _basNext:
 	.word		$0000			;BASIC prog terminator
-	.assert         * = $080D, error, "BASIC Loader incorrect!"
+	.assert         * = $080D, error, "BASIC interface incorrect!"
 bootstrap:
+;	Exclude BASIC (include Kernal and IO)
+		LDA	$00
+		ORA	#$07
+		STA	$00
+		LDA	#$1E
+		STA	$01		
+
+;***TODO:	Change VIC mode here and standardise
+
+		JSR	initDataLoad
+		
+		LDA	#$7F			;disable standard CIA irqs
+		STA	cia1IRQCtl
+		
+		CLD
+		SEI
+		
 		JMP	init
 	
-;dengland
+	.assert         * < $0840, error, "Bootstrap incorrect!"
+	
 ;	We need this space in order to use it for the mouse pointer (from $0800)
-	.byte		$00, $00, $00, $00, $00, $00, $00, $00
-	.byte		$00, $00, $00, $00, $00, $00, $00, $00
-	.byte		$00, $00, $00, $00, $00, $00, $00, $00
-	.byte		$00, $00, $00, $00, $00, $00, $00, $00
-	.byte		$00, $00, $00, $00, $00, $00, $00, $00
-	.byte		$00, $00, $00, $00, $00, $00, $00, $00
-	.assert         * = $0840, error, "Program bootstrap incorrect!"
+	.repeat	($0840 - *), I
+		.byte	$00
+	.endrep
+
+plrToken:
+			.byte	%00111100, $00, $00
+			.byte 	%01111110, $00, $00
+			.byte	%11111111, $00, $00
+			.byte	%11111111, $00, $00
+			.byte	%11111111, $00, $00
+			.byte	%11111111, $00, $00
+			.byte 	%01111110, $00, $00
+			.byte	%00111100, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00
+
+plrMinimap:
+			.byte	$C0, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00, $00, $00
+			.byte	$00
+
+brdMiniMap:
+			.byte	%10011111, %11111111, %11111001
+			.byte	%10011111, %11100111, %11111001
+			.byte	%10011111, %11100111, %11111001
+			.byte	%10011111, %11100111, %11111001
+			.byte	%10011111, %11100111, %11111001
+			.byte	%10011111, %11100111, %11111001
+			.byte	%11101111, %11011011, %11110111
+			.byte	%11111111, %11111111, %11111111
+			.byte	%11111111, %11111111, %11111111
+			.byte	%11111111, %11011011, %11111111
+			.byte	%10000000, %00000000, %00000001
+			.byte	%11111111, %11011011, %11111111
+			.byte	%11111111, %11111111, %11111111
+			.byte	%11111111, %11111111, %11111111
+			.byte	%11101111, %11011011, %11110111
+			.byte	%10011111, %11100111, %11111001
+			.byte	%10011111, %11100111, %11111001
+			.byte	%10011111, %11100111, %11111001
+			.byte	%10011111, %11100111, %11111001
+			.byte	%10011111, %11100111, %11111001
+			.byte	%10011111, %11111111, %11111001
+			.byte  	$00
+;			.byte	%11111111, %11111111, %11111111
+;			.byte	%10000000, %00010000, %00000001
+;			.byte	%10100000, %00001000, %00000101
+;			.byte	%10000000, %00010000, %00000001
+;			.byte	%10100000, %00001000, %00000101
+;			.byte	%10000000, %00010000, %00000001
+;			.byte	%10010000, %00100100, %00001001
+;			.byte	%10000000, %00000000, %00000001
+;			.byte	%10000000, %00000000, %00000001
+;			.byte	%10000000, %00100100, %00000001
+;			.byte	%10101010, %10000001, %01010101
+;			.byte	%10000000, %00100100, %00000001
+;			.byte	%10000000, %00000000, %00000001
+;			.byte	%10000000, %00000000, %00000001
+;			.byte	%10010000, %00100100, %00001001
+;			.byte	%10000000, %00001000, %00000001
+;			.byte	%10100000, %00010000, %00000101
+;			.byte	%10000000, %00001000, %00000001
+;			.byte	%10100000, %00010000, %00000101
+;			.byte	%10000000, %00001000, %00000001
+;			.byte	%11111111, %11111111, %11111111
+;			.byte  	$00
+
+	.assert         * = $0900, error, "Program header incorrect!"
 
 ;Include the sound driver and music data
 SNDBASE:		
@@ -611,56 +743,12 @@ sfxRentHi:
 			
 	
 ;-------------------------------------------------------------------------------
-;Global variables
+;Global variable data
 ;-------------------------------------------------------------------------------
-ui:		.tag 	UI
-game:		.tag	GAME
-plr0:		.tag	PLAYER
-plr1:		.tag	PLAYER
-plr2:		.tag	PLAYER
-plr3:		.tag	PLAYER
-plr4:		.tag	PLAYER
-plr5:		.tag 	PLAYER
-sqr00:		.tag	SQUARE	
-sqr01:		.tag	SQUARE	
-sqr02:		.tag	SQUARE	
-sqr03:		.tag	SQUARE	
-sqr04:		.tag	SQUARE	
-sqr05:		.tag	SQUARE	
-sqr06:		.tag	SQUARE	
-sqr07:		.tag	SQUARE	
-sqr08:		.tag	SQUARE	
-sqr09:		.tag	SQUARE	
-sqr0A:		.tag	SQUARE	
-sqr0B:		.tag	SQUARE	
-sqr0C:		.tag	SQUARE	
-sqr0D:		.tag	SQUARE	
-sqr0E:		.tag	SQUARE	
-sqr0F:		.tag	SQUARE	
-sqr10:		.tag	SQUARE	
-sqr11:		.tag	SQUARE	
-sqr12:		.tag	SQUARE	
-sqr13:		.tag	SQUARE	
-sqr14:		.tag	SQUARE	
-sqr15:		.tag	SQUARE	
-sqr16:		.tag	SQUARE	
-sqr17:		.tag	SQUARE	
-sqr18:		.tag	SQUARE	
-sqr19:		.tag	SQUARE	
-sqr1A:		.tag	SQUARE	
-sqr1B:		.tag	SQUARE	
-sqr1C:		.tag	SQUARE	
-sqr1D:		.tag	SQUARE	
-sqr1E:		.tag	SQUARE	
-sqr1F:		.tag	SQUARE	
-sqr20:		.tag	SQUARE	
-sqr21:		.tag	SQUARE	
-sqr22:		.tag	SQUARE	
-sqr23:		.tag	SQUARE	
-sqr24:		.tag	SQUARE	
-sqr25:		.tag	SQUARE	
-sqr26:		.tag	SQUARE	
-sqr27:		.tag	SQUARE	
+prmptTok0:	.tag	TOKEN
+prmptTok1:	.tag	TOKEN
+prmptClr0:	.tag	TOKEN
+prmptClr1:	.tag	TOKEN
 
 trade0:		.tag	TRADE
 trddeeds0:		
@@ -709,117 +797,51 @@ trdrepay2:
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+
+
+;-------------------------------------------------------------------------------
+;game consts/tables
+;-------------------------------------------------------------------------------
+plrColours:
+			.byte	$02, $04, $05, $06, $07, $08, $09, $0A
+			.byte   $0D, $0E
+			
+plrFlags:		.byte	$01, $02, $04, $08, $10, $20
 	
-	
-	.include 	"strings.inc"
+plrLo:
+			.byte	<plr0, <plr1, <plr2
+			.byte	<plr3, <plr4, <plr5
+plrHi:
+			.byte	>plr0, >plr1, >plr2
+			.byte	>plr3, >plr4, >plr5
+plrNameLo:		
+			.byte	<(plr0 + PLAYER::name)
+			.byte	<(plr1 + PLAYER::name) 
+			.byte	<(plr2 + PLAYER::name)
+			.byte	<(plr3 + PLAYER::name)
+			.byte	<(plr4 + PLAYER::name)
+			.byte	<(plr5 + PLAYER::name)
+plrNameHi:
+			.byte	>(plr0 + PLAYER::name)
+			.byte	>(plr1 + PLAYER::name) 
+			.byte	>(plr2 + PLAYER::name)
+			.byte	>(plr3 + PLAYER::name)
+			.byte	>(plr4 + PLAYER::name)
+			.byte	>(plr5 + PLAYER::name)
 
 	
 ;-------------------------------------------------------------------------------
 ;init
 ;-------------------------------------------------------------------------------
-FILENAME:
-		.byte	"STRINGS"
-FILENAME_2:
-		.byte	"RULES"
-FILENAME_3:
-
 init:
-;		PHP				;save the initial state
-;		PHA	
-;		TYA				;Don't bother, we're no longer 
-;		PHA				;going back.
-;		TXA
-;		PHA
-
-		CLD
-		
-		LDA	#<screenLoad0
-		STA	$FD
-		LDA	#>screenLoad0
-		STA	$FE
-		
-		JSR	screenPerformList
-
-		LDA	#$8E			;go to uppercase characters
-		JSR	krnlOutChr
-		
-		LDA	#$08			;disable change character case
-		JSR	krnlOutChr
-
-		LDA	#$01
-		LDX	#$08
-		LDY	#$01
-		
-		JSR	krnlSetLFS
-		
-		LDA	#FILENAME_2 - FILENAME
-		LDX	#<FILENAME
-		LDY	#>FILENAME
-
-		JSR	krnlSetNam
-		
-		LDA	#$00
-		LDX	#<$E000
-		LDY	#>$E000
-		
-		JSR	krnlLoad
-		
-		JSR	knrlClAll
-
-		LDA	#<screenLoad1
-		STA	$FD
-		LDA	#>screenLoad1
-		STA	$FE
-		
-		JSR	screenPerformList
-
-		LDA	#$01
-		LDX	#$08
-		LDY	#$01
-		
-		JSR	krnlSetLFS
-		
-		LDA	#FILENAME_3 - FILENAME_2
-		LDX	#<FILENAME_2
-		LDY	#>FILENAME_2
-
-		JSR	krnlSetNam
-		
-		LDA	#$00
-		LDX	#<$F400
-		LDY	#>$F400
-		
-		JSR	krnlLoad
-		
-		JSR	knrlClAll
-
-		LDA	#$7F			;disable standard CIA irqs
-		STA	cia1IRQCtl
-
-		SEI
-
-;***FIXME:	Reset the stack pointer?
-
 		JSR	initMem
-;		JSR	decrunch
-
-		LDA  	#$0B			;set screen colours
-		STA	vicBrdrClr
-		LDA	#$00
-		STA	vicBkgdClr
-
+		JSR	keyInit
 		JSR	initFirstTime
-		
 		JSR	initBoard
-
 		JSR	initSprites		
-		
 		JSR	initPlayers		
-
 		JSR	initScreen
-
 		JSR	initMenu
-			
 		JSR	initDialog
 
 		LDA	#musTuneIntro
@@ -828,16 +850,10 @@ init:
 		JSR	plyrInit
  		JSR	plyrInstall
 		
-		CLI
-	
-		JMP	uloop			;jump to updates
-
 ;-------------------------------------------------------------------------------
 ;main
 ;-------------------------------------------------------------------------------
 main:
-;		LDA	game + GAME::term
-;		BNE	exit
 		CLI				;does this fix the race condition?
 		
 uloop:
@@ -858,66 +874,8 @@ uloop:
 
 		JMP	main
 		
-exit:
-;		JSR	plyrUninstall
-;		JSR	finMem
-;		LDA	#$09			;enable change character case
-;		JSR	krnlOutChr
-;
-;		PLA				;restore initial state
-;		TAX
-;		PLA				;We're not going back
-;		TAY
-;		PLA
-;		PLP
-
 hang:
 		JMP	hang
-
-		RTS				;return to BASIC
-		
-
-;-------------------------------------------------------------------------------
-;initMem
-;-------------------------------------------------------------------------------
-initMem:
-;	Bank out BASIC + Kernal (keep IO).  First, make sure that the IO port
-;	is set to output on those lines.
-		LDA	$00
-		ORA	#$07
-		STA	$00
-		
-;	Now, exclude BASIC + KERNAL from the memory map (include only IO)
-;		LDA	$01
-;		AND	#$FC
-;		ORA	#$01
-		LDA	#$1D
-		STA	$01		
-		
-;		LDX	#$00			;We don't need to back-up the
-;@loop:						;zero page since we're no
-;		LDA	$00, X			;longer returning to BASIC
-;		STA	$C000, X
-;		INX
-;		BNE	@loop
-		
-		JSR	keyInit
-		
-		RTS
-
-
-;-------------------------------------------------------------------------------
-;finMem
-;-------------------------------------------------------------------------------
-finMem:
-;		LDX	#$00			;We haven't backed-up the zero
-;@loop:						;page
-;		LDA	$C000, X
-;		STA	$00, X
-;		INX
-;		BNE	@loop
-		
-		RTS
 
 
 ;-------------------------------------------------------------------------------
@@ -1168,42 +1126,12 @@ updatesExit:
 @realexit:
 		RTS
 
-;-------------------------------------------------------------------------------
-;game consts/tables
-;-------------------------------------------------------------------------------
-plrColours:
-			.byte	$02, $04, $05, $06, $07, $08, $09, $0A
-			.byte   $0D, $0E
-			
-plrFlags:		.byte	$01, $02, $04, $08, $10, $20
-	
-plrLo:
-			.byte	<plr0, <plr1, <plr2
-			.byte	<plr3, <plr4, <plr5
-plrHi:
-			.byte	>plr0, >plr1, >plr2
-			.byte	>plr3, >plr4, >plr5
-plrNameLo:		
-			.byte	<(plr0 + PLAYER::name)
-			.byte	<(plr1 + PLAYER::name) 
-			.byte	<(plr2 + PLAYER::name)
-			.byte	<(plr3 + PLAYER::name)
-			.byte	<(plr4 + PLAYER::name)
-			.byte	<(plr5 + PLAYER::name)
-plrNameHi:
-			.byte	>(plr0 + PLAYER::name)
-			.byte	>(plr1 + PLAYER::name) 
-			.byte	>(plr2 + PLAYER::name)
-			.byte	>(plr3 + PLAYER::name)
-			.byte	>(plr4 + PLAYER::name)
-			.byte	>(plr5 + PLAYER::name)
-
 
 ;-------------------------------------------------------------------------------
 ;gameRebuildScreen
 ;-------------------------------------------------------------------------------
 gameRebuildScreen:
-		JSR	screenBeginButtons	;???Is this really required???
+		JSR	screenBeginButtons	
 
 		LDA	#<screenQErase0
 		STA	$FD
@@ -1229,9 +1157,19 @@ gameRebuildScreen:
 ;FOR KEYS.S
 ;==============================================================================
 
+;keyBuffer0	=	$0277			;to 0280 so 10 bytes
+;keyBufferSize 	=	$0289       		;byte
+;keyRepeatFlag 	=	$028A       		;byte
+;keyRepeatSpeed  =	$028B			;byte
+;keyRepeatDelay	=	$028C       		;byte
+;keyModifierFlag = 	$028D			;byte
+;keyModifierLast =	$028E			;byte
+;keyModifierVect =	$028F			;word
+;keyModifierLock =	$0291			;byte
+
 keyQueue0:
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00
+		.byte	$00, $00
 
 keyQueueDePos:	
 		.byte	$00
@@ -1241,10 +1179,16 @@ keyQueueEnPos:
 
 keyInit:
 		LDA	#<keyEvaluateSpecial
-		STA	$028F
+		STA	keyModifierVect
 		LDA	#>keyEvaluateSpecial
-		STA	$0290
+		STA	keyModifierVect + 1
 		
+		LDA	#$00
+		STA	keyRepeatFlag
+		STA	keyModifierLock
+		
+		LDA	#$0A
+		STA	keyBufferSize
 		RTS
 
 keyEnqueueKey:
@@ -1283,23 +1227,24 @@ keyDequeueKeys:
 ;-------------------------------------------------------------------------------
 keyInjectKey:	
 ;-------------------------------------------------------------------------------
-		LDX	$C6			;Put a key into the buffer
-		STA	$0277, X
-		INC	$C6
+;TODO:		Should check buffer size
+
+		LDX	keyZPKeyCount		;Put a key into the buffer
+		STA	keyBuffer0, X
+		INC	keyZPKeyCount
 		
 		RTS
-
 
 keyScanKey:
 ;.,EA87 A9 00    clear A
 		LDA 	#$00        
 		
 ;.,EA89 8D 8D 02 clear the keyboard shift/control/c= flag
-		STA 	$028D       
+		STA 	keyModifierFlag
 ;.,EA8C A0 40    set no key
 		LDY 	#$40
 ;.,EA8E 84 CB    save which key
-		STY 	$CB         
+		STY 	keyZPKeyScan         
 ;.,EA90 8D 00 DC clear VIA 1 DRA, keyboard column drive
 		STA 	$DC00       
 ;.,EA93 AE 01 DC read VIA 1 DRB, keyboard row port
@@ -1314,11 +1259,11 @@ keyScanKey:
 ;.,EA9B A9 81    get the decode table low byte
 		LDA 	#<keyTableStandard	;$81        
 ;.,EA9D 85 F5    save the keyboard pointer low byte
-		STA 	$F5         
+		STA 	keyZPDecodePtr         
 ;.,EA9F A9 EB    get the decode table high byte
 		LDA 	#>keyTableStandard	;$EB        
 ;.,EAA1 85 F6    save the keyboard pointer high byte
-		STA 	$F6         
+		STA 	keyZPDecodePtr + 1         
 ;.,EAA3 A9 FE    set column 0 low
 		LDA 	#$FE
 ;.,EAA5 8D 00 DC save VIA 1 DRA, keyboard column drive
@@ -1343,7 +1288,7 @@ keyScanKey:
 ;.,EAB6 48       save row
 		PHA             
 ;.,EAB7 B1 F5    get character from decode table
-		LDA 	($F5),Y     
+		LDA 	(keyZPDecodePtr),Y     
 ;.,EAB9 C9 05    compare with $05, there is no $05 key but the control
 ;                                keys are all less than $05
 		CMP 	#$05        
@@ -1356,14 +1301,14 @@ keyScanKey:
 ;                                character is $01 - shift, $02 - c= or $04 - control
 		BEQ 	@nextfix		;$EAC9       
 ;.,EAC1 0D 8D 02 OR it with the keyboard shift/control/c= flag
-		ORA 	$028D       
+		ORA 	keyModifierFlag       
 ;.,EAC4 8D 8D 02 save the keyboard shift/control/c= flag
-		STA 	$028D       
+		STA 	keyModifierFlag       
 ;.,EAC7 10 02    skip save key, branch always
 		BPL 	@nextfix1		;$EACB       
 @nextfix:
 ;.,EAC9 84 CB    save key count
-		STY 	$CB         
+		STY 	keyZPKeyScan      
 @nextfix1:
 ;.,EACB 68       restore row
 		PLA             
@@ -1394,29 +1339,29 @@ keyScanKey:
 		PLA             
 ;.,EADD 6C 8F 02 evaluate the SHIFT/CTRL/C= keys, $EBDC
 ;                                key decoding continues here after the SHIFT/CTRL/C= keys are evaluated
-		JMP 	($028F)     
+		JMP 	(keyModifierVect)     
 keysCont:
 ;.,EAE0 A4 CB    get saved key count
-		LDY 	$CB         
+		LDY 	keyZPKeyScan         
 ;.,EAE2 B1 F5    get character from decode table
-		LDA 	($F5), Y     
+		LDA 	(keyZPDecodePtr), Y     
 ;.,EAE4 AA       copy character to X
 		TAX             
 ;.,EAE5 C4 C5    compare key count with last key count
-		CPY 	$C5         
+		CPY 	keyZPKeyDown         
 ;.,EAE7 F0 07    if this key = current key, key held, go test repeat
 		BEQ 	@tstrepeat		;$EAF0 
 ;.,EAE9 A0 10    set the repeat delay count
 		LDY 	#$10        
 ;.,EAEB 8C 8C 02 save the repeat delay count
-		STY 	$028C       
+		STY 	keyRepeatDelay
 ;.,EAEE D0 36    go save key to buffer and exit, branch always
 		BNE 	keysSave		;$EB26       
 @tstrepeat:
 ;.,EAF0 29 7F    clear b7
 		AND 	#$7F        
 ;.,EAF2 2C 8A 02 test key repeat
-		BIT 	$028A       
+		BIT 	keyRepeatFlag
 ;.,EAF5 30 16    if repeat all go ??
 		BMI 	keysNextRep		;$EB0D       
 ;.,EAF7 70 49    
@@ -1447,25 +1392,25 @@ keysTstSave:
 
 keysNextRep:
 ;.,EB0D AC 8C 02 get the repeat delay counter
-		LDY 	$028C       
+		LDY 	keyRepeatDelay 
 ;.,EB10 F0 05    if delay expired go ??
 		BEQ 	@decrephigh		;$EB17       
 ;.,EB12 CE 8C 02 else decrement repeat delay counter
-		DEC 	$028C       
+		DEC 	keyRepeatDelay 
 ;.,EB15 D0 2B    if delay not expired go ??
 ;                                repeat delay counter has expired
 		BNE 	exitKeys		;$EB42       
 @decrephigh:
 ;.,EB17 CE 8B 02 decrement the repeat speed counter
-		DEC 	$028B       
+		DEC 	keyRepeatSpeed      
 ;.,EB1A D0 26    branch if repeat speed count not expired
 		BNE 	exitKeys		;$EB42       
 ;.,EB1C A0 04    set for 4/60ths of a second
 		LDY 	#$04        
 ;.,EB1E 8C 8B 02 save the repeat speed counter
-		STY 	$028B       
+		STY 	keyRepeatSpeed       
 ;.,EB21 A4 C6    get the keyboard buffer index
-		LDY 	$C6         
+		LDY 	keyZPKeyCount         
 ;.,EB23 88       decrement it
 		DEY             
 ;.,EB24 10 1C    if the buffer isn't empty just exit
@@ -1475,13 +1420,13 @@ keysNextRep:
 		BPL 	exitKeys		;$EB42       
 keysSave:
 ;.,EB26 A4 CB    get the key count
-		LDY 	$CB         
+		LDY 	keyZPKeyScan         
 ;.,EB28 84 C5    save it as the current key count
-		STY 	$C5         
+		STY 	keyZPKeyDown        
 ;.,EB2A AC 8D 02 get the keyboard shift/control/c= flag
-		LDY 	$028D       
+		LDY 	keyModifierFlag       
 ;.,EB2D 8C 8E 02 save it as last keyboard shift pattern
-		STY 	$028E       
+		STY 	keyModifierLast      
 ;.,EB30 E0 FF    compare the character with the table end marker or no key
 		CPX 	#$FF        
 ;.,EB32 F0 0E    if it was the table end marker or no key just exit
@@ -1489,17 +1434,17 @@ keysSave:
 ;.,EB34 8A       copy the character to A
 		TXA             
 ;.,EB35 A6 C6    get the keyboard buffer index
-		LDX 	$C6         
+		LDX 	keyZPKeyCount         
 ;.,EB37 EC 89 02 compare it with the keyboard buffer size
-		CPX 	$0289       
+		CPX 	keyBufferSize
 ;.,EB3A B0 06    if the buffer is full just exit
 		BCS 	exitKeys		;$EB42       
 ;.,EB3C 9D 77 02 save the character to the keyboard buffer
-		STA 	$0277, X     
+		STA 	keyBuffer0, X     
 ;.,EB3F E8       increment the index
 		INX             
 ;.,EB40 86 C6    save the keyboard buffer index
-		STX 	$C6         
+		STX 	keyZPKeyCount         
 exitKeys:
 ;.,EB42 A9 7F    enable column 7 for the stop key
 		LDA 	#$7F        
@@ -1512,17 +1457,17 @@ exitKeys:
 keyEvaluateSpecial:
 ;				*** evaluate the SHIFT/CTRL/C= keys
 ;.,EB48 AD 8D 02 get the keyboard shift/control/c= flag
-		LDA 	$028D       
+		LDA 	keyModifierFlag
 ;.,EB4B C9 03    compare with [SHIFT][C=]
 		CMP 	#$03        
 ;.,EB4D D0 15    if not [SHIFT][C=] go ??
 		BNE 	@control		;$EB64       
 ;.,EB4F CD 8E 02 compare with last
-		CMP 	$028E       
+		CMP 	keyModifierLast
 ;.,EB52 F0 EE    exit if still the same
 		BEQ 	exitKeys		;$EB42       
 ;.,EB54 AD 91 02 get the shift mode switch $00 = enabled, $80 = locked
-		LDA 	$0291       
+		LDA 	keyModifierLock      
 ;.,EB57 30 1D    if locked continue keyboard decode
 ;                                toggle text mode
 		BMI 	@done			;$EB76       
@@ -1550,11 +1495,11 @@ keyEvaluateSpecial:
 ;.,EB6C BD 79 EB get the decode table pointer low byte
 		LDA 	keyTableAddresses, X     
 ;.,EB6F 85 F5    save the decode table pointer low byte
-		STA 	$F5         
+		STA 	keyZPDecodePtr         
 ;.,EB71 BD 7A EB get the decode table pointer high byte
 		LDA 	keyTableAddresses + 1,X     
 ;.,EB74 85 F6    save the decode table pointer high byte
-		STA 	$F6         
+		STA 	keyZPDecodePtr + 1         
 @done:
 ;.,EB76 4C E0 EA continue the keyboard decode
 		JMP 	keysCont		;$EAE0       
@@ -2959,25 +2904,6 @@ pointCodes:
 screenClear0:
 			.byte	$11, $00, $00, $28, $19
 			.byte	$00
-screenLoad0:
-			.byte	$11, $00, $00, $28, $19
-			.byte	$90, $00, $01
-			.word	strText0Load0
-			.byte	$00
-screenLoad1:
-			.byte	$90, $00, $02
-			.word	strText0Load1
-			.byte	$00
-			
-strText0Load0:		;LOADING RESOURCES...
-			.byte $14, $0C, $0F, $01, $04, $09, $0E, $07
-			.byte $20, $12, $05, $13, $0F, $15, $12, $03
-			.byte $05, $13, $2E, $2E, $2E
-strText0Load1:		;LOADING RULES...
-			.byte $10, $0C, $0F, $01, $04, $09, $0E, $07
-			.byte $20, $12, $15, $0C, $05, $13, $2E, $2E
-			.byte $2E
-
 
 screenQErase0:
 ;			.byte	$58, $00, $00, $06
@@ -3353,7 +3279,7 @@ plyrIRQ:
 ;***FIXME:	It just becomes a hacked mess from here on.
 
 		
-		LDA	#$0D
+		LDA	#$21
 		STA	irqglob + IRQGLOBS::varA
 	.if	DEBUG_IRQ
 		LDA	#$01
@@ -3362,7 +3288,7 @@ plyrIRQ:
 		JMP	@begin
 				
 @miniPrep:
-		LDA	#$0E
+		LDA	#$22
 		STA	irqglob + IRQGLOBS::varA
 	.if	DEBUG_IRQ
 		LDA	#$0A
@@ -3943,16 +3869,16 @@ CMOVEY:
 ;handleKeyInput
 ;-------------------------------------------------------------------------------
 handleKeyInput:
-		LDY	$0277			;copy kernal code for input key
+		LDY	keyBuffer0		;copy kernal code for input key
 		LDX	#$00
 @loop:
-		LDA	$0278, X
-		STA	$0277, X
+		LDA	keyBuffer0 + 1, X
+		STA	keyBuffer0, X
 		INX
-		CPX	$C6
+		CPX	keyZPKeyCount
 		BNE	@loop
 		
-		DEC	$C6
+		DEC	keyZPKeyCount
 		TYA
 ;		CLI				;NO!  Causes problem for IRQ
 		CLC
@@ -3988,7 +3914,7 @@ handleKeys:
 		STA	($FB), Y		;Yes - update colour of indicator
 		
 @cont:
-		LDA	$C6			;copy kernal code for get key
+		LDA	keyZPKeyCount		;copy kernal code for get key
 		BNE	@1
 		RTS
 		
@@ -5401,7 +5327,7 @@ prmptClear:
 		LDA 	#$20
 		LDX	#$1F
 @loop1:
-		STA	game + GAME::tPrmT0, X
+		STA	prmptTok0, X
 		
 		DEX
 		BPL	@loop1
@@ -5409,10 +5335,10 @@ prmptClear:
 		LDX	#$0F
 @loop2:
 		LDA	#$0C
-		STA	game + GAME::tPrmC0, X
+		STA	prmptClr0, X
 
 		LDA	#$0F
-		STA	game + GAME::tPrmC1, X
+		STA	prmptClr1, X
 		
 		DEX
 		BPL 	@loop2
@@ -5432,7 +5358,7 @@ prmptClear2:
 		LDX	#$0F
 		LDA	#$20
 @loop0:
-		STA	game + GAME::tPrmT1, X
+		STA	prmptTok1, X
 		DEX
 		BPL	@loop0
 		
@@ -5450,14 +5376,14 @@ prmptClear2:
 prmptDisplay:
 		LDX	#$0F
 @loop0:
-		LDA	game + GAME::tPrmT0, X
+		LDA	prmptTok0, X
 		STA	prmpt0Txt0, X
-		LDA	game + GAME::tPrmC0, X
+		LDA	prmptClr0, X
 		STA	prmpt0Clr0, X
 		
-		LDA	game + GAME::tPrmT1, X
+		LDA	prmptTok1, X
 		STA	prmpt1Txt0, X
-		LDA	game + GAME::tPrmC1, X
+		LDA	prmptClr1, X
 		STA	prmpt1Clr0, X
 
 		DEX
@@ -5496,18 +5422,18 @@ prmptUpdate:
 @cont0:
 		LDX	#$02
 @loop0:
-		STA	game + GAME::tPrmC0 + $05, X
+		STA	prmptClr0 + $05, X
 		DEX
 		BPL	@loop0
 
 		JSR	numConvPRTSGN
 		
 		LDA	heap0
-		STA	game + GAME::tPrmT0 + $05
+		STA	prmptTok0 + $05
 		LDA	heap0 + $04
-		STA	game + GAME::tPrmT0 + $06
+		STA	prmptTok0 + $06
 		LDA	heap0 + $05
-		STA	game + GAME::tPrmT0 + $07
+		STA	prmptTok0 + $07
 		
 		LDA	game + GAME::cntHt
 		STA	Z:numConvVALUE
@@ -5528,18 +5454,18 @@ prmptUpdate:
 @cont1:
 		LDX	#$02
 @loop1:
-		STA	game + GAME::tPrmC0 + $0D, X
+		STA	prmptClr0 + $0D, X
 		DEX
 		BPL	@loop1
 		
 		JSR	numConvPRTSGN
 		
 		LDA	heap0
-		STA	game + GAME::tPrmT0 + $0D
+		STA	prmptTok0 + $0D
 		LDA	heap0 + $04
-		STA	game + GAME::tPrmT0 + $0E
+		STA	prmptTok0 + $0E
 		LDA	heap0 + $05
-		STA	game + GAME::tPrmT0 + $0F
+		STA	prmptTok0 + $0F
 		
 @test:
 		LDA	prmptTemp2
@@ -5556,23 +5482,23 @@ prmptUpdate:
 		LDX	#$05
 @loop2:
 		LDA	heap0, X
-		STA	game + GAME::tPrmT1 + $0A, X
+		STA	prmptTok1 + $0A, X
 		
 		LDA	prmptTemp2
 		AND	#$0F
-		STA	game + GAME::tPrmC1 + $0A, X
+		STA	prmptClr1 + $0A, X
 		
 		DEX
 		BPL	@loop2
 		
-		STA	game + GAME::tPrmC1 + $09
+		STA	prmptClr1 + $09
 
 ;		LDA	prmptTemp2			;This would put a + in
 ;		AND	#$0F				;all add cash (green) values
 ;		CMP	#$05				;but it looks strange 
 ;		BNE	@exit				;sometimes - eg for sale 
 ;		LDA	#$2B
-;		STA	game + GAME::tPrmT1 + $0A
+;		STA	prmptTok1 + $0A
 
 @exit:	
 		LDA	#$00
@@ -5588,26 +5514,26 @@ prmptRolled:
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptRolled, X
-		STA	game + GAME::tPrmT0, X
+		STA	prmptTok0, X
 
 		LDA	#$0C
-		STA	game + GAME::tPrmC0, X
+		STA	prmptClr0, X
 
 		DEX
 		BPL	@loop1
 		
 		PLA
-		STA	game + GAME::tPrmC0
+		STA	prmptClr0
 		
 		LDA	game + GAME::dieA
 		CLC
 		ADC	#'0'
-		STA	game + GAME::tPrmT0 + $09
+		STA	prmptTok0 + $09
 		
 		LDA	game + GAME::dieB
 		CLC
 		ADC	#'0'
-		STA	game + GAME::tPrmT0 + $0B
+		STA	prmptTok0 + $0B
 
 		LDA	#$01
 		STA	prmptTemp3
@@ -5625,16 +5551,16 @@ prmptManage:
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptManage, X
-		STA	game + GAME::tPrmT0, X
+		STA	prmptTok0, X
 
 		LDA	#$0C
-		STA	game + GAME::tPrmC0, X
+		STA	prmptClr0, X
 
 		DEX
 		BPL	@loop1
 		
 		LDA	#$0F
-		STA	game + GAME::tPrmC0
+		STA	prmptClr0
 		
 		LDA	#$80
 		ORA	prmptTemp2
@@ -5666,16 +5592,16 @@ prmptMustSell:
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptMustSell, X
-		STA	game + GAME::tPrmT1, X
+		STA	prmptTok1, X
 
 		LDA	#$01
-		STA	game + GAME::tPrmC1, X
+		STA	prmptClr1, X
 
 		DEX
 		BPL	@loop1
 
 		PLA
-		STA	game + GAME::tPrmC1
+		STA	prmptClr1
 
 		LDA	prmptTemp2		;Exclude flags for text 1 (not 
 		AND	#$F0			;needed)
@@ -5695,16 +5621,16 @@ prmptGoneGaol:
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptGaol, X
-		STA	game + GAME::tPrmT1, X
+		STA	prmptTok1, X
 
 		LDA	#$0F
-		STA	game + GAME::tPrmC1, X
+		STA	prmptClr1, X
 
 		DEX
 		BPL	@loop1
 
 		PLA
-		STA	game + GAME::tPrmC1
+		STA	prmptClr1
 
 		LDA	prmptTemp2
 		AND	#$F0
@@ -5719,7 +5645,7 @@ prmptGoneGaol:
 
 prmptDoSubCash:
 		PLA
-		STA	game + GAME::tPrmC1
+		STA	prmptClr1
 		
 		SEC
 		LDA	#$00
@@ -5744,7 +5670,7 @@ prmptDoSubCash:
 
 prmptDoAddCash:
 		PLA
-		STA	game + GAME::tPrmC1
+		STA	prmptClr1
 		
 		LDA	game + GAME::varD
 		STA	prmptTemp0
@@ -5771,10 +5697,10 @@ prmptRent:
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptRent, X
-		STA	game + GAME::tPrmT1, X
+		STA	prmptTok1, X
 
 		LDA	#$0F
-		STA	game + GAME::tPrmC1, X
+		STA	prmptClr1, X
 
 		DEX
 		BPL	@loop1
@@ -5789,10 +5715,10 @@ prmptBought:
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptBought, X
-		STA	game + GAME::tPrmT1, X
+		STA	prmptTok1, X
 
 		LDA	#$0F
-		STA	game + GAME::tPrmC1, X
+		STA	prmptClr1, X
 
 		DEX
 		BPL	@loop1
@@ -5807,10 +5733,10 @@ prmptPostBail:
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptPostBail, X
-		STA	game + GAME::tPrmT1, X
+		STA	prmptTok1, X
 
 		LDA	#$0F
-		STA	game + GAME::tPrmC1, X
+		STA	prmptClr1, X
 
 		DEX
 		BPL	@loop1
@@ -5825,10 +5751,10 @@ prmptTax:
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptTax, X
-		STA	game + GAME::tPrmT1, X
+		STA	prmptTok1, X
 
 		LDA	#$0F
-		STA	game + GAME::tPrmC1, X
+		STA	prmptClr1, X
 
 		DEX
 		BPL	@loop1
@@ -5843,10 +5769,10 @@ prmptFee:
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptFee, X
-		STA	game + GAME::tPrmT1, X
+		STA	prmptTok1, X
 
 		LDA	#$0F
-		STA	game + GAME::tPrmC1, X
+		STA	prmptClr1, X
 
 		DEX
 		BPL	@loop1
@@ -5861,10 +5787,10 @@ prmptSalary:
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptSalary, X
-		STA	game + GAME::tPrmT1, X
+		STA	prmptTok1, X
 
 		LDA	#$0F
-		STA	game + GAME::tPrmC1, X
+		STA	prmptClr1, X
 
 		DEX
 		BPL	@loop1
@@ -5879,10 +5805,10 @@ prmptFParking:
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptFParking, X
-		STA	game + GAME::tPrmT1, X
+		STA	prmptTok1, X
 
 		LDA	#$0F
-		STA	game + GAME::tPrmC1, X
+		STA	prmptClr1, X
 
 		DEX
 		BPL	@loop1
@@ -5897,10 +5823,10 @@ prmptSold:
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptSold, X
-		STA	game + GAME::tPrmT1, X
+		STA	prmptTok1, X
 
 		LDA	#$0F
-		STA	game + GAME::tPrmC1, X
+		STA	prmptClr1, X
 
 		DEX
 		BPL	@loop1
@@ -5915,10 +5841,10 @@ prmptMortgage:
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptMortgage, X
-		STA	game + GAME::tPrmT1, X
+		STA	prmptTok1, X
 
 		LDA	#$0F
-		STA	game + GAME::tPrmC1, X
+		STA	prmptClr1, X
 
 		DEX
 		BPL	@loop1
@@ -5933,10 +5859,10 @@ prmptRepay:
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptRepay, X
-		STA	game + GAME::tPrmT1, X
+		STA	prmptTok1, X
 
 		LDA	#$0F
-		STA	game + GAME::tPrmC1, X
+		STA	prmptClr1, X
 
 		DEX
 		BPL	@loop1
@@ -5951,10 +5877,10 @@ prmptChestSub:
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptChest, X
-		STA	game + GAME::tPrmT1, X
+		STA	prmptTok1, X
 
 		LDA	#$0F
-		STA	game + GAME::tPrmC1, X
+		STA	prmptClr1, X
 
 		DEX
 		BPL	@loop1
@@ -5969,10 +5895,10 @@ prmptChanceSub:
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptChance, X
-		STA	game + GAME::tPrmT1, X
+		STA	prmptTok1, X
 
 		LDA	#$0F
-		STA	game + GAME::tPrmC1, X
+		STA	prmptClr1, X
 
 		DEX
 		BPL	@loop1
@@ -5987,10 +5913,10 @@ prmptChestAdd:
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptChest, X
-		STA	game + GAME::tPrmT1, X
+		STA	prmptTok1, X
 
 		LDA	#$0F
-		STA	game + GAME::tPrmC1, X
+		STA	prmptClr1, X
 
 		DEX
 		BPL	@loop1
@@ -6005,10 +5931,10 @@ prmptChanceAdd:
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptChance, X
-		STA	game + GAME::tPrmT1, X
+		STA	prmptTok1, X
 
 		LDA	#$0F
-		STA	game + GAME::tPrmC1, X
+		STA	prmptClr1, X
 
 		DEX
 		BPL	@loop1
@@ -6051,10 +5977,10 @@ prmptForSale:
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptForSale, X
-		STA	game + GAME::tPrmT1, X
+		STA	prmptTok1, X
 
 		LDA	#$0F
-		STA	game + GAME::tPrmC1, X
+		STA	prmptClr1, X
 
 		DEX
 		BPL	@loop1
@@ -6348,6 +6274,12 @@ uiActionCallsHi:
 		.byte	>(uiActionImprv - 1), >(uiActionGOFree - 1)
 		.byte	>(uiActionPost - 1), >(uiActionRoll - 1)
 		.byte	>(uiActionSendKey - 1), >(uiActionDelay - 1)
+		
+uiActnCache	=	$FB00
+;	.repeat		256, I
+;			.byte	$FF, $00, $00, $00
+;	.endrep
+;
 
 ;-------------------------------------------------------------------------------
 uiInitQueue:
@@ -6486,7 +6418,7 @@ uiProcessInit:
 		LDA	#$00
 		STA	ui + UI::fInjKey
 		
-		LDA	#$17
+		LDA	#$60
 		STA	game + GAME::iStpCnt
 		LDA	#$00			
 		STA	game + GAME::fStpSig
@@ -6638,10 +6570,10 @@ uiProcessTerminate:
 		LDA	plrHi, X
 		STA	$FC
 		
-		LDY	#PLAYER::colour
-		LDA	($FB), Y
-		TAX
-		JSR	prmptClearOrRoll
+;		LDY	#PLAYER::colour
+;		LDA	($FB), Y
+;		TAX
+;		JSR	prmptClearOrRoll
 
 		JSR	uiProcessChkAllMPay	
 
@@ -7794,7 +7726,7 @@ menuPushPage:
 		STA	$FD
 ;		STY	$FE
 
-		LDX	#.SIZEOF(MENUPAGE) - 1
+		LDX	#.sizeof(MENUPAGE) - 1
 @loop:
 		LDA	menuActivePage1, X
 		STA	menuActivePage2, X
@@ -7814,7 +7746,7 @@ menuPushPage:
 ;-------------------------------------------------------------------------------
 menuPopPage:
 ;-------------------------------------------------------------------------------
-		LDX	#.SIZEOF(MENUPAGE) - 1
+		LDX	#.sizeof(MENUPAGE) - 1
 @loop:
 		LDA	menuActivePage1, X
 		STA	menuActivePage0, X
@@ -10901,7 +10833,7 @@ menuPageTrade0Draw:
 							;but we need more flags to
 							;do it properly.
 		
-		LDX	#.SIZEOF(TRADE) - 1	;Clear the wanted data
+		LDX	#.sizeof(TRADE) - 1	;Clear the wanted data
 		LDA	#$00
 @loop0:
 		STA 	trade0, X
@@ -13492,7 +13424,7 @@ gameInitiatePStats:
 ;-------------------------------------------------------------------------------
 gameInitiateTrade:
 ;-------------------------------------------------------------------------------
-		LDX	#.SIZEOF(TRADE) - 1
+		LDX	#.sizeof(TRADE) - 1
 		LDA	#$00
 @loop0:
 		STA 	trade0, X
@@ -13586,7 +13518,7 @@ gameUnpackTrdData:
 
 		JSR	gamePrepTradePtrs
 
-		LDY	#.SIZEOF(TRADE) - 1	;Copy basic trade info
+		LDY	#.sizeof(TRADE) - 1	;Copy basic trade info
 @loop0:
 		LDA	($A3), Y
 		STA	trade2, Y
@@ -25180,7 +25112,7 @@ rulesDoGameOver:
 
 
 rulesInitTradeData:
-		LDX	#.SIZEOF(TRADE) - 1	
+		LDX	#.sizeof(TRADE) - 1	
 		LDA	#$00
 @loop0:
 		STA 	trade0, X
@@ -26943,17 +26875,46 @@ rulesAutoConstruct:
 		
 		
 rulesAutoRepayGroup:
-		LDA	#$02
+		LDA	#$03
 		STA	game + GAME::varA
 		
 @loop0:
+		LDX	game + GAME::varA
+		BPL	@fetchsqr
+		
+		JMP	@complete
+		
+@fetchsqr:
+		LDA	game + GAME::varJ
+		CMP	#$09
+		BNE	@tstutil
+		
+		JSR	rulesStnSqrForIndex
+		JMP	@begin0
+		
+@tstutil:
+		CMP	#$0A
+		BNE	@street
+		
+		CPX	#$02
+		BPL	@skipidx
+
+		JSR	rulesUtilSqrForIndex
+		JMP	@begin0
+
+@street:
+		CPX	#$03
+		BNE	@docalc
+		
+@skipidx:
+		DEC	game + GAME::varA
+		JMP	@loop0
+		
+@docalc:
 		LDA	#$1C
 		LDX	game + GAME::varA
-		BPL	@loop1
 		
-		JMP	@incomplete
-		
-		
+
 @loop1:
 		INX
 		CPX	#$03
@@ -26969,7 +26930,6 @@ rulesAutoRepayGroup:
 		
 		TAX
 		LDA	rulesGrpSqrs0, X
-		STA	game + GAME::varF
 		
 		CMP	#$FF
 		BNE	@begin0
@@ -26978,6 +26938,8 @@ rulesAutoRepayGroup:
 		JMP	@loop0
 
 @begin0:
+		STA	game + GAME::varF
+		
 		ASL
 		STA	game + GAME::varL
 		TAX
@@ -27029,7 +26991,7 @@ rulesAutoRepayGroup:
 		SBC	game + GAME::varE
 		STA	game + GAME::varP
 		
-		LDA	UI_ACT_REPY
+		LDA	#UI_ACT_REPY
 		STA	$68
 		LDA	game + GAME::varK
 		STA	$69
@@ -27045,7 +27007,7 @@ rulesAutoRepayGroup:
 		BEQ	@incomplete
 		
 		JMP	@loop0
-		
+@complete:		
 		LDA	#$01
 		RTS
 		
@@ -27258,6 +27220,9 @@ rulesAutoGaol:
 		JMP	@complete
 
 @tstpost:
+;***TODO:	Could do this properly now, get a base reserve by rental
+;		expectations.
+
 ;	if have $770+(2->5nudge), post
 		LDA	#<770
 		STA	game + GAME::varD
@@ -27283,7 +27248,7 @@ rulesAutoGaol:
 		
 ;		D, E < (O, P) -> SEC | CLC
 		JSR	gameAmountIsLessDirect
-		BCC	@doroll
+		BCC	@tstroll
 
 		LDA	#UI_ACT_POST
 		STA	$68
@@ -27292,10 +27257,22 @@ rulesAutoGaol:
 		JSR	uiEnqueueAction
 		JMP	@complete
 		
-@doroll:
+@tstroll:
+		LDA	game + GAME::dieRld
+		BNE	@donext
+
 		LDA	#UI_ACT_ROLL
 		STA	$68
 		LDA	game + GAME::pActive
+		STA	$69
+		JSR	uiEnqueueAction
+		
+		JMP	@complete
+		
+@donext:
+		LDA	#UI_ACT_SKEY
+		STA	$68
+		LDA	#'N'
 		STA	$69
 		JSR	uiEnqueueAction
 		
@@ -27317,12 +27294,12 @@ rulesAutoAuction:
 		RTS
 
 
-rulesAutoTradeTo:
+rulesAutoTradeInitiate:
 		LDA	#$00
 		RTS
 
 
-rulesAutoTradeWith:
+rulesAutoTradeApprove:
 		LDA	#$00
 		RTS
 
@@ -27358,20 +27335,20 @@ rulesAutoPlay:
 rulesStnSqrForIndex:
 		CPX	#$00
 		BNE	@1
-		LDA	#$05
+		LDA	#$23
 		RTS
 @1:
 		CPX	#$01
 		BNE	@2
-		LDA	#$0F
+		LDA	#$19
 		RTS
 @2:
 		CPX	#$02
 		BNE	@3
-		LDA	#$19
+		LDA	#$0F
 		RTS
 @3:
-		LDA	#$23
+		LDA	#$05
 		RTS
 		
 
@@ -27396,7 +27373,7 @@ rulesAutoEliminGroup:
 		JMP	@complete
 		
 @fetchsqr:
-		LDA	game + GAME::varG
+		LDA	game + GAME::varJ
 		CMP	#$09
 		BNE	@tstutil
 		
@@ -28095,6 +28072,10 @@ RTRN:
 ;FOR INIT.S
 ;===============================================================================
 
+plrDefName:
+			.byte 	$08, $90, $8C, $81, $99, $85, $92, $E4, $B0
+
+
 ;-------------------------------------------------------------------------------
 initBoard:
 ;-------------------------------------------------------------------------------
@@ -28118,58 +28099,7 @@ initBoard:
 ;-------------------------------------------------------------------------------
 initSprites:
 ;-------------------------------------------------------------------------------
-		LDA	#<plrToken		;Set-up player token loc		
-		STA	$FB
-		LDA	#>plrToken
-		STA	$FC
-		
-		LDA	#<spriteMemD		;Set-up sprite data loc
-		STA	$FD
-		LDA	#>spriteMemD
-		STA	$FE
-		
-		LDY	#$00
-@loop0:						;Copy player token data
-		LDA	($FB), Y
-		STA	($FD), Y
-		
-		INY
-		CPY	#$18
-		BNE	@loop0
-		
-@loop1:						;Clear sprite data
-		STA	($FD), Y
-		INY
-		CPY	#$80
-		BNE	@loop1
-
-		LDA	#$C0			;Minimap token
-		STA	spriteMemE		
-		
-		LDA	#<spriteMemF		;Minimap bg
-		STA	$FD
-		LDA	#>spriteMemF
-		STA	$FE
-		
-		LDA	#<brdMiniMap		;Set-up minimap bkgnd		
-		STA	$FB
-		LDA	#>brdMiniMap
-		STA	$FC
-		
-		LDY	#$00
-		
-@loop2:						;Copy data
-		LDA	($FB), Y
-		STA	($FD), Y
-		
-		INY
-		CPY	#$3F
-		BNE	@loop2
-
-		LDA	#$00
-		STA	($FD), Y
-		
-		LDA	#$0F
+		LDA	#$23
 		LDX	#$07
 		STA	spritePtr0, X
 
@@ -28205,25 +28135,6 @@ initSprites:
 		
 		LDA	#$03
 		STA	($FB), Y
-
-		LDA	#<msePointer		;Set-up player token loc		
-		STA	$FB
-		LDA	#>msePointer
-		STA	$FC
-		
-		LDA	#<spriteMem20		;Set-up sprite data loc
-		STA	$FD
-		LDA	#>spriteMem20
-		STA	$FE
-		
-		LDY	#$00
-@loop5:						;Copy mouse pointer data
-		LDA	($FB), Y
-		STA	($FD), Y
-		
-		INY
-		CPY	#$3F
-		BNE	@loop5
 
 		LDA	#$01			;MCM only mouse
 		STA	vicSprCMod
@@ -28364,31 +28275,6 @@ initPlayers:
 		
 		
 ;-------------------------------------------------------------------------------
-initFirstTime:
-;-------------------------------------------------------------------------------
-		LDA	#$00			;init game
-		STA	game + GAME::sig
-		STA	game + GAME::term
-		STA	game + GAME::qVis		
-		STA	game + GAME::dlgVis
-		STA	ui + UI::fHveInp
-		
-		LDA	#JSTKSENS_LOW
-		STA	ui + UI::cJskSns
-		
-		LDA	#$01
-		STA	game + GAME::lock
-		STA	game + GAME::pVis
-
-		JSR	numConvInit
-
-		JSR	initUI
-
-		JSR	initNew
-
-		RTS
-
-;-------------------------------------------------------------------------------
 initUI:
 ;-------------------------------------------------------------------------------
 		JSR	uiInitQueue
@@ -28503,9 +28389,189 @@ initDialog:
 		RTS
 
 
+;===============================================================================
+;HEAP
+;===============================================================================
+heap0:
+	.assert         heap0 < $CD00, error, "Program too large!"
+	
+
+;===============================================================================
+;DISCARD.S
+;===============================================================================
+
+screenLoad0:
+			.byte	$11, $00, $00, $28, $19
+			.byte	$90, $00, $01
+			.word	strText0Load0
+			.byte	$00
+screenLoad1:
+			.byte	$90, $00, $02
+			.word	strText0Load1
+			.byte	$00
+			
+strText0Load0:		;LOADING RESOURCES...
+			.byte $14, $0C, $0F, $01, $04, $09, $0E, $07
+			.byte $20, $12, $05, $13, $0F, $15, $12, $03
+			.byte $05, $13, $2E, $2E, $2E
+strText0Load1:		;LOADING RULES...
+			.byte $10, $0C, $0F, $01, $04, $09, $0E, $07
+			.byte $20, $12, $15, $0C, $05, $13, $2E, $2E
+			.byte $2E
+			
+FILENAME:
+		.byte	"STRINGS"
+FILENAME_2:
+		.byte	"RULES"
+FILENAME_3:
+
 ;-------------------------------------------------------------------------------
-;init tables
+initDataLoad:
 ;-------------------------------------------------------------------------------
+		LDA	#<screenLoad0
+		STA	$FD
+		LDA	#>screenLoad0
+		STA	$FE
+		
+		JSR	screenPerformList
+
+		LDA	#$8E			;go to uppercase characters
+		JSR	krnlOutChr
+		
+		LDA	#$08			;disable change character case
+		JSR	krnlOutChr
+
+		LDA	#$01
+		LDX	#$08
+		LDY	#$01
+		
+		JSR	krnlSetLFS
+		
+		LDA	#FILENAME_2 - FILENAME
+		LDX	#<FILENAME
+		LDY	#>FILENAME
+
+		JSR	krnlSetNam
+		
+		LDA	#$00
+		LDX	#<$E000
+		LDY	#>$E000
+		
+		JSR	krnlLoad
+		
+		JSR	knrlClAll
+
+		LDA	#<screenLoad1
+		STA	$FD
+		LDA	#>screenLoad1
+		STA	$FE
+		
+		JSR	screenPerformList
+
+		LDA	#$01
+		LDX	#$08
+		LDY	#$01
+		
+		JSR	krnlSetLFS
+		
+		LDA	#FILENAME_3 - FILENAME_2
+		LDX	#<FILENAME_2
+		LDY	#>FILENAME_2
+
+		JSR	krnlSetNam
+		
+		LDA	#$00
+		LDX	#<$F400
+		LDY	#>$F400
+		
+		JSR	krnlLoad
+		
+		JSR	knrlClAll
+
+		RTS
+
+
+;-------------------------------------------------------------------------------
+;initMem
+;-------------------------------------------------------------------------------
+initMem:
+;	Bank out BASIC + Kernal (keep IO).  First, make sure that the IO port
+;	is set to output on those lines.
+		LDA	$00
+		ORA	#$07
+		STA	$00
+		
+;	Now, exclude BASIC + KERNAL from the memory map (include only IO)
+;		LDA	$01
+;		AND	#$FC
+;		ORA	#$01
+		LDA	#$1D
+		STA	$01		
+		
+		LDX	$FF
+		LDA	$00
+@loop:
+		STA	$0300, X
+		STA	$0200, X
+		
+		DEX
+		BPL	@loop
+		
+		LDA	#<msePointer		;Set-up player token loc		
+		STA	$FB
+		LDA	#>msePointer
+		STA	$FC
+		
+		LDA	#<spriteMem20		;Set-up sprite data loc
+		STA	$FD
+		LDA	#>spriteMem20
+		STA	$FE
+		
+		LDY	#$00
+@loop5:						;Copy mouse pointer data
+		LDA	($FB), Y
+		STA	($FD), Y
+		
+		INY
+		CPY	#$3F
+		BNE	@loop5
+		
+;***FIXME:	Reset the stack pointer?
+
+		RTS
+
+
+;-------------------------------------------------------------------------------
+initFirstTime:
+;-------------------------------------------------------------------------------
+		LDA  	#$0B			;set screen colours
+		STA	vicBrdrClr
+		LDA	#$00
+		STA	vicBkgdClr
+		
+		LDA	#$00			;init game
+		STA	game + GAME::sig
+		STA	game + GAME::term
+		STA	game + GAME::qVis		
+		STA	game + GAME::dlgVis
+		STA	ui + UI::fHveInp
+		
+		LDA	#JSTKSENS_LOW
+		STA	ui + UI::cJskSns
+		
+		LDA	#$01
+		STA	game + GAME::lock
+		STA	game + GAME::pVis
+
+		JSR	numConvInit
+
+		JSR	initUI
+
+		JSR	initNew
+
+		RTS
+		
+
 msePointer:
 			.byte 	%01010101, %01010000, %00000000
 			.byte 	%01111111, %11010000, %00000000
@@ -28528,70 +28594,7 @@ msePointer:
 			.byte 	%00000000, %00000000, %00000000
 			.byte 	%00000000, %00000000, %00000000
 			.byte 	%00000000, %00000000, %00000000
-
-plrToken:
-			.byte	%00111100, $00, $00
-			.byte 	%01111110, $00, $00
-			.byte	%11111111, $00, $00
-			.byte	%11111111, $00, $00
-			.byte	%11111111, $00, $00
-			.byte	%11111111, $00, $00
-			.byte 	%01111110, $00, $00
-			.byte	%00111100, $00, $00
-			
-brdMiniMap:
-			.byte	%10011111, %11111111, %11111001
-			.byte	%10011111, %11100111, %11111001
-			.byte	%10011111, %11100111, %11111001
-			.byte	%10011111, %11100111, %11111001
-			.byte	%10011111, %11100111, %11111001
-			.byte	%10011111, %11100111, %11111001
-			.byte	%11101111, %11011011, %11110111
-			.byte	%11111111, %11111111, %11111111
-			.byte	%11111111, %11111111, %11111111
-			.byte	%11111111, %11011011, %11111111
-			.byte	%10000000, %00000000, %00000001
-			.byte	%11111111, %11011011, %11111111
-			.byte	%11111111, %11111111, %11111111
-			.byte	%11111111, %11111111, %11111111
-			.byte	%11101111, %11011011, %11110111
-			.byte	%10011111, %11100111, %11111001
-			.byte	%10011111, %11100111, %11111001
-			.byte	%10011111, %11100111, %11111001
-			.byte	%10011111, %11100111, %11111001
-			.byte	%10011111, %11100111, %11111001
-			.byte	%10011111, %11111111, %11111001
-;			.byte	%11111111, %11111111, %11111111
-;			.byte	%10000000, %00010000, %00000001
-;			.byte	%10100000, %00001000, %00000101
-;			.byte	%10000000, %00010000, %00000001
-;			.byte	%10100000, %00001000, %00000101
-;			.byte	%10000000, %00010000, %00000001
-;			.byte	%10010000, %00100100, %00001001
-;			.byte	%10000000, %00000000, %00000001
-;			.byte	%10000000, %00000000, %00000001
-;			.byte	%10000000, %00100100, %00000001
-;			.byte	%10101010, %10000001, %01010101
-;			.byte	%10000000, %00100100, %00000001
-;			.byte	%10000000, %00000000, %00000001
-;			.byte	%10000000, %00000000, %00000001
-;			.byte	%10010000, %00100100, %00001001
-;			.byte	%10000000, %00001000, %00000001
-;			.byte	%10100000, %00010000, %00000101
-;			.byte	%10000000, %00001000, %00000001
-;			.byte	%10100000, %00010000, %00000101
-;			.byte	%10000000, %00001000, %00000001
-;			.byte	%11111111, %11111111, %11111111
-			
-plrDefName:
-			.byte 	$08, $90, $8C, $81, $99, $85, $92, $E4, $B0
-
-uiActnCache	=	$FB00
-;	.repeat		256, I
-;			.byte	$FF, $00, $00, $00
-;	.endrep
-;
-heap0:
 			.byte	$00
-			
-	.assert         * < $CD00, error, "Program too large!"
+
+	.assert		(* - heap0) < $0200, error, "Discardable area too large!"
+	.assert         * < $D000, error, "Program too large!"

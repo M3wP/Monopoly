@@ -408,11 +408,10 @@ the condition.  The game will be unplayable.  I should normalise the
 system configuration in the first-time initialisation.
 * SFX often get lost and "music" breaks up because of the limited 
 number of channels (two) available to play sounds on.  The third 
-voice is used for random number generation.  Better performance may 
-be achieved when I update to version 2.74 of the GoatTracker driver? 
-Even though it is a more comfortable pace, using the stepping (not 
-jumping) mode is worse for the sound.  You can play very fast in the 
-jumping mode and cause some interesting squeaks too.
+voice is used for random number generation. Even though it is a more 
+comfortable pace, using the stepping (not jumping) mode is worse for the sound. 
+You can play very fast in the jumping mode and cause some interesting squeaks too. 
+There are other sound oddities which I am trying to address.
 * The audio driver and IRQ handler is expecting a PAL machine.  You
 will get strange results on an NTSC one, I expect.  I may release an
 NTSC/PAL-N version in the future.
@@ -428,13 +427,8 @@ NTSC/PAL-N version in the future.
 * Should be able to do beta release state after above
 
 * Could now instead of copy name on elimin and gameover dialogs, just refer.
-* Backup/retrieve menu button selection going to/returning from dialogs when
-  the menu hasn't changed?  Would be nice...
-  
-* Move keybuffer & remove vector use to allow for locating ui and game globals 
-  at $0200
-* After above, move tPrmT0/1+tPrmC0/1 to own space
-* After above, move ui, game, plr, sqr and keys globals to $0200+ saving half a KB
+ 
+* Trim down key scan routine (remove vector for atl keys and control, sys tables).
   
 * CPU players setup menu
 
@@ -443,30 +437,30 @@ NTSC/PAL-N version in the future.
 * AutoBuy - there is a bug when reclaiming equity in order to sell that
   causes no money to be paid for sale.  I can only see it with CPU player, can't 
   reproduce in debugging equivalents.  Now trapping and faulting if occurs.
-* AutoGaol incorrectly chose roll over post?
-* rulesAutoRepayGroup needs to step through the group like 
-  rulesAutoEliminGroup does.
+* rulesDoCommitMrtg needs to step through the squares like rulesAutoRepayGroup 
+  does (but in forward order).
 
 * Allow players to input name?
-* Trim down key scan routine.
 * Get exomiser working.
+* Consolidate all the backup/retrievals of game mode + player into a single main
+  state stack.
+* Once have above, can check in roll that the player is the one with the dice 
+  (is the player for the last normal mode).  Just to be safe?
+* Could also do other mode chain integrity checks.
+* Backup/retrieve menu button selection going to/returning from dialogs when
+  the menu hasn't changed?  Would be nice...
 * Change "all" dirty to be just board dirty and req. individual flags?
-* Back-fit GoatTracker driver changes from version 2.74.
 * Player sprites on overview dialog.  Would look pretty.  IRQ is a mess.
 * Put code into separate files as indicated.
 * Is rent3 SFX still a little lame?  Does it matter?  Are the sounds okay on 
   Android (where the emulation is terrible)?
-* Properly divide game and rule routines.  
+* Properly divide game and rule routines.  Hmm...
 * Fix ZPage variable use, in particular active player pointer and IRQ.
 * Fix IRQ handler -- its gotten hacked to death.
-* Game save/load?
-* Screen double buffering?  Is it required if the dirty/update code is 
-  optimised?  Would be difficult - quite a bit of rework.
+* Game save/load?  Difficult now that the Kernal program and data space is used.
 * Optimise, optimise, optimise (eg. BIT instead of LDA, AND/ORA trains).
   Self modifying code??  Need cartridge/ROM support?  Already modify many data 
   items.
-* Check music/sfx - sometimes does not fire correctly at all (other than
-  resource contention issue).  Perhaps fixed by 2.74?  Very rare issue.
 
 ## For Testing (Needs Confirmation):
 * Player focus restored after player lose to player interrupt?
@@ -480,7 +474,22 @@ NTSC/PAL-N version in the future.
 * Fixed issue with CPU player and setup1 chosing invalid option.
 
 ## Change History (Since Version 0.01.99A)
+* 12JUL2018
+	* Move/add some init code into bootstrap.
+	* Move some discardable data/code to after heap ptr to save memory.  Saved
+	  some 300 bytes for program.
+	* Code tidy.
+	* Move heap ptr and top of program data expectation.
+	* Remove extra sprite data definitions.  In the end, these last changes
+	  should have saved around 300 to 400 bytes.
+	* Move all sprite data to $0800+.
+	* Move ui, game, plr, sqr and keys globals to $0200+.  This should have
+	  saved about 500 bytes but it doesn't because of the above.
+	* Refactor GAME::tPrmT0/1+tPrmC0/1 into own space.
+	* Refactor key scan routine to use variables instead of addresses.
+	* Fix AutoGaol bug.
 * 11JUL2018
+	* Fix AutoRepay, AutoEliminate bugs.
 	* Move Action cache into high memory saving another 1KB for program area.
 	* Fixed elimination bugs.
 	* Correct PlyrSel0 menu display issues.
