@@ -376,10 +376,11 @@ To compile:
     
 	cl65 -t none c64client.o -Ln c64client.lbl -o c64client.prg
 
-There are some more details about building the strings but these aren't 
+There are some more details about building the strings and rules but these aren't 
 available yet.
 
-The game must also be run from the disk image so it too must be built.
+The game must also be run from the disk image so it too must be built (put all
+of the programs on it:  c64client.prg, strings.prg and rules.prg).
 
 
 ## Running
@@ -422,6 +423,7 @@ NTSC/PAL-N version in the future.
 ## TODO
 
 * Statistics/Overview from trade approval, must pay.  They should work now.
+* Change trade jump menu naming and texts to action jump menu
 
 * Should be able to do beta release state after above
 
@@ -429,21 +431,25 @@ NTSC/PAL-N version in the future.
 * Backup/retrieve menu button selection going to/returning from dialogs when
   the menu hasn't changed?  Would be nice...
   
-* Change trade jump menu naming and texts to action jump menu
-* Fix texts on action jump menu
+* Move keybuffer & remove vector use to allow for locating ui and game globals 
+  at $0200
+* After above, move tPrmT0/1+tPrmC0/1 to own space
+* After above, move ui, game, plr, sqr and keys globals to $0200+ saving half a KB
+  
+* CPU players setup menu
 
-* CPU player still needs:  AutoRepay, AutoAuction, AutoTradeTo, AutoTradeWith,
-  AutoElimin
-* Will I need to load the rules constant data into high memory, too?
-* Fix issue with CPU player and setup1 chosing invalid option.
+* CPU player still needs:  AutoAuction, AutoTradeApprove, AutoTradeInitiate
 * "Thinking" prompt when cpu engaged?  Its so fast anyway... 
 * AutoBuy - there is a bug when reclaiming equity in order to sell that
-  causes no money to be paid for sale
+  causes no money to be paid for sale.  I can only see it with CPU player, can't 
+  reproduce in debugging equivalents.  Now trapping and faulting if occurs.
 * AutoGaol incorrectly chose roll over post?
+* rulesAutoRepayGroup needs to step through the group like 
+  rulesAutoEliminGroup does.
 
 * Allow players to input name?
 * Trim down key scan routine.
-* Get exmomiser working.
+* Get exomiser working.
 * Change "all" dirty to be just board dirty and req. individual flags?
 * Back-fit GoatTracker driver changes from version 2.74.
 * Player sprites on overview dialog.  Would look pretty.  IRQ is a mess.
@@ -453,6 +459,7 @@ NTSC/PAL-N version in the future.
 * Properly divide game and rule routines.  
 * Fix ZPage variable use, in particular active player pointer and IRQ.
 * Fix IRQ handler -- its gotten hacked to death.
+* Game save/load?
 * Screen double buffering?  Is it required if the dirty/update code is 
   optimised?  Would be difficult - quite a bit of rework.
 * Optimise, optimise, optimise (eg. BIT instead of LDA, AND/ORA trains).
@@ -469,8 +476,21 @@ NTSC/PAL-N version in the future.
 * Used GO Free cards prevented from appearing in deck until after 
   shuffle (and while owned by a player)
 * Ensure all options/pages are displayed for all menus.
+* In elmination, trdsel dialog doesn't show cash value.
+* Fixed issue with CPU player and setup1 chosing invalid option.
 
 ## Change History (Since Version 0.01.99A)
+* 11JUL2018
+	* Move Action cache into high memory saving another 1KB for program area.
+	* Fixed elimination bugs.
+	* Correct PlyrSel0 menu display issues.
+	* Correct TrdSel0 dialog button and display issues.
+	* Add the remaining equity in an elimination to the correct player.
+	* The method of blanking the menu for a cpu player (to prevent flickering)
+	  was invalid.  Fixed.
+	* Rename "AutoSell" to "AutoPay".  Much better.
+	* Implement AutoEliminate.
+	* Implement AutoRepay.
 * 10JUL2018
 	* Move rules constant data into high memory (and load at start).
 	* Implement AutoConstruct for AutoImprove (need AutoRepay).

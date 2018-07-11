@@ -31,8 +31,8 @@
 ;defs
 ;-------------------------------------------------------------------------------
 	.define	DEBUG_IRQ	0
-	.define DEBUG_KEYS	1
-	.define DEBUG_CPU	1
+	.define DEBUG_KEYS	0
+	.define DEBUG_CPU	0
 
 spriteMemD	=	$0340
 spriteMemE	=	$0380
@@ -370,7 +370,7 @@ JSTKSENS_HIGH	=	9
 		oGrp0A	.byte			;Utilities
 		
 		mDAcc0	.word			;Accounts for players
-		mDAcc1	.word			;Same acc# as player no. is
+		mDAcc1	.word			;Same acc# as player# is
 		mDAcc2	.word			;bank (general)
 		mDAcc3	.word
 		mDAcc4	.word
@@ -720,7 +720,8 @@ trdrepay2:
 FILENAME:
 		.byte	"STRINGS"
 FILENAME_2:
-
+		.byte	"RULES"
+FILENAME_3:
 
 init:
 ;		PHP				;save the initial state
@@ -732,9 +733,9 @@ init:
 
 		CLD
 		
-		LDA	#<screenClear1
+		LDA	#<screenLoad0
 		STA	$FD
-		LDA	#>screenClear1
+		LDA	#>screenLoad0
 		STA	$FE
 		
 		JSR	screenPerformList
@@ -764,7 +765,34 @@ init:
 		JSR	krnlLoad
 		
 		JSR	knrlClAll
+
+		LDA	#<screenLoad1
+		STA	$FD
+		LDA	#>screenLoad1
+		STA	$FE
 		
+		JSR	screenPerformList
+
+		LDA	#$01
+		LDX	#$08
+		LDY	#$01
+		
+		JSR	krnlSetLFS
+		
+		LDA	#FILENAME_3 - FILENAME_2
+		LDX	#<FILENAME_2
+		LDY	#>FILENAME_2
+
+		JSR	krnlSetNam
+		
+		LDA	#$00
+		LDX	#<$F400
+		LDY	#>$F400
+		
+		JSR	krnlLoad
+		
+		JSR	knrlClAll
+
 		LDA	#$7F			;disable standard CIA irqs
 		STA	cia1IRQCtl
 
@@ -1666,6 +1694,8 @@ screenBtnSglSeen:
 			.byte	$00
 screenBtnSglStart:
 			.byte	$00
+screenRedirectNull:
+			.byte	$00
 
 screenRowsLo:
 			.byte	<$0400, <$0428, <$0450, <$0478, <$04A0
@@ -2198,6 +2228,11 @@ screenPerformList:
 ;-------------------------------------------------------------------------------
 		LDA	#$00
 		STA	screenBtnSglSeen
+		
+		LDA	screenRedirectNull
+		BEQ	@start
+		
+		RTS
 
 @start:
 		JSR	screenReadByte
@@ -2924,17 +2959,26 @@ pointCodes:
 screenClear0:
 			.byte	$11, $00, $00, $28, $19
 			.byte	$00
-screenClear1:
+screenLoad0:
 			.byte	$11, $00, $00, $28, $19
 			.byte	$90, $00, $01
-			.word	screenText0Clear1
+			.word	strText0Load0
+			.byte	$00
+screenLoad1:
+			.byte	$90, $00, $02
+			.word	strText0Load1
 			.byte	$00
 			
-screenText0Clear1:	;LOADING RESOURCES...
+strText0Load0:		;LOADING RESOURCES...
 			.byte $14, $0C, $0F, $01, $04, $09, $0E, $07
 			.byte $20, $12, $05, $13, $0F, $15, $12, $03
 			.byte $05, $13, $2E, $2E, $2E
-			
+strText0Load1:		;LOADING RULES...
+			.byte $10, $0C, $0F, $01, $04, $09, $0E, $07
+			.byte $20, $12, $15, $0C, $05, $13, $2E, $2E
+			.byte $2E
+
+
 screenQErase0:
 ;			.byte	$58, $00, $00, $06
 			.byte	$58, $12, $00, $07
@@ -6285,6 +6329,7 @@ UI_ACT_GOFR	=	9
 UI_ACT_POST	=	10
 UI_ACT_ROLL	=	11
 UI_ACT_SKEY	=	12
+UI_ACT_DELY	= 	13
 
 
 uiActionCallsLo:
@@ -6294,7 +6339,7 @@ uiActionCallsLo:
 		.byte	<(uiActionSell - 1), <(uiActionBuy - 1)
 		.byte	<(uiActionImprv - 1), <(uiActionGOFree - 1)
 		.byte	<(uiActionPost - 1), <(uiActionRoll - 1)
-		.byte	<(uiActionSendKey - 1)
+		.byte	<(uiActionSendKey - 1), <(uiActionDelay - 1)
 uiActionCallsHi:
 		.byte	>(uiActionFault - 1), >(uiActionTrade - 1)
 		.byte	>(uiActionRepay - 1), >(uiActionFee - 1)
@@ -6302,7 +6347,7 @@ uiActionCallsHi:
 		.byte	>(uiActionSell - 1), >(uiActionBuy - 1)
 		.byte	>(uiActionImprv - 1), >(uiActionGOFree - 1)
 		.byte	>(uiActionPost - 1), >(uiActionRoll - 1)
-		.byte	>(uiActionSendKey - 1)
+		.byte	>(uiActionSendKey - 1), >(uiActionDelay - 1)
 
 ;-------------------------------------------------------------------------------
 uiInitQueue:
@@ -6998,6 +7043,10 @@ uiActionSendKey:
 		LDA	$69
 		JSR	keyEnqueueKey
 		RTS
+		
+		
+uiActionDelay:
+		RTS
 
 
 ;==============================================================================
@@ -7065,9 +7114,15 @@ cpuEngageBehaviour:
 		CMP	cpuThisPerform + 1
 		BNE	@update
 		
+@fault:
 		LDA	#$01
 		STA	cpuHaveFault
 		STA	cpuFlagFault
+		
+		LDA	#<@fault
+		STA	cpuFaultAddr
+		LDA	#>@fault
+		STA	cpuFaultAddr + 1
 		
 		JMP	@exit
 		
@@ -7107,6 +7162,12 @@ cpuPerformFault:
 		LDA	game + GAME::pActive
 		STA	cpuFaultPlayer
 		
+		LDA	#<cpuPerformFault
+		STA	cpuFaultAddr
+		LDA	#>cpuPerformFault
+		STA	cpuFaultAddr + 1
+		
+		
 		RTS
 		
 		
@@ -7144,7 +7205,16 @@ cpuPerformPlay:
 		STA	$69
 		
 		JSR	uiEnqueueAction
+
+		LDA	#UI_ACT_DELY
+		STA	$68
+		LDA	#$00
+		STA	$69
+		STA	$6A
+		STA	$6B
 		
+		JSR	uiEnqueueAction
+
 @exit:
 		RTS
 
@@ -7197,7 +7267,7 @@ cpuPerformTrade:
 
 		LDA	#UI_ACT_SKEY
 		STA	$68
-	.if	DEBUG_KEYS
+	.if	DEBUG_CPU
 		LDA	#'C'
 	.else
 		LDA	#'X'
@@ -7209,15 +7279,11 @@ cpuPerformTrade:
 		
 
 cpuPerformElimin:
-;***TODO:	Select as many big name deeds and repay as you can
+		LDY	#TRADE::player
+		LDA	trade1, Y
+		TAX
+		JSR	rulesAutoEliminate
 
-		LDA	#UI_ACT_SKEY
-		STA	$68
-		LDA	#'C'
-		STA	$69
-		
-		JSR	uiEnqueueAction
-		
 		RTS
 		
 		
@@ -7250,7 +7316,7 @@ cpuPerformGaolMustPost:
 		
 		
 cpuPerformMustPay:
-		JSR	rulesAutoSell
+		JSR	rulesAutoPay
 
 		RTS
 
@@ -7587,6 +7653,9 @@ menuDisplay:
 		
 		JSR	menuDefDraw
 @cont:
+		LDA	#$00
+		STA	screenRedirectNull
+
 		LDX	game + GAME::pActive
 		LDA	plrLo, X
 		STA	$FB
@@ -7604,7 +7673,8 @@ menuDisplay:
 		CMP	#$06
 		BEQ	@disp
 		
-		JMP	@farreturn
+		LDA	#$01
+		STA	screenRedirectNull
 
 @disp:
 		LDA	#>(@farreturn - 1)
@@ -7615,6 +7685,9 @@ menuDisplay:
 		JMP	(menuActivePage0 + MENUPAGE::aDraw)
 		
 @farreturn:
+		LDA	#$00
+		STA	screenRedirectNull
+		
 		LDA	ui + UI::fMseEnb
 		BNE	@reset
 
@@ -8986,14 +9059,14 @@ menuPagePlay0StdKeys:
 		CMP	#'A'
 		BNE	@keysQ
 		
-		JSR	rulesAutoSell
+		JSR	rulesAutoPay
 		
 		LDA	ui + UI::cActns
-		BNE	@autosell
+		BNE	@autopay
 		
 		JMP	@keysDing
 		
-@autosell:
+@autopay:
 		LDA	#$01
 		STA	ui + UI::fActInt
 		LDA	#$00
@@ -10836,7 +10909,7 @@ menuPageTrade0Draw:
 		DEX
 		BPL	@loop0
 		
-		LDX	#$27
+		LDX	#$1B
 @loop1:
 		STA	trddeeds0, X
 		STA	trdrepay0, X
@@ -11345,6 +11418,36 @@ menuPageElimin0SetAuctn:
 			
 			
 menuPageElimin0Keys:
+	.if	DEBUG_KEYS
+		CMP	#'A'
+		BNE	@keysP
+
+		LDY	#TRADE::player
+		LDA	trade1, Y
+		TAX
+		JSR	rulesAutoEliminate
+
+		LDA	ui + UI::cActns
+		BNE	@autoelimin
+		
+		JMP	@keysBuzz
+		
+@autoelimin:
+		LDA	#$01
+		STA	menuElimin0HaveOffer
+		
+		LDA	#$01
+		STA	ui + UI::fActInt
+		LDA	#$00
+		STA	ui + UI::fActTyp
+		
+		JSR	uiProcessInit
+		
+		JMP	@keysDing
+
+		RTS
+	.endif
+@keysP:
 		CMP	#'P'
 		BNE	@keysO
 
@@ -11388,7 +11491,7 @@ menuPageElimin0Keys:
 		
 		LDY	#PLAYER::fCPU
 		LDA	($FB), Y
-		BNE	@tstproc
+		BNE	@proc
 		
 		LDA	menuElimin0HaveOffer
 		BNE	@tstproc
@@ -11472,9 +11575,8 @@ menuPlyrSelCallProc:
 		.word	$0000
 
 
-	.define	PLYRSEL_P	.HIBYTE(*)
+;***THIS IS VERY NAUGHTY SO THE MENU DATA CAN'T BE MORE THAN ONE PAGE 
 menuWindowPlyrSelPN:
-;***THIS IS VERY NAUGHTY SO THE MENU DATA CAN'T CROSS PAGE BOUNDARY
 		.byte	menuWindowPlyrSelP0 - menuWindowPlyrSel0 
 		.byte	menuWindowPlyrSelP1 - menuWindowPlyrSel0
 		.byte	menuWindowPlyrSelP2 - menuWindowPlyrSel0
@@ -11490,6 +11592,7 @@ menuWindowPlyrSelNN:
 		.byte	menuWindowPlyrSelN4 - menuWindowPlyrSel0
 		.byte	menuWindowPlyrSelN5 - menuWindowPlyrSel0
 
+	.define	PLYRSEL_P	*
 menuWindowPlyrSel0:
 			.byte	$90, $01, $07
 			.word	     	strHeaderPSel0
@@ -11533,7 +11636,7 @@ menuWindowPlyrSelN5:
 			.word		plr5 + PLAYER::name
 
 			.byte	$00
-	.assert	PLYRSEL_P = .HIBYTE(*), error, "WindowPlyrSel must be on one page!"
+	.assert	(* - PLYRSEL_P)  < $FE, error, "WindowPlyrSel must be on one page!"
 			
 			
 menuPagePlyrSel0Keys:
@@ -11610,19 +11713,35 @@ menuPagePlyrSel0Draw:
 		LDA	($FB), Y
 		AND	#$01
 		
-		BEQ	@disable
+		BEQ	@hide
 		
 		LDA	menuWindowPlyrSelPN, X
 		TAY
 		LDA	#$A1
 		STA	($A3), Y
+		
+		LDA	menuWindowPlyrSelNN, X
+		TAY
+		LDA	plrNameLo, X
+		STA	($A3), Y
+		INY
+		LDA	plrNameHi, X
+		STA	($A3), Y
 
 		JMP	@next
 
-@disable:
+@hide:
 		LDA	menuWindowPlyrSelPN, X
 		TAY
 		LDA	#$A2
+		STA	($A3), Y
+		
+		LDA	menuWindowPlyrSelNN, X
+		TAY
+		LDA	#<strDummyDummy0
+		STA	($A3), Y
+		INY
+		LDA	#>strDummyDummy0
 		STA	($A3), Y
 
 @next:
@@ -11655,31 +11774,6 @@ menuPagePlyrSel0Draw:
 		STA	$FE
 		
 		JSR	screenPerformList
-		
-		LDA	menuPlyrSelAllowCur
-		BNE	@exit
-		
-		LDX	game + GAME::pActive
-		
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
-		LDY	#PLAYER::name
-		LDA	($FB), Y
-		STA	game + GAME::varA
-		INY
-		LDA	($FB), Y
-		STA	game + GAME::varB
-		
-		LDA	menuWindowPlyrSelNN, X
-		TAY
-		LDA	game + GAME::varA
-		STA	($A3), Y
-		INY
-		LDA	game + GAME::varB
-		STA	($A3), Y
 		
 @exit:
 		RTS
@@ -12136,6 +12230,8 @@ doGameScoreCntGOFree:
 
 
 doGameScoreCntGroups:
+;***TODO:	Isn't this supposed to be groups that are wholy owned?
+
 		LDA	#$00
 		STA	game + GAME::varM
 		STA	game + GAME::varN
@@ -12614,6 +12710,12 @@ gameMustPayAfterPost:
 ;-------------------------------------------------------------------------------
 gameSwitchMPayToElmin:
 ;-------------------------------------------------------------------------------
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
 		JSR	gamePerfLosing
 		JSR	rulesDoPlayerElimin
 		
@@ -13399,7 +13501,7 @@ gameInitiateTrade:
 		DEX
 		BPL	@loop0
 		
-		LDX	#$27
+		LDX	#$1B
 @loop1:
 		STA	trddeeds0, X
 		STA	trdrepay0, X
@@ -13765,7 +13867,6 @@ gamePerfTradeStep:
 		RTS
 		
 @stage0phase1:
-
 		LDY	#TRADE::player
 		LDA	trade0, Y
 ;		STA	game + GAME::pLast
@@ -14132,6 +14233,9 @@ gamePerfTradeFull:
 ;		STA	game + GAME::fTrdTyp
 ;		STA	game + GAME::fTrdInt
 
+		LDA	game + GAME::fTrdTyp
+		BNE	@loop
+
 		JSR	gamePerfTradeMoney
 		
 @loop:
@@ -14144,11 +14248,15 @@ gamePerfTradeFull:
 	
 		JSR	gamePerfTradePopMode
 	
+		LDA	ui + UI::cActns
+		BEQ	@exit
+	
 		JSR	uiProcessInit
 		
 		LDA	game + GAME::fTrdTyp
 		STA	ui + UI::fActTyp
 
+@exit:
 		RTS
 		
 		
@@ -17238,22 +17346,10 @@ dialogWindowTrdSel2:
 			.byte	$AE, $0F, $1C, $22, $53, $1C, $0F
 			.word		strOptn2TrdSel0
 
-;***TODO:		Move these into other display data
-			.byte	$90, $05, $07		;Cash btn lbls
-			.word		strText1TrdSel0
-			.byte	$90, $05, $08
-			.word		strText2TrdSel0
-			.byte	$8F, $05, $07		;Cash btn clrs
-			.byte	$8F, $05, $08
-			
 			.byte	$00
 
 
 dialogWindowTrdSel3:
-			.byte	$90, $05, $05		;Cash lbls
-			.word		strText3TrdSel0
-			.byte	$2C, $05, $05, $06	;Cash lbl + $ 
-			.byte	$2F, $05, $06, $06	
 							;Cash btns
 			.byte	$A4, $07, $08, $09, $55, $08, $07
 			.word		strDummyDummy0
@@ -17268,6 +17364,18 @@ dialogWindowTrdSel3:
 			.byte	$A4, $08, $0A, $0B, $4C, $0A, $08
 			.word		strDummyDummy0
 
+			.byte	$90, $05, $07		;Cash btn lbls
+			.word		strText1TrdSel0
+			.byte	$90, $05, $08
+			.word		strText2TrdSel0
+;			.byte	$8F, $05, $07		;Cash btn clrs
+;			.byte	$8F, $05, $08
+			
+			.byte	$90, $05, $05		;Cash lbls
+			.word		strText3TrdSel0
+			.byte	$2C, $05, $05, $06	;Cash lbl + $ 
+			.byte	$2F, $05, $06, $06	
+			
 			.byte	$00
 
 dialogWindowTrdSel4:
@@ -18191,8 +18299,12 @@ doDialogTrdSelSetState:
 		BPL	@loop1
 
 
+		LDA	dialogTrdSelDoElimin
+		BNE	@skipcash
+
 		JSR	doDialogTrdSelSetCash
 		
+@skipcash:
 		LDA	dialogTrdSelDoApprv
 		BEQ	@initial
 		
@@ -18707,24 +18819,11 @@ dialogDlgTrdSel0Draw:
 		
 		JSR	screenPerformList
 
-		LDA	dialogTrdSelDoRepay
-		BEQ	@skipRepay
-		
-		LDA	#<dialogWindowTrdSel1
-		STA	$FD
-		LDA	#>dialogWindowTrdSel1
-		STA	$FE
-		
-		JSR	screenPerformList
-
-@skipRepay:
-		LDA	dialogTrdSelDoElimin
-		BNE	@doRepay
 
 		LDA	dialogTrdSelDoApprv
-		BNE	@approv
-		
-@doRepay:
+		BNE	@repay
+	
+@select:	
 		LDA	#<dialogWindowTrdSel2
 		STA	$FD
 		LDA	#>dialogWindowTrdSel2
@@ -18732,7 +18831,22 @@ dialogDlgTrdSel0Draw:
 		
 		JSR	screenPerformList
 
-@approv:
+@repay:
+		LDA	dialogTrdSelDoElimin
+		BNE	@dorepay
+
+		LDA	dialogTrdSelDoRepay
+		BEQ	@accept
+		
+@dorepay:
+		LDA	#<dialogWindowTrdSel1
+		STA	$FD
+		LDA	#>dialogWindowTrdSel1
+		STA	$FE
+		
+		JSR	screenPerformList
+
+@accept:
 		LDA	#<dialogWindowTrdSel4
 		STA	$FD
 		LDA	#>dialogWindowTrdSel4
@@ -21306,686 +21420,9 @@ rulesChanceIdx:
 
 
 
-;***TODO:		Put all of this constant data up high, too.
-
-rulesGrpPriority:
-		.byte	$01, $02, $03, $0A, $04, $05, $06, $07, $09, $08
-
-
-rulesScore0:	
-			.byte	1, 2, 5, 7, 15
-rulesScore1:
-			.byte	5, 15, 30, 40, 70
-rulesScore2:
-			.byte	10, 20, 50, 70, 100
-rulesScore3:
-			.byte	20, 35, 80, 110, 180
-
-
-rulesGrp0:
-			.byte	$03
-			.byte	$04
-			.byte	$00
-			.word	$0000
-			.word	rulesCrdCrnr0
-			.word	rulesCrdCrnr1
-			.word	rulesCrdCrnr2
-			.word	rulesCrdCrnr3
-rulesGrp1:
-			.byte	$09
-			.byte	$02
-			.byte	50
-			.word	rulesScore0
-			.word	rulesCrdBrown0
-			.word	rulesCrdBrown1
-			.word	$0000
-			.word	$0000
-rulesGrp2:
-			.byte	$0E
-			.byte	$03
-			.byte	50
-			.word	rulesScore0
-			.word	rulesCrdLBlue0
-			.word	rulesCrdLBlue1
-			.word	rulesCrdLBlue2
-			.word	$0000
-rulesGrp3:
-			.byte	$04
-			.byte	$03
-			.byte	100
-			.word	rulesScore1
-			.word	rulesCrdPrple0
-			.word	rulesCrdPrple1
-			.word	rulesCrdPrple2
-			.word	$0000
-rulesGrp4:
-			.byte	$08
-			.byte	$03
-			.byte	100
-			.word	rulesScore1
-			.word	rulesCrdOrnge0
-			.word	rulesCrdOrnge1
-			.word	rulesCrdOrnge2
-			.word	$0000
-rulesGrp5:
-			.byte	$02
-			.byte	$03
-			.byte	150
-			.word	rulesScore2
-			.word	rulesCrdRed0
-			.word	rulesCrdRed1
-			.word	rulesCrdRed2
-			.word	$0000
-rulesGrp6:			
-			.byte	$07
-			.byte	$03
-			.byte	150
-			.word	rulesScore2
-			.word	rulesCrdYellw0
-			.word	rulesCrdYellw1
-			.word	rulesCrdYellw2
-			.word	$0000
-rulesGrp7:
-			.byte	$05
-			.byte	$03
-			.byte	200
-			.word	rulesScore3
-			.word	rulesCrdGreen0
-			.word	rulesCrdGreen1
-			.word	rulesCrdGreen2
-			.word	$0000
-rulesGrp8:
-			.byte	$06
-			.byte	$02
-			.byte	200
-			.word	rulesScore3
-			.word	rulesCrdBlue0
-			.word	rulesCrdBlue1
-			.word	$0000
-			.word	$0000
-rulesGrp9:			
-			.byte	$01
-			.byte	$04
-			.byte	$00
-			.word 	$0000
-			.word	rulesCrdStn0
-			.word	rulesCrdStn1
-			.word	rulesCrdStn2
-			.word	rulesCrdStn3
-rulesGrpA:			
-			.byte	$01
-			.byte	$02
-			.byte	$00
-			.word	$0000
-			.word	rulesCrdUtil0
-			.word	rulesCrdUtil1
-			.word	$0000
-			.word	$0000
-rulesGrpB:
-			.byte	$03
-			.byte	$01
-			.byte	$00
-			.word	$0000
-			.word	rulesCrdChest0
-			.word	$0000
-			.word	$0000
-			.word	$0000
-rulesGrpC:
-			.byte	$03
-			.byte	$01
-			.byte	$00
-			.word	$0000
-			.word	rulesCrdChnce0
-			.word	$0000
-			.word	$0000
-			.word	$0000
-rulesGrpD:			
-			.byte	$03
-			.byte	$02
-			.byte	$00
-			.word	$0000
-			.word	rulesCrdTax0
-			.word	rulesCrdTax1
-			.word	$0000
-			.word	$0000
+	.include	"rules.inc"
 	
-rulesGrpLo:		.byte	<rulesGrp0, <rulesGrp1, <rulesGrp2, <rulesGrp3
-			.byte	<rulesGrp4, <rulesGrp5, <rulesGrp6, <rulesGrp7
-			.byte	<rulesGrp8, <rulesGrp9, <rulesGrpA, <rulesGrpB
-			.byte	<rulesGrpC, <rulesGrpD
-
-rulesGrpHi:		.byte	>rulesGrp0, >rulesGrp1, >rulesGrp2, >rulesGrp3
-			.byte	>rulesGrp4, >rulesGrp5, >rulesGrp6, >rulesGrp7
-			.byte	>rulesGrp8, >rulesGrp9, >rulesGrpA, >rulesGrpB
-			.byte	>rulesGrpC, >rulesGrpD
-
-
-rulesGrpSqrs0:
-			.byte	$FF, $01, $06, $0B, $10, $15, $1A, $1F
-			.byte	$25, $FF, $FF, $FF, $FF, $FF
-rulesGrpSqrs1:
-			.byte	$FF, $03, $08, $0D, $12, $17, $1B, $20
-			.byte	$27, $FF, $FF, $FF, $FF, $FF
-			
-rulesGrpSqrs2:
-			.byte	$FF, $FF, $09, $0E, $13, $18, $1D, $22
-			.byte	$FF, $FF, $FF, $FF, $FF, $FF
-
-
-rulesCrdCrnr0:
-			.word	strTitle0Crnr0
-			.word	strDummyDummy0
-rulesCrdCrnr1:
-			.word	strTitle0Crnr1
-			.word	strDummyDummy0
-rulesCrdCrnr2:
-			.word	strTitle0Crnr2
-			.word	strDummyDummy0
-rulesCrdCrnr3:
-			.word	strTitle0Crnr3
-			.word	strDummyDummy0
-rulesCrdBrown0:
-			.word	strTitle0Brown0
-			.word	strDummyDummy0
-			.word	60
-			.word	30
-			.word	3
-			.word	2
-			.word	10
-			.word	30
-			.word	90
-			.word	160
-			.word	250
-rulesCrdBrown1:
-			.word	strTitle0Brown1
-			.word	strDummyDummy0
-			.word	60
-			.word	30
-			.word	3
-			.word	4
-			.word	20
-			.word	60
-			.word	180
-			.word	320
-			.word	450
-rulesCrdLBlue0:
-			.word	strTitle0LBlue0
-			.word	strTitle1LBlue0
-			.word	100
-			.word	50
-			.word	5
-			.word	6
-			.word	30
-			.word	90
-			.word	270
-			.word	400
-			.word	550
-rulesCrdLBlue1:
-			.word	strTitle0LBlue1
-			.word	strDummyDummy0
-			.word	100
-			.word	50
-			.word	5
-			.word	6
-			.word	30
-			.word	90
-			.word	270
-			.word	400
-			.word	550
-rulesCrdLBlue2:
-			.word	strTitle0LBlue2
-			.word	strDummyDummy0
-			.word	120
-			.word	60
-			.word	6
-			.word	8
-			.word	40
-			.word	100
-			.word	300
-			.word	450
-			.word	600
-rulesCrdPrple0:
-			.word	strTitle0Prple0
-			.word	strDummyDummy0
-			.word	140
-			.word	70
-			.word	7
-			.word	10
-			.word	50
-			.word	150
-			.word	450
-			.word	625
-			.word	750
-rulesCrdPrple1:
-			.word	strTitle0Prple1
-			.word	strDummyDummy0
-			.word	140
-			.word	70
-			.word	7
-			.word	10
-			.word	50
-			.word	150
-			.word	450
-			.word	625
-			.word	750
-rulesCrdPrple2:
-			.word	strTitle0Prple2
-			.word	strTitle1Prple2
-			.word	160
-			.word	80
-			.word	8
-			.word	12
-			.word	60
-			.word	180
-			.word	500
-			.word	700
-			.word	900
-rulesCrdOrnge0:
-			.word	strTitle0Ornge0
-			.word	strDummyDummy0
-			.word	180
-			.word	90
-			.word	9
-			.word	14
-			.word	70
-			.word	200
-			.word	550
-			.word	750
-			.word	950
-rulesCrdOrnge1:
-			.word	strTitle0Ornge1
-			.word	strDummyDummy0
-			.word	180
-			.word	90
-			.word	9
-			.word	14
-			.word	70
-			.word	200
-			.word	550
-			.word	750
-			.word	950
-rulesCrdOrnge2:
-			.word	strTitle0Ornge2
-			.word	strDummyDummy0
-			.word	200
-			.word	100
-			.word	10
-			.word	16
-			.word	80
-			.word	220
-			.word	600
-			.word	800
-			.word	1000
-rulesCrdRed0:
-			.word	strTitle0Red0
-			.word	strDummyDummy0
-			.word	220
-			.word	110
-			.word	11
-			.word	18
-			.word	90
-			.word	250
-			.word	700
-			.word	875
-			.word	1050
-rulesCrdRed1:
-			.word	strTitle0Red1
-			.word	strDummyDummy0
-			.word	220
-			.word	110
-			.word	11
-			.word	18
-			.word	90
-			.word	250
-			.word	700
-			.word	875
-			.word	1050
-rulesCrdRed2:
-			.word	strTitle0Red2
-			.word	strDummyDummy0
-			.word	240
-			.word	120
-			.word	12
-			.word	20
-			.word	100
-			.word	300
-			.word	750
-			.word	925
-			.word	1100
-rulesCrdYellw0:
-			.word	strTitle0Yellw0
-			.word	strDummyDummy0
-			.word	260
-			.word	130
-			.word	13
-			.word	22
-			.word	110
-			.word	330
-			.word	800
-			.word	975
-			.word	1150
-rulesCrdYellw1:
-			.word	strTitle0Yellw1
-			.word	strDummyDummy0
-			.word	260
-			.word	130
-			.word	13
-			.word	22
-			.word	110
-			.word	330
-			.word	800
-			.word	975
-			.word	1150
-rulesCrdYellw2:
-			.word	strTitle0Yellw2
-			.word	strDummyDummy0
-			.word	280
-			.word	140
-			.word	14
-			.word	24
-			.word	120
-			.word	360
-			.word	850
-			.word	1025
-			.word	1200
-rulesCrdGreen0:
-			.word	strTitle0Green0
-			.word	strDummyDummy0
-			.word	300
-			.word	150
-			.word	15
-			.word	26
-			.word	130
-			.word	390
-			.word	900
-			.word	1100
-			.word	1275
-rulesCrdGreen1:
-			.word	strTitle0Green1
-			.word	strDummyDummy0
-			.word	300
-			.word	150
-			.word	15
-			.word	26
-			.word	130
-			.word	390
-			.word	900
-			.word	1100
-			.word	1275
-rulesCrdGreen2:
-			.word	strTitle0Green2
-			.word	strDummyDummy0
-			.word	320
-			.word	160
-			.word	16
-			.word	28
-			.word	150
-			.word	450
-			.word	1000
-			.word	1200
-			.word	1400
-rulesCrdBlue0:
-			.word	strTitle0Blue0
-			.word	strDummyDummy0
-			.word	350
-			.word	175
-			.word	18
-			.word	35
-			.word	175
-			.word	500
-			.word	1100
-			.word	1300
-			.word	1500
-rulesCrdBlue1:
-			.word	strTitle0Blue1
-			.word	strDummyDummy0
-			.word	400
-			.word	200
-			.word	20
-			.word	50
-			.word	200
-			.word	600
-			.word	1400
-			.word	1700
-			.word	2000
-rulesCrdStn0:
-			.word	strTitle0Stn0
-			.word	strTitle1Stn0
-			.word	200
-			.word	100
-			.word	10
-			.word	25
-rulesCrdStn1:
-			.word	strTitle0Stn1
-			.word	strDummyDummy0
-			.word	200
-			.word	100
-			.word	10
-			.word	25
-rulesCrdStn2:
-			.word	strTitle0Stn2
-			.word	strTitle1Stn2
-			.word	200
-			.word	100
-			.word	10
-			.word	25
-rulesCrdStn3:
-			.word	strTitle0Stn3
-			.word	strTitle1Stn3
-			.word	200
-			.word	100
-			.word	10
-			.word	25
-rulesCrdUtil0:
-			.word	strTitle0Util0
-			.word	strDummyDummy0
-			.word	150
-			.word	75
-			.word	8
-rulesCrdUtil1:
-			.word	strTitle0Util1
-			.word	strDummyDummy0
-			.word	150
-			.word	75
-			.word	8
-rulesCrdChest0:
-			.word	strHeaderCCCCard0
-			.word	strDummyDummy0
-rulesCrdChnce0:
-			.word	strHeaderCCCCard1
-			.word	strDummyDummy0
-rulesCrdTax0:
-			.word	strTitle0Tax0
-			.word	strDummyDummy0
-rulesCrdTax1:
-			.word	strTitle0Tax1
-			.word	strDummyDummy0
-
-
-
-rulesSqr0:
-			.byte	$00		;GO
-			.byte	$00
-			
-			.byte	$01		;Brown 1
-			.byte	$00
-			
-			.byte	$0B		;Chest	
-			.byte	$00
-			
-			.byte	$01		;Brown 2
-			.byte	$01
-
-			.byte	$0D		;INC TAX 
-			.byte	$00
-			
-			.byte	$09		;Station 1
-			.byte	$00
-
-			.byte	$02		;LBlue 1
-			.byte	$00
-			
-			.byte	$0C		;Chance 
-			.byte	$00
-
-			.byte	$02		;LBlue 2
-			.byte	$01
-
-			.byte	$02		;LBlue 3
-			.byte	$02
-			
-			.byte	$00		;Gaol
-			.byte	$01
-			
-			.byte	$03		;Purple 1
-			.byte	$00
-			
-			.byte	$0A		;Electric Co. 
-			.byte	$00
-			
-			.byte	$03		;Purple 2
-			.byte	$01
-			
-			.byte	$03		;Purple 3
-			.byte	$02
-			
-			.byte	$09		;Station 2 
-			.byte	$01
-			
-			.byte	$04		;Orange 1
-			.byte	$00
-			
-			.byte	$0B		;Chest 
-			.byte	$00
-			
-			.byte	$04		;Orange 2
-			.byte	$01
-
-			.byte	$04		;Orange 3
-			.byte	$02
-			
-			.byte	$00		;Free Parking
-			.byte	$02
-			
-			.byte	$05		;Red 1
-			.byte	$00
-			
-			.byte	$0C		;Chance
-			.byte	$00
-			
-			.byte	$05		;Red 2
-			.byte	$01
-
-			.byte	$05		;Red 3
-			.byte	$02
-
-			.byte	$09		;Station 3 
-			.byte	$02
-			
-			.byte	$06		;Yellow 1
-			.byte	$00
-			
-			.byte	$06		;Yellow 2
-			.byte 	$01
-			
-			.byte	$0A		;Waterworks 
-			.byte	$01
-
-			.byte	$06		;Yellow 3
-			.byte	$02
-			
-			.byte	$00		;GO GAOL
-			.byte	$03
-			
-			.byte	$07		;Green 1
-			.byte	$00
-			
-			.byte	$07		;Green 2
-			.byte	$01
-			
-			.byte	$0B		;Chest 
-			.byte	$00
-			
-			.byte	$07		;Green 3
-			.byte	$02
-			
-			.byte	$09		;Station 4 
-			.byte	$03
-			
-			.byte	$0C		;Chance 
-			.byte	$00
-			
-			.byte	$08		;Blue 1
-			.byte	$00	
-			
-			.byte	$0D		;Income TAX 
-			.byte	$01
-			
-			.byte	$08		;Blue 2
-			.byte	$01
-
-rulesSqrStrsLo:
-			.byte 	<rulesSqrStrsCrnr0, <rulesSqrStrsCrnr1
-			.byte	<rulesSqrStrsCrnr2, <rulesSqrStrsCrnr3
-			.byte   <rulesSqrStrsChest0, <rulesSqrStrsChance0
-			.byte   <rulesSqrStrsTax0, <rulesSqrStrsTax1
-rulesSqrStrsHi:
-			.byte 	>rulesSqrStrsCrnr0, >rulesSqrStrsCrnr1
-			.byte	>rulesSqrStrsCrnr2, >rulesSqrStrsCrnr3
-			.byte   >rulesSqrStrsChest0, >rulesSqrStrsChance0
-			.byte   >rulesSqrStrsTax0, >rulesSqrStrsTax1
-
-
-rulesSqrStrsCrnr0:
-			.word 	strText0Crnr0
-			.word 	strText1Crnr0
-			.word 	strText2Crnr0
-			.word 	strText3Crnr0
-			.word 	strText4Crnr0
-rulesSqrStrsCrnr1:
-			.word 	strText0Crnr1
-			.word 	strText1Crnr1
-			.word 	strText2Crnr1
-			.word 	strText3Crnr1
-			.word 	strText4Crnr1
-rulesSqrStrsCrnr2:
-			.word 	strText0Crnr2
-			.word 	strText1Crnr2
-			.word 	strText2Crnr2
-			.word 	strText3Crnr2
-			.word 	strText4Crnr2
-rulesSqrStrsCrnr3:
-			.word 	strText0Crnr3
-			.word 	strText1Crnr3
-			.word 	strText2Crnr3
-			.word 	strText3Crnr3
-			.word 	strText4Crnr3
-rulesSqrStrsChest0:
-			.word 	strText0Chest0
-			.word 	strText1Chest0
-			.word 	strText2Chest0
-			.word 	strText3Chest0
-			.word 	strText4Chest0
-rulesSqrStrsChance0:
-			.word 	strText0Chance0
-			.word 	strText1Chance0
-			.word 	strText2Chance0
-			.word 	strText3Chance0
-			.word 	strText4Chance0
-rulesSqrStrsTax0:
-			.word 	strText0Tax0
-			.word 	strText1Tax0
-			.word 	strText2Tax0
-			.word 	strText3Tax0
-			.word 	strText4Tax0
-rulesSqrStrsTax1:
-			.word 	strText0Tax1
-			.word 	strText1Tax1
-			.word 	strText2Tax1
-			.word 	strText3Tax1
-			.word 	strText4Tax1
-
-
+	
 rulesCCCrdProcsLo:
 			.byte	<rulesCCCrdProcDummy	;none
 			.byte	<rulesCCCrdProcInc	;get cash
@@ -22014,434 +21451,7 @@ rulesCCCrdProcsHi:
 			.byte	>rulesCCCrdProcBrb	;pay all players
 			.byte	>rulesCCCrdProcAUT	;adv to util pay 10x
 
-rulesChestStrsLo:
-			.byte	<rulesChestStrs0
-			.byte	<rulesChestStrs1
-			.byte	<rulesChestStrs2
-			.byte	<rulesChestStrs3
-			.byte	<rulesChestStrs4
-			.byte	<rulesChestStrs5
-			.byte	<rulesChestStrs6
-			.byte	<rulesChestStrs7
-			.byte	<rulesChestStrs8
-			.byte	<rulesChestStrs9
-			.byte	<rulesChestStrsA
-			.byte	<rulesChestStrsB
-			.byte	<rulesChestStrsC
-			.byte	<rulesChestStrsD
-			.byte	<rulesChestStrsE
-			.byte	<rulesChestStrsF
-rulesChestStrsHi:
-			.byte	>rulesChestStrs0
-			.byte	>rulesChestStrs1
-			.byte	>rulesChestStrs2
-			.byte	>rulesChestStrs3
-			.byte	>rulesChestStrs4
-			.byte	>rulesChestStrs5
-			.byte	>rulesChestStrs6
-			.byte	>rulesChestStrs7
-			.byte	>rulesChestStrs8
-			.byte	>rulesChestStrs9
-			.byte	>rulesChestStrsA
-			.byte	>rulesChestStrsB
-			.byte	>rulesChestStrsC
-			.byte	>rulesChestStrsD
-			.byte	>rulesChestStrsE
-			.byte	>rulesChestStrsF
 
-rulesChestStrs0:
-			.word	strDesc0Chest0
-			.word	strDesc1Chest0
-			.word 	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$01
-			.word	strText0CCCCard0
-rulesChestStrs1:
-			.word	strDesc0Chest1
-			.word	strDesc1Chest1
-			.word 	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-rulesChestStrs2:
-			.word	strDesc0Chest2
-			.word	strDesc1Chest2
-			.word 	strDummyDummy0
-			.byte	$01
-			.word	strText2CCCCard0
-			.byte	$01
-			.word	strText3CCCCard0
-rulesChestStrs3:
-			.word	strDesc0Chest3
-			.word	strDesc1Chest3
-			.word 	strDesc2Chest3
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$01
-			.word	strText0CCCCard0
-rulesChestStrs4:
-			.word	strDesc0Chest4
-			.word	strDummyDummy0
-			.word 	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$01
-			.word	strText0CCCCard0
-rulesChestStrs5:
-			.word	strDesc0Chest5
-			.word	strDummyDummy0
-			.word 	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$01
-			.word	strText0CCCCard0
-rulesChestStrs6:
-			.word	strDesc0Chest6
-			.word	strDummyDummy0
-			.word 	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$01
-			.word	strText4CCCCard0
-rulesChestStrs7:
-			.word	strDesc0Chest7
-			.word	strDummyDummy0
-			.word 	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$01
-			.word	strText0CCCCard0
-rulesChestStrs8:
-			.word	strDesc0Chest8
-			.word	strDesc1Chest8
-			.word 	strDesc2Chest8
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-rulesChestStrs9:
-			.word	strDesc0Chest9
-			.word	strDummyDummy0
-			.word 	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$01
-			.word	strText1CCCCard0
-rulesChestStrsA:
-			.word	strDesc0ChestA
-			.word	strDummyDummy0
-			.word 	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$01
-			.word	strText0CCCCard0
-rulesChestStrsB:
-			.word	strDesc0ChestB
-			.word	strDummyDummy0
-			.word 	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$01
-			.word	strText1CCCCard0
-rulesChestStrsC:
-			.word	strDesc0ChestC
-			.word	strDesc1ChestC
-			.word 	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$01
-			.word	strText0CCCCard0
-rulesChestStrsD:
-			.word	strDesc0ChestD
-			.word	strDesc1ChestD
-			.word 	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$01
-			.word	strText0CCCCard0
-rulesChestStrsE:
-			.word	strDesc0ChestE
-			.word	strDummyDummy0
-			.word 	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$01
-			.word	strText1CCCCard0
-rulesChestStrsF:
-			.word	strDesc0ChestF
-			.word	strDesc1ChestF
-			.word 	strDesc2ChestF
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-
-
-rulesChest0:					;Bank error, $200
-			.byte	$01
-			.byte	200
-rulesChest1:					;Advance Go
-			.byte	$02	
-			.byte	$00
-rulesChest2:					;Street repairs (chest)
-			.byte	$03
-			.byte	$00
-rulesChest3:					;Beauty contest, $10
-			.byte	$01
-			.byte	10
-rulesChest4:					;sale stock, $50
-			.byte	$01
-			.byte	50
-rulesChest5:					;inherit $100		
-			.byte	$01
-			.byte	100
-rulesChest6:					;collect $10 from each player
-			.byte	$04
-			.byte	10
-rulesChest7:					;consultancy $25
-			.byte	$01
-			.byte	25
-rulesChest8:					;go gaol
-			.byte	$05		
-			.byte	$00
-rulesChest9:					;pay $100 hospital
-			.byte	$06		
-			.byte	100
-rulesChestA:					;income tax refund $20
-			.byte	$01
-			.byte	20
-rulesChestB:					;pay school fees $50
-			.byte	$06
-			.byte	50
-rulesChestC:					;life insurance $100
-			.byte	$01
-			.byte	100
-rulesChestD:					;holiday fund $100
-			.byte	$01
-			.byte	100
-rulesChestE:					;doctor's fee $50
-			.byte	$06
-			.byte	50
-rulesChestF:					;get out of gaol free
-			.byte	$07
-			.byte	00
-
-
-rulesChanceStrsLo:
-			.byte	<rulesChanceStrs0
-			.byte	<rulesChanceStrs1
-			.byte	<rulesChanceStrs2
-			.byte	<rulesChanceStrs3
-			.byte	<rulesChanceStrs4
-			.byte	<rulesChanceStrs5
-			.byte	<rulesChanceStrs6
-			.byte	<rulesChanceStrs7
-			.byte	<rulesChanceStrs8
-			.byte	<rulesChanceStrs9
-			.byte	<rulesChanceStrsA
-			.byte	<rulesChanceStrsB
-			.byte	<rulesChanceStrsC
-			.byte	<rulesChanceStrsD
-			.byte	<rulesChanceStrsE
-			.byte	<rulesChanceStrsF
-rulesChanceStrsHi:
-			.byte	>rulesChanceStrs0
-			.byte	>rulesChanceStrs1
-			.byte	>rulesChanceStrs2
-			.byte	>rulesChanceStrs3
-			.byte	>rulesChanceStrs4
-			.byte	>rulesChanceStrs5
-			.byte	>rulesChanceStrs6
-			.byte	>rulesChanceStrs7
-			.byte	>rulesChanceStrs8
-			.byte	>rulesChanceStrs9
-			.byte	>rulesChanceStrsA
-			.byte	>rulesChanceStrsB
-			.byte	>rulesChanceStrsC
-			.byte	>rulesChanceStrsD
-			.byte	>rulesChanceStrsE
-			.byte	>rulesChanceStrsF
-
-rulesChanceStrs0:
-			.word	strDesc0Chance0
-			.word	strDesc1Chance0
-			.word 	strDesc2Chance0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-rulesChanceStrs1:
-			.word	strDesc0Chance1
-			.word	strDesc1Chance1
-			.word 	strDesc2Chance1
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-rulesChanceStrs2:
-			.word	strDesc0Chance2
-			.word	strDummyDummy0
-			.word 	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$01
-			.word	strText1CCCCard0
-rulesChanceStrs3:
-			.word	strDesc0Chance3
-			.word	strDesc1Chance3
-			.word 	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-rulesChanceStrs4:
-			.word	strDesc0Chance4
-			.word	strDesc1Chance4
-			.word 	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$01
-			.word	strText5CCCCard0
-rulesChanceStrs5:
-			.word	strDesc0Chance5
-			.word	strDummyDummy0
-			.word 	strDesc1Chance5
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-rulesChanceStrs6:
-			.word	strDesc0Chance6
-			.word	strDesc1Chance6
-			.word 	strDesc2Chance6
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-rulesChanceStrs7:
-			.word	strDesc0Chance7
-			.word	strDesc1Chance7
-			.word 	strDummyDummy0
-			.byte	$01
-			.word	strText2CCCCard0
-			.byte	$01
-			.word	strText3CCCCard0
-rulesChanceStrs8:
-			.word	strDesc0Chance8
-			.word	strDummyDummy0
-			.word 	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$01
-			.word	strText0CCCCard0
-rulesChanceStrs9:
-			.word	strDesc0Chance9
-			.word	strDesc1Chance9
-			.word 	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-rulesChanceStrsA:
-			.word	strDesc0ChanceA
-			.word	strDesc1ChanceA
-			.word 	strDesc2ChanceA
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-rulesChanceStrsB:
-			.word	strDesc0ChanceB
-			.word	strDesc1ChanceB
-			.word 	strDesc2ChanceB
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-rulesChanceStrsC:
-			.word	strDesc0ChanceC
-			.word	strDummyDummy0
-			.word 	strDesc1ChanceC
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-rulesChanceStrsD:
-			.word	strDesc0ChanceD
-			.word	strDesc1ChanceD
-			.word 	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$01
-			.word	strText0CCCCard0
-rulesChanceStrsE:
-			.word	strDesc0ChanceE
-			.word	strDesc1ChanceE
-			.word 	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-rulesChanceStrsF:
-			.word	strDesc0ChanceF
-			.word	strDummyDummy0
-			.word 	strDesc1ChanceF
-			.byte	$00
-			.word	strDummyDummy0
-			.byte	$00
-			.word	strDummyDummy0
-
-
-rulesChance0:					;advance to station, pay double
-			.byte	$08
-			.byte	$00
-rulesChance1:					;advance to station, pay double
-			.byte	$08
-			.byte	$00
-rulesChance2:					;speeding fine $15
-			.byte	$06
-			.byte	15
-rulesChance3:					;go back 3 spaces
-			.byte	$09
-			.byte	3
-rulesChance4:					;chairman pay each player $50
-			.byte	$0A
-			.byte	50
-rulesChance5:					;advance pall mall
-			.byte	$02		
-			.byte	$0B
-rulesChance6:					;get out of gaol free
-			.byte	$07
-			.byte	$01
-rulesChance7:					;general repairs (chance)
-			.byte	$03
-			.byte	$01
-rulesChance8:					;bank pays $50
-			.byte	$01
-			.byte	50
-rulesChance9:					;Advance Go
-			.byte	$02	
-			.byte	$00
-rulesChanceA:					;go gaol
-			.byte	$05		
-			.byte	$00
-rulesChanceB:					;advance utility, pay 10 times
-			.byte	$0B		
-			.byte	$00
-rulesChanceC:					;Advance Trafalgar
-			.byte	$02	
-			.byte	$18
-rulesChanceD:					;building loan $150
-			.byte	$01
-			.byte	150
-rulesChanceE:					;Advance Kings cross
-			.byte	$02	
-			.byte	$05
-rulesChanceF:					;Advance Mayfair
-			.byte	$02	
-			.byte	$27
 
 ;-------------------------------------------------------------------------------
 ;rulesGenRnd0F
@@ -26073,8 +25083,6 @@ rulesDoPlayerElimin:
 		LDA	($FB), Y
 		STA	game + GAME::varE
 		
-		JSR	rulesAddCash
-
 		LDA	game + GAME::pActive	;Find who we lost to
 		TAX
 		ASL
@@ -26111,6 +25119,37 @@ rulesDoPlayerElimin:
 		RTS
 
 @lostplyr:
+		TXA
+		PHA
+
+		LDA	game + GAME::varE
+		BMI	@skipcash		;This can't happen but
+						;safeguard against it
+		
+		LDA	game + GAME::pActive
+		STA	game + GAME::varU
+		PLA
+		STA	game + GAME::pActive
+
+		TAY
+		LDA	plrLo, Y
+		STA	$FB
+		LDA	plrHi, Y
+		STA	$FC
+
+		JSR	rulesAddCash
+
+		LDX	game + GAME::pActive
+		LDA	game + GAME::varU
+		STA	game + GAME::pActive
+		
+		TAY
+		LDA	plrLo, Y
+		STA	$FB
+		LDA	plrHi, Y
+		STA	$FC
+
+@skipcash:
 		JSR	rulesDoPlyrLostPlyr	;Player lost to other player
 		RTS
 
@@ -26150,7 +25189,7 @@ rulesInitTradeData:
 		DEX
 		BPL	@loop0
 		
-		LDX	#$27
+		LDX	#$1B
 @loop1:
 		STA	trddeeds0, X
 		STA	trdrepay0, X
@@ -26977,7 +26016,7 @@ rulesAutoRecover:
 		RTS
 
 
-rulesAutoSell:
+rulesAutoPay:
 		LDX	game + GAME::pActive
 		LDA	plrLo, X
 		STA	$FB
@@ -27032,6 +26071,7 @@ rulesDoGetOwnCount:
 		TAX
 		LDA	rulesSqr0, X
 		TAX
+
 		DEX
 		TXA
 		
@@ -27084,6 +26124,7 @@ rulesDoGetLastOwn:
 		TAX
 		LDA	rulesSqr0, X
 		TAX
+		
 		DEX
 		TXA
 		
@@ -27377,6 +26418,16 @@ rulesSuggestBaseReserve:
 		CMP	game + GAME::pActive
 		BEQ	@next0
 		
+		TAY
+		LDA	plrLo, Y
+		STA	$A3
+		LDA	plrHi, Y
+		STA	$A4
+		LDY	#PLAYER::status
+		LDA	($A3), Y
+		AND	#$01
+		BEQ	@next0
+		
 		LDA	sqr00 + 1, X
 		AND	#$08
 		BNE	@hotel0
@@ -27630,6 +26681,16 @@ rulesCountOwnedDeeds:
 		CMP	#$FF
 		BEQ	@next
 		
+		TAY
+		LDA	plrLo, Y
+		STA	$A3
+		LDA	plrHi, Y
+		STA	$A4
+		LDY	#PLAYER::status
+		LDA	($A3), Y
+		AND	#$01
+		BEQ	@next
+		
 		INC	game + GAME::varA
 
 @next:
@@ -27816,17 +26877,12 @@ rulesAutoConstruct:
 ;				construct at level
 ;				
 
-		LDX	game + GAME::pActive
-		STX	game + GAME::varK		;varK = player
-
-		JSR	rulesDoCopyImprv
-		
 		LDA	game + GAME::cntHs
 		STA	game + GAME::varH
 		LDA	game + GAME::cntHt
 		STA	game + GAME::varI
 		
-		LDX	#$0A
+		LDX	#$09
 @loop0:
 		STX	game + GAME::varG		;varG = group index
 		
@@ -27886,12 +26942,151 @@ rulesAutoConstruct:
 		RTS
 		
 		
+rulesAutoRepayGroup:
+		LDA	#$02
+		STA	game + GAME::varA
+		
+@loop0:
+		LDA	#$1C
+		LDX	game + GAME::varA
+		BPL	@loop1
+		
+		JMP	@incomplete
+		
+		
+@loop1:
+		INX
+		CPX	#$03
+		BEQ	@cont0
+		
+		SEC
+		SBC	#$0E
+		JMP	@loop1
+		
+@cont0:
+		CLC
+		ADC	game + GAME::varJ
+		
+		TAX
+		LDA	rulesGrpSqrs0, X
+		STA	game + GAME::varF
+		
+		CMP	#$FF
+		BNE	@begin0
+		
+		DEC	game + GAME::varA
+		JMP	@loop0
+
+@begin0:
+		ASL
+		STA	game + GAME::varL
+		TAX
+		LDA	sqr00, X
+		CMP	game + GAME::varK
+		BEQ	@begin1
+		
+		JMP	@donext
+		
+@begin1:
+		LDX	game + GAME::varF
+		LDA	rulesSqrImprv, X
+		AND	#$80
+		BEQ	@donext
+
+		LDX	game + GAME::varL
+		JSR	gameGetCardPtrForSquareImmed
+		
+		LDY	#DEED::mValue
+		LDA	($FD), Y
+		STA	game + GAME::varD
+		INY
+		LDA	($FD), Y
+		STA	game + GAME::varE
+		
+		LDY	#DEED::mFee
+		CLC
+		LDA	($FD), Y
+		ADC	game + GAME::varD
+		STA	game + GAME::varD
+		INY
+		LDA	($FD), Y
+		ADC	game + GAME::varE
+		STA	game + GAME::varE
+
+		JSR	gameAmountIsLessDirect
+		BCS	@repay
+		
+@incomplete:
+		LDA	#$00
+		RTS
+		
+@repay:
+		SEC
+		LDA	game + GAME::varO
+		SBC	game + GAME::varD
+		STA	game + GAME::varO
+		LDA	game + GAME::varP
+		SBC	game + GAME::varE
+		STA	game + GAME::varP
+		
+		LDA	UI_ACT_REPY
+		STA	$68
+		LDA	game + GAME::varK
+		STA	$69
+		LDA	game + GAME::varF
+		STA	$6A
+		
+		JSR	uiEnqueueAction
+
+@donext:
+		DEC	game + GAME::varA
+		LDA	game + GAME::varA
+		CMP	#$FF
+		BEQ	@incomplete
+		
+		JMP	@loop0
+		
+		LDA	#$01
+		RTS
+		
+		
 rulesAutoRepay:
+		LDA	game + GAME::varD
+		STA	game + GAME::varO
+		LDA	game + GAME::varE
+		STA	game + GAME::varP
+
+		LDX	#$09
+@loop0:
+		STX	game + GAME::varG		;varG = group index
+		
+		LDA	rulesGrpPriority, X	
+		STA	game + GAME::varJ	
+
+		JSR	rulesAutoRepayGroup
+
+@next0:
+		LDX	game + GAME::varG
+
+		DEX
+		BPL	@loop0
+		
+@complete:		
 		RTS
 
 
 rulesAutoImprove:
 ;	USES:	varD,E	=	amount surplus and available
+
+		LDX	game + GAME::pActive
+		STX	game + GAME::varK		;varK = player
+
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+
+		JSR	rulesDoCopyImprv
 
 ;	Find base rent value needed
 		JSR	rulesSuggestBaseReserve
@@ -27899,9 +27094,9 @@ rulesAutoImprove:
 ;	Find number deeds owned
 		JSR	rulesCountOwnedDeeds
 
-;	All 22
+;	All 28
 		LDA	game + GAME::varA
-		CMP	#$16
+		CMP	#$1C
 		BNE	@tst16
 		
 ;		Increase value by 150
@@ -27913,8 +27108,8 @@ rulesAutoImprove:
 		JMP	@bump
 		
 @tst16:
-;	Or more than 16
-		CMP	#$10
+;	Or more than 20
+		CMP	#$14
 		BMI	@tst11
 
 ;		Increase value by 200
@@ -27926,8 +27121,8 @@ rulesAutoImprove:
 		JMP	@bump
 
 @tst11:
-;	Or more than 11
-		CMP	#$0B
+;	Or more than 12
+		CMP	#$0C
 		BMI	@default
 		
 ;		Increase value by 300
@@ -27956,12 +27151,6 @@ rulesAutoImprove:
 		STA	game + GAME::varE
 
 ;	Subtract value from money store as value
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::money
 		SEC
 		LDA	($FB), Y
@@ -28139,7 +27328,7 @@ rulesAutoTradeWith:
 
 
 rulesAutoPlay:
-		JSR	rulesAutoSell
+		JSR	rulesAutoPay
 		BNE	@complete
 
 		LDA	game + GAME::dieRld
@@ -28162,6 +27351,248 @@ rulesAutoPlay:
 		RTS
 
 @complete:
+		LDA	#$01
+		RTS
+
+
+rulesStnSqrForIndex:
+		CPX	#$00
+		BNE	@1
+		LDA	#$05
+		RTS
+@1:
+		CPX	#$01
+		BNE	@2
+		LDA	#$0F
+		RTS
+@2:
+		CPX	#$02
+		BNE	@3
+		LDA	#$19
+		RTS
+@3:
+		LDA	#$23
+		RTS
+		
+
+rulesUtilSqrForIndex:
+		CPX	#$00
+		BNE	@1
+		LDA	#$0C
+		RTS
+@1:
+		LDA	#$1C
+		RTS
+		
+
+rulesAutoEliminGroup:
+		LDA	#$03
+		STA	game + GAME::varA
+		
+@loop0:
+		LDX	game + GAME::varA
+		BPL	@fetchsqr
+		
+		JMP	@complete
+		
+@fetchsqr:
+		LDA	game + GAME::varG
+		CMP	#$09
+		BNE	@tstutil
+		
+		JSR	rulesStnSqrForIndex
+		JMP	@begin0
+		
+@tstutil:
+		CMP	#$0A
+		BNE	@street
+		
+		CPX	#$02
+		BPL	@skipidx
+
+		JSR	rulesUtilSqrForIndex
+		JMP	@begin0
+
+@street:
+		CPX	#$03
+		BNE	@docalc
+		
+@skipidx:
+		DEC	game + GAME::varA
+		JMP	@loop0
+		
+@docalc:
+		LDA	#$1C
+		LDX	game + GAME::varA
+		
+
+@loop1:
+		INX
+		CPX	#$03
+		BEQ	@cont0
+		
+		SEC
+		SBC	#$0E
+		JMP	@loop1
+		
+@cont0:
+		CLC
+		ADC	game + GAME::varJ
+		
+		TAX
+		LDA	rulesGrpSqrs0, X
+		
+		CMP	#$FF
+		BNE	@begin0
+		
+		DEC	game + GAME::varA
+		JMP	@loop0
+
+@begin0:
+		STA	game + GAME::varF
+		
+		ASL
+		TAX
+		LDA	sqr00, X
+		CMP	game + GAME::varK
+		BEQ	@begin1
+		
+		JMP	@donext
+		
+@begin1:
+		JSR	gameGetCardPtrForSquareImmed
+		
+		LDY	#DEED::mValue
+		LDA	($FD), Y
+		STA	game + GAME::varD
+		INY
+		LDA	($FD), Y
+		STA	game + GAME::varE
+		
+		LDY	#DEED::mFee
+		CLC
+		LDA	($FD), Y
+		ADC	game + GAME::varD
+		STA	game + GAME::varD
+		INY
+		LDA	($FD), Y
+		ADC	game + GAME::varE
+		STA	game + GAME::varE
+
+		JSR	gameAmountIsLessDirect
+		BCS	@select
+		
+		JMP	@donext
+		
+@select:
+		SEC
+		LDA	game + GAME::varO
+		SBC	game + GAME::varD
+		STA	game + GAME::varO
+		LDA	game + GAME::varP
+		SBC	game + GAME::varE
+		STA	game + GAME::varP
+		
+		LDY	#TRADE::cntDeed
+		LDA	trade1, Y
+		TAY
+		LDA	game + GAME::varF
+		STA	trddeeds1, Y
+		LDA	#$81
+		STA	trdrepay1, Y
+		INY
+		TYA
+		LDY	#TRADE::cntDeed
+		STA	trade1, Y
+		
+@donext:
+		DEC	game + GAME::varA
+		LDA	game + GAME::varA
+		CMP	#$FF
+		BEQ	@complete
+		
+		JMP	@loop0
+		
+@complete:
+		LDA	#$01
+		RTS
+		
+
+rulesAutoEliminSelect:
+		LDA	game + GAME::varD
+		STA	game + GAME::varO
+		LDA	game + GAME::varE
+		STA	game + GAME::varP
+		
+		LDX	#$09
+@loop0:
+		STX	game + GAME::varG		;varG = group index
+		
+		LDA	rulesGrpPriority, X	
+		STA	game + GAME::varJ	
+
+		JSR	rulesAutoEliminGroup
+
+@next0:
+		LDX	game + GAME::varG
+
+		DEX
+		BPL	@loop0
+		
+@complete:		
+		RTS
+		
+
+rulesAutoEliminate:
+		STX	game + GAME::varK		;varK = player
+
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+
+		JSR	rulesDoCopyImprv
+
+;	Find base rent value needed
+		JSR	rulesSuggestBaseReserve
+		
+		CLC
+		LDA	game + GAME::varD
+		ADC	#175
+		STA	game + GAME::varD
+		LDA	game + GAME::varE
+		ADC	#$00
+		STA	game + GAME::varE
+
+		LDY	#$02
+		LDX	#$05
+		JSR	rulesDoNudgeValue
+
+;	Subtract value from money store as value
+		LDY	#PLAYER::money
+		SEC
+		LDA	($FB), Y
+		SBC	game + GAME::varD
+		STA	game + GAME::varD
+		INY
+		LDA	($FB), Y
+		SBC	game + GAME::varE
+		STA	game + GAME::varE
+		
+;	Have positive value, AutoEliminSelect
+		BMI	@complete
+
+		JSR	rulesAutoEliminSelect
+		
+@complete:	
+		LDA	#UI_ACT_SKEY
+		STA	$68
+		LDA	#'C'
+		STA	$69
+		
+		JSR	uiEnqueueAction
+		
 		LDA	#$01
 		RTS
 
@@ -28951,8 +28382,19 @@ initFirstTime:
 
 		JSR	numConvInit
 
+		JSR	initUI
+
 		JSR	initNew
 
+		RTS
+
+;-------------------------------------------------------------------------------
+initUI:
+;-------------------------------------------------------------------------------
+		JSR	uiInitQueue
+		LDA	#$FF
+		LDY	#$00
+		STA	($6D), Y
 		RTS
 
 
@@ -29144,11 +28586,11 @@ brdMiniMap:
 plrDefName:
 			.byte 	$08, $90, $8C, $81, $99, $85, $92, $E4, $B0
 
-uiActnCache:
-	.repeat		256, I
-			.byte	$FF, $00, $00, $00
-	.endrep
-
+uiActnCache	=	$FB00
+;	.repeat		256, I
+;			.byte	$FF, $00, $00, $00
+;	.endrep
+;
 heap0:
 			.byte	$00
 			
