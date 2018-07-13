@@ -150,25 +150,26 @@ version can effectively do to a very large extent).
 The following optional house rules are available (or considered):
 	
 * Starting money can be set low ($1000) or high ($2000).  I have
-done this because I feel that with only two players, the normal
-starting money is too low.  There just isn't enough capital in play
-in my opinion.  $2000 for three players is questionably high but 
-still works alright enough.  For four or more you probably want the 
-normal amount.  I may expand the selection range.  I have been 
-asked for $3000 but this is definitely too high.
+  done this because I feel that with only two players, the normal
+  starting money is too low.  There just isn't enough capital in play
+  in my opinion.  $2000 for three players is questionably high but 
+  still works alright enough.  For four or more you probably want the 
+  normal amount.  I may expand the selection range.  I have been 
+  asked for $3000 but this is definitely too high.
 * Taxes can be sent to and collected from Free Parking. 
-I actually hate this house rule because it is insanely unbalanced and
-can cause the game to drag on.  It is widely desired, however so I
-provide it (it has been almost free in the implementation 
-anyway).  Only taxes will be accumulated.
+  I actually hate this house rule because it is insanely unbalanced and
+  can cause the game to drag on.  It is widely desired, however so I
+  provide it (it has been almost free in the implementation 
+  anyway).  Only tax accumulation is implemented and that's all I'll 
+  allow.  Ever.  Period.
 * I am considering the "double salary for actually landing on Go"
-house rule but I feel it is largely redundant with a high starting
-money option.
+  house rule but I feel it is largely redundant with a high starting
+  money option.
 * Since I have mentioned it, I will field requests for the printed
-bills only house rule (since there is always going to be some kind
-of cap).  It would be implemented such that effectively, a best-fit
-of bills would be applied (shuffling them about through all accounts).
-So simply a total funds cap.
+  bills only house rule (since there is always going to be some kind
+  of cap).  It would be implemented such that effectively, a best-fit
+  of bills would be applied (shuffling them about through all accounts).
+  So simply a total funds cap.
 
 
 ## Rule Observations and Deductions
@@ -394,49 +395,45 @@ RUN
 
 ## Known Issues
 
+* Pasting the clipboard into WinVICE causes all kinds of problems including
+  data corruption and crashes.  It is definitely a WinVICE bug because my code 
+  never sees it happen.
 * There seems to be an odd race condition which will, on occasion, cause
-the game to not update correctly and hang at launch.  It only happens 
-once in a hundred times when loading on VICE (and perhaps a real C64) 
-but on the Mega65, it happens all the time unless the machine is warm 
-booted prior to loading the game.  I have attempted to fix it but I
-haven't succeeded.  I will now endeavour to debug if and when it
-occurs in my testing.  From what I have been able to see, it seems
-that the IRQ has not been acknowledged correctly when this occurs?
+  the game to not update correctly and hang at launch.  It only happens 
+  once in a hundred times when loading on VICE (and perhaps a real C64) 
+  but on the Mega65, it happens all the time unless the machine is warm 
+  booted prior to loading the game.  I have attempted to fix it but I
+  haven't succeeded.  I will now endeavour to debug if and when it
+  occurs in my testing.  From what I have been able to see, it seems
+  that the IRQ has not been acknowledged correctly when this occurs?
 * If the game is launched in a non-default memory configuration (the 
-VIC-II screen and charrom locations), it won't attempt to normalise 
-the condition.  The game will be unplayable.  I should normalise the 
-system configuration in the first-time initialisation.
+  VIC-II screen and charrom locations), it won't attempt to normalise 
+  the condition.  The game will be unplayable.  I should normalise the 
+  system configuration in the bootstrap.
 * SFX often get lost and "music" breaks up because of the limited 
-number of channels (two) available to play sounds on.  The third 
-voice is used for random number generation. Even though it is a more 
-comfortable pace, using the stepping (not jumping) mode is worse for the sound. 
-You can play very fast in the jumping mode and cause some interesting squeaks too. 
-There are other sound oddities which I am trying to address.
+  number of channels (two) available to play sounds on.  The third 
+  voice is used for random number generation. Even though it is a more 
+  comfortable pace, using the stepping (not jumping) mode is worse for the sound. 
+  You can play very fast in the jumping mode and cause some interesting squeaks too. 
 * The audio driver and IRQ handler is expecting a PAL machine.  You
-will get strange results on an NTSC one, I expect.  I may release an
-NTSC/PAL-N version in the future.
-* Clicking too quickly with the joystick at the very start seems to
-  cause the game to think you're using the mouse.  I might be able
-  to fix this...
+  will get strange results on an NTSC one, I expect.  I may release an
+  NTSC/PAL-N version in the future.
+
+
 
 ## TODO
 
 * Statistics/Overview from trade approval, must pay.  They should work now.
-* Change trade jump menu naming and texts to action jump menu
+* Change trade jump menu naming and texts to action jump menu.
 
 * Should be able to do beta release state after above
 
 * Could now instead of copy name on elimin and gameover dialogs, just refer.
  
-* Trim down key scan routine (remove vector for atl keys and control, sys tables).
-  
 * CPU players setup menu
 
 * CPU player still needs:  AutoAuction, AutoTradeApprove, AutoTradeInitiate
 * "Thinking" prompt when cpu engaged?  Its so fast anyway... 
-* AutoBuy - there is a bug when reclaiming equity in order to sell that
-  causes no money to be paid for sale.  I can only see it with CPU player, can't 
-  reproduce in debugging equivalents.  Now trapping and faulting if occurs.
 * rulesDoCommitMrtg needs to step through the squares like rulesAutoRepayGroup 
   does (but in forward order).
 
@@ -447,8 +444,6 @@ NTSC/PAL-N version in the future.
 * Once have above, can check in roll that the player is the one with the dice 
   (is the player for the last normal mode).  Just to be safe?
 * Could also do other mode chain integrity checks.
-* Backup/retrieve menu button selection going to/returning from dialogs when
-  the menu hasn't changed?  Would be nice...
 * Change "all" dirty to be just board dirty and req. individual flags?
 * Player sprites on overview dialog.  Would look pretty.  IRQ is a mess.
 * Put code into separate files as indicated.
@@ -471,10 +466,39 @@ NTSC/PAL-N version in the future.
   shuffle (and while owned by a player)
 * Ensure all options/pages are displayed for all menus.
 * In elmination, trdsel dialog doesn't show cash value.
-* Fixed issue with CPU player and setup1 chosing invalid option.
+* GOFree cards properly traded in trades.
+
 
 ## Change History (Since Version 0.01.99A)
+* 13JUL2018
+	* Add debugging data (player and address) for CPU fault to null0 dialog.
+	* Save the last selected button and attempt to restore it as the current
+	  selection when redrawing the same menu.  This should work when going 
+	  between dialog and menu but mostly this will involve a menu change, 
+	  anyway.
+	* Add actual GOFree card exchange to trade.
+	* Fixed menu looping when no deeds in trade.
+	* Don't assume mouse when receiving space in setup7 keys.  Assume invalid 
+	  input unless flag set for peripheral device and check peripherals properly.
+	* Implement MouseUsed flag for determining source of generic input.
+	* Fix bug in uiPerformBuy causing price to not be paid.
+	* Some other delays.  It is more versatile this way...
+	* Add delay to next out of gaol and after AutoImprove, AutoRepay (not both)
+	  and AutoRecover.  I find this funny because I optimised the delay away
+	  and then put it back again for some/many cases.
+	* Fix CPU not engaging on menu changes when joystick input not enabled and
+	  strange artefacts updating button selection (also get hot flashing for
+	  mouse now?).
+	* AutoImprove from gaol.
+	* Calculate suggested base reserve correctly.
 * 12JUL2018
+	* Fix key code for repay button on trdsel0 dialog.
+	* Remove special key (control, shift, CBM) handling from key scan.
+	* Revert change to lead time on processing actions.
+	* Fix CPU making invalid selection for Setup1 menu.
+	* Fix bug in init code (I shouldn't need that code, anyway).
+	* Fix a problem with hot button flashing.
+	* Move more init code into discardable area.
 	* Move/add some init code into bootstrap.
 	* Move some discardable data/code to after heap ptr to save memory.  Saved
 	  some 300 bytes for program.
