@@ -395,9 +395,9 @@ RUN
 
 ## Known Issues
 
-* Pasting the clipboard into WinVICE causes all kinds of problems including
-  data corruption and crashes.  It is definitely a WinVICE bug because my code 
-  never sees it happen.
+* Pasting the clipboard in VICE causes all kinds of problems including
+  data corruption and crashes.  It is definitely a VICE issue because my code 
+  never sees it happen.  Don't paste in VICE!
 * There seems to be an odd race condition which will, on occasion, cause
   the game to not update correctly and hang at launch.  It only happens 
   once in a hundred times when loading on VICE (and perhaps a real C64) 
@@ -406,10 +406,6 @@ RUN
   haven't succeeded.  I will now endeavour to debug if and when it
   occurs in my testing.  From what I have been able to see, it seems
   that the IRQ has not been acknowledged correctly when this occurs?
-* If the game is launched in a non-default memory configuration (the 
-  VIC-II screen and charrom locations), it won't attempt to normalise 
-  the condition.  The game will be unplayable.  I should normalise the 
-  system configuration in the bootstrap.
 * SFX often get lost and "music" breaks up because of the limited 
   number of channels (two) available to play sounds on.  The third 
   voice is used for random number generation. Even though it is a more 
@@ -417,39 +413,46 @@ RUN
   You can play very fast in the jumping mode and cause some interesting squeaks too. 
 * The audio driver and IRQ handler is expecting a PAL machine.  You
   will get strange results on an NTSC one, I expect.  I may release an
-  NTSC/PAL-N version in the future.
+  NTSC/PAL-N compatible version in the future.
 
 
 
 ## TODO
 
 * Statistics/Overview from trade approval, must pay.  They should work now.
-* Change trade jump menu naming and texts to action jump menu.
+* Put AutoPay on play menu.
 
-* Should be able to do beta release state after above
+* Should be able to do beta release state after above.
 
-* Could now instead of copy name on elimin and gameover dialogs, just refer.
- 
-* CPU players setup menu
-
-* CPU player still needs:  AutoAuction, AutoTradeApprove, AutoTradeInitiate
-* "Thinking" prompt when cpu engaged?  Its so fast anyway... 
-* rulesDoCommitMrtg needs to step through the squares like rulesAutoRepayGroup 
-  does (but in forward order).
-
-* Allow players to input name?
-* Get exomiser working.
+* CPU players setup menu.
+* Change trade6 menu naming to action jump menu.
 * Consolidate all the backup/retrievals of game mode + player into a single main
   state stack.
-* Once have above, can check in roll that the player is the one with the dice 
-  (is the player for the last normal mode).  Just to be safe?
+* Once have main state stack, can check in roll that the player is the one 
+  with the dice (is the player for the normal mode).  Just to be safe?
 * Could also do other mode chain integrity checks.
-* Change "all" dirty to be just board dirty and req. individual flags?
+* Allow players to input name.
+* Could now instead of copy name on elimin and gameover dialogs, just refer.
+* gamePlayerHasWealth is unused?
+
+* CPU player still needs:  AutoTradeApprove, AutoTradeInitiate
+* "Thinking" menu/prompt when cpu engaged?  Its so fast anyway... 
+* rulesSuggestDeedValue should tap values based on group significance.
+* AutoAuction should commit equity like AutoBuy does and perhaps not bail so 
+  early (push value upwards if its less than what they and other players currently 
+  have).
+
 * Player sprites on overview dialog.  Would look pretty.  IRQ is a mess.
+* Get exomiser working.
+
+* Should be able to do release state after above and all testing items passed.
+
+* Change "all" dirty to be just board dirty and req. individual flags?
 * Put code into separate files as indicated.
 * Is rent3 SFX still a little lame?  Does it matter?  Are the sounds okay on 
   Android (where the emulation is terrible)?
 * Properly divide game and rule routines.  Hmm...
+* CPU difficulty settings?
 * Fix ZPage variable use, in particular active player pointer and IRQ.
 * Fix IRQ handler -- its gotten hacked to death.
 * Game save/load?  Difficult now that the Kernal program and data space is used.
@@ -460,17 +463,33 @@ RUN
 ## For Testing (Needs Confirmation):
 * Player focus restored after player lose to player interrupt?
 * Money cap (32767) not exceeded on addcash?
-* Don't allow leave management when -ve hses, htls at all
-* Must pay works from trade/elimination?
+* Don't allow leave management when -ve hses, htls at all.
+* Must pay works after trade/elimination?
+* Multiple eliminations in one turn works?
 * Used GO Free cards prevented from appearing in deck until after 
-  shuffle (and while owned by a player)
+  shuffle (and while owned by a player).
 * Ensure all options/pages are displayed for all menus.
 * In elmination, trdsel dialog doesn't show cash value.
 * GOFree cards properly traded in trades.
 
 
 ## Change History (Since Version 0.01.99A)
-* 13JUL2018
+* 14JUL2018
+	* Normalise VIC-II settings in bootstrap.
+	* Add strings for CPU players menu (setup9).
+	* Change texts on trade6 menu for action updating.
+	* Prompt for actions taken on auction menu.
+	* Fix rulesDoCommitMrtg to not step through all squares (just squares in
+	  group), to also check improvements and correctly flag mortgage.
+	* Don't improve in rulesDoConstructAtLevel when have insufficient funds
+	  already.
+	* Change setting/usetting of carry in gameAmountIsLess (et al) to match 
+	  CPU unsigned behaviour for less than (carry clear not carry set).
+	* Bump version.
+	* Implement AutoAuction.
+	* Fix GOFree card trade?
+* 13JUL2018	
+	* CPU mustn't roll and then post in AutoGaol.
 	* Add debugging data (player and address) for CPU fault to null0 dialog.
 	* Save the last selected button and attempt to restore it as the current
 	  selection when redrawing the same menu.  This should work when going 

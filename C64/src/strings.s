@@ -26,7 +26,7 @@ strDesc4Titles0:	;SOLUTIONS
 			.byte $8E, $93	
 strDesc8Titles0:	;VERSION 0.02.02A
 			.byte $10, $96, $85, $92, $93, $89, $8F, $8E
-			.byte $A0, $B0, $AE, $B0, $B2, $AE, $B0, $B2
+			.byte $A0, $B0, $AE, $B0, $B2, $AE, $B1, $B9
 			.byte $81			
 strDesc5Titles0:	;(C) 1935, 2016
 			.byte $0E, $A8, $83, $A9, $A0, $B1, $B9, $B3

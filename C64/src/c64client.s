@@ -20,6 +20,33 @@
 ;
 ;Please see readme.md for further information.
 ;
+;
+;Free memory information (as of last update from 0.02.19A):
+;	* Between strings and rules data, 843 bytes (free for data)
+;	* Between rules data and action cache, 239 bytes (free for data)
+;	* Between heap and reserved, 5596 bytes (free for program)
+;	* Reserved areas, 768 bytes (unavailable/unused)
+;
+;By my calculation, there are 655 bytes unaccounted for somewhere...  Where did
+;they go?
+;
+;
+;Memory map (as of last update from 0.02.19A):
+;	0000 -	00FF	Zero page
+;	0100 -	01FF	System stack
+;	0200 - 	03FF	Global state
+;	0400 - 	07FF	Screen data and sprite pointers
+;	0800 - 	08FF	Sprite data/bootstrap
+;	0900 -  B823	Program area
+;	B824 - 	CDFF	Discard/heap
+;	CE00 - 	CFFF	Reserved (may be used for additional discard/heap)
+;	D000 - 	DFFF	System IO
+;	E000 -	F3FF	Strings data (ends at F0B5)
+;	F400 - 	FAFF	Rules data (ends at FA11)
+;	FB00 - 	FEFF	Action cache
+;	FF00 -  FFF9	Reserved (unused on purpose)
+;	FFFA -	FFFF	System vectors
+;
 ;===============================================================================
 
 
@@ -31,9 +58,9 @@
 ;-------------------------------------------------------------------------------
 ;Compile switch definitions
 ;-------------------------------------------------------------------------------
-	.define	DEBUG_IRQ	0
+	.define DEBUG_IRQ 	0
 	.define DEBUG_KEYS	0
-	.define DEBUG_CPU	0
+	.define DEBUG_CPU 	0
 
 
 ;-------------------------------------------------------------------------------
@@ -119,6 +146,7 @@ vicCtrlReg	=	$D011
 vicRstrVal	=	$D012
 vicSprEnab	= 	$D015
 vicSprExpY	=	$D017
+vicMemCtrl	=	$D018
 vicIRQFlgs	=	$D019
 vicIRQMask	=	$D01A
 vicSprCMod	= 	$D01C
@@ -582,7 +610,7 @@ bootstrap:
 		LDA	#$1E
 		STA	$01		
 
-;***TODO:	Change VIC mode here and standardise
+		JSR	initVICII
 
 		JSR	initDataLoad
 		
@@ -1158,22 +1186,6 @@ keyQueueEnPos:
 		.byte	$00
 
 
-keyInit:
-;		LDA	#<keyEvaluateSpecial
-;		STA	keyModifierVect
-;		LDA	#>keyEvaluateSpecial
-;		STA	keyModifierVect + 1
-		
-		LDA	#$00
-		STA	keyRepeatFlag
-		
-;		LDA	#$80
-;		STA	keyModifierLock
-		
-		LDA	#$0A
-		STA	keyBufferSize
-		RTS
-
 keyEnqueueKey:
 		LDX	keyQueueEnPos
 		STA	keyQueue0, X
@@ -1181,6 +1193,7 @@ keyEnqueueKey:
 		INC	keyQueueEnPos
 		
 		RTS
+
 
 keyDequeueKeys:
 		LDA	ui + UI::fInjKey
@@ -3050,41 +3063,11 @@ irqglob:	.tag	IRQGLOBS
 irqBlinkSeq0:
 		.byte	$00, $00, $0C, $0C, $0F, $0F, $01, $01, $0F, $0F, $0C, $0C
 
-;-------------------------------------------------------------------------------
-;plyrInit
-;-------------------------------------------------------------------------------
-plyrInit:
-		LDX	game + GAME::pActive
-		LDA	vicSprClr1, X
-		STA	irqBlinkSeq0
-		STA	irqBlinkSeq0 + 1
-		
-		STX	irqglob + IRQGLOBS::minPlr
-		LDA	#$00
-		STA	irqglob + IRQGLOBS::minIdx
-		STA	irqglob + IRQGLOBS::minFlg
-		
-		LDA	ui + UI::cJskSns
-		STA	ui + UI::cJskDly
-		
-		LDA	#$01
-		STA	ui + UI::fMseEnb
-		STA	ui + UI::fJskEnb
-		
-		JSR	CMOVEX
-		JSR	CMOVEY
-		
-		RTS
-
-
-plyrNOP:
-		RTI
 
 
 ;-------------------------------------------------------------------------------
-;plyrInstall
+installPlyr:
 ;-------------------------------------------------------------------------------
-plyrInstall:
 		LDA	irqglob + IRQGLOBS::instld
 		CMP	#$01
 		BEQ	@exit
@@ -3127,7 +3110,13 @@ plyrInstall:
 		
 
 ;-------------------------------------------------------------------------------
-;plyrIRQ
+plyrNOP:
+;-------------------------------------------------------------------------------
+		RTI
+
+
+;-------------------------------------------------------------------------------
+plyrIRQ:
 ;-------------------------------------------------------------------------------
 ;***TODO:		Should use self-patching in IRQ routine.  Use RAM!
 ;***FIXME:		Perhaps way it does so much testing is reason for 
@@ -3135,7 +3124,6 @@ plyrInstall:
 ;***FIXME:		Don't do third interrupt?  Process its code after
 ;			second?
 
-plyrIRQ:
 		PHP				;save the initial state
 		PHA
 		TXA				;de This is done in the kernal
@@ -3390,9 +3378,8 @@ plyrIRQ:
 
 
 ;-------------------------------------------------------------------------------
-;plyrCheckStepping
-;-------------------------------------------------------------------------------
 plyrCheckStepping:
+;-------------------------------------------------------------------------------
 		LDA	game + GAME::gMode	;If in trade selection mode
 		CMP	#$07				
 		BEQ	@tstsig
@@ -5326,6 +5313,16 @@ tokPrmptPostBail:	;BAIL
 tokPrmptFee:		;FEE
 			.byte 	$51, $06, $05, $05, $20, $20, $20, $20
 			.byte	$20, $24, $20, $20, $20, $20, $20, $20
+tokPrmptForfeit:	;FORFEIT
+			.byte 	$51, $06, $0F, $12, $06, $05, $09, $14
+			.byte	$20, $20, $20, $20, $20, $20, $20, $20
+tokPrmptPass:		;PASS
+			.byte 	$51, $10, $01, $13, $13, $20, $20, $20
+			.byte	$20, $20, $20, $20, $20, $20, $20, $20
+tokPrmptBid:		;BID
+			.byte 	$51, $02, $09, $04, $20, $20, $20, $20
+			.byte	$20, $24, $20, $20, $20, $20, $20, $20
+
 
 ;-------------------------------------------------------------------------------
 ;prmptClear
@@ -5998,8 +5995,84 @@ prmptForSale:
 		JMP	prmptDoAddCash
 
 		RTS
+
+
+prmptForfeit:
+		TXA
+		PHA
 		
+		LDX	#$0F
+@loop1:
+		LDA	tokPrmptForfeit, X
+		STA	prmptTok1, X
+
+		LDA	#$0F
+		STA	prmptClr1, X
+
+		DEX
+		BPL	@loop1
 		
+		PLA
+		STA	prmptClr1
+		
+		LDA	prmptTemp2
+		AND	#$F0
+		STA	prmptTemp2
+		
+		LDA	#$20
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+		RTS
+
+
+prmptPass:
+		TXA
+		PHA
+		
+		LDX	#$0F
+@loop1:
+		LDA	tokPrmptPass, X
+		STA	prmptTok1, X
+
+		LDA	#$0F
+		STA	prmptClr1, X
+
+		DEX
+		BPL	@loop1
+		
+		PLA
+		STA	prmptClr1
+		
+		LDA	prmptTemp2
+		AND	#$F0
+		STA	prmptTemp2
+		
+		LDA	#$20
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+		RTS
+
+
+prmptBid:
+		TXA
+		PHA
+
+		LDX	#$0F
+@loop1:
+		LDA	tokPrmptBid, X
+		STA	prmptTok1, X
+
+		LDA	#$0F
+		STA	prmptClr1, X
+
+		DEX
+		BPL	@loop1
+		
+		JMP	prmptDoAddCash
+
+
 ;==============================================================================
 ;FOR STATUS.S
 ;==============================================================================
@@ -7193,17 +7266,7 @@ cpuPerformBuy:
 
 
 cpuPerformAuction:
-;***TODO:	Try to participate
-
-;***TODO:	I don't know if this works because of the way that the
-;		action processing changes the current player??
-
-		LDA	#UI_ACT_SKEY
-		STA	$68
-		LDA	#'F'
-		STA	$69
-		
-		JSR	uiEnqueueAction
+		JSR	rulesAutoAuction
 		
 		RTS
 
@@ -9708,9 +9771,9 @@ menuPageAuctnDefKeys:
 		LDA	game + GAME::mACurr
 		LDY	game + GAME::mACurr + 1
 		
-;		So, if money less than A, Y - set carry else clear
+;		So, if money less than A, Y - clear carry else set
 		JSR	gamePlayerHasFunds
-		BCC	@beginbid
+		BCS	@beginbid
 		
 		JMP	@keysBuzz
 		
@@ -9725,9 +9788,25 @@ menuPageAuctnDefKeys:
 		
 		LDA	game + GAME::mACurr + 1
 		CMP	game + GAME::mAuctn + 1
-		BEQ	@keysExit		;Yes, so don't do anything
+		BNE	@dobid
+		JMP	@keysExit		;Yes, so don't do anything
 		
 @dobid:
+		LDA	game + GAME::mACurr
+		STA	game + GAME::varD
+		LDA	game + GAME::mACurr + 1
+		STA	game + GAME::varE
+
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		LDY 	#PLAYER::colour
+		LDA	($FB), Y
+		TAX
+		JSR	prmptBid
+
 		JSR	menuPageAuctn0Bid
 		JSR	rulesNextTurn
 		JMP	@keysUpdateAll
@@ -9736,6 +9815,16 @@ menuPageAuctnDefKeys:
 		CMP	#'P'
 		BNE	@keysF
 
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		LDY 	#PLAYER::colour
+		LDA	($FB), Y
+		TAX
+		JSR	prmptPass
+		
 		JSR	menuPageAuctn0Pass
 		JSR	rulesNextTurn
 		JMP	@keysUpdateAll
@@ -9743,7 +9832,19 @@ menuPageAuctnDefKeys:
 
 @keysF:
 		CMP	#'F'
-		BNE	@keysOther
+		BEQ	@forfeit
+		JMP	@keysOther
+		
+@forfeit:
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		LDY 	#PLAYER::colour
+		LDA	($FB), Y
+		TAX
+		JSR	prmptForfeit
 		
 		JSR	menuPageAuctn0Forf
 		JSR	rulesNextTurn
@@ -9758,9 +9859,9 @@ menuPageAuctnDefKeys:
 		LDA	game + GAME::mAuctn
 		LDY	game + GAME::mAuctn + 1
 		
-;		D, E < A, Y -> SEC | CLC
+;		D, E < A, Y -> CLC | SEC
 		JSR	gameAmountIsLess	;If trying to bid less...
-		BCC	@keysUpdate
+		BCS	@keysUpdate
 
 		LDA	game + GAME::mAuctn	;reset the bid
 		STA	game + GAME::mACurr
@@ -9773,9 +9874,9 @@ menuPageAuctnDefKeys:
 		LDA	game + GAME::mACurr
 		LDY	game + GAME::mACurr + 1
 		
-;		So, if money less than A, Y - set carry else clear
+;		So, if money less than A, Y - clear carry else set
 		JSR	gamePlayerHasFunds
-		BCC	@keysUpdate
+		BCS	@keysUpdate
 		
 		LDY	#PLAYER::money		;This is safe since $FB was loaded
 		LDA	($FB), Y		;in gamePlayerHasFunds
@@ -9854,9 +9955,9 @@ menuPageAuctn0Draw:
 		LDA	game + GAME::mACurr
 		LDY	game + GAME::mACurr + 1
 		
-;		So, if money less than A, Y - set carry else clear
+;		So, if money less than A, Y - clear carry else set
 		JSR	gamePlayerHasFunds
-		BCC	@havefunds
+		BCS	@havefunds
 		
 		LDA	#$A0
 		STA	menuWindowAuctn0Bid
@@ -11543,13 +11644,12 @@ menuPageElimin0Draw:
 		RTS
 
 
-
+menuPlyrSelCallProc:
+		.word	$0000
 menuPlyrSelAllowCur:
 		.byte	$00
 menuPlyrSelSelect:
 		.byte	$00
-menuPlyrSelCallProc:
-		.word	$0000
 
 
 ;***THIS IS VERY NAUGHTY SO THE MENU DATA CAN'T BE MORE THAN ONE PAGE 
@@ -12058,9 +12158,9 @@ gamePerformQuit:
 		LDA	game + GAME::varI
 		STA	game + GAME::varE
 	
-;		D, E < (O, P) -> SEC | CLC
+;		D, E < (O, P) -> CLC | SEC 
 		JSR	gameAmountIsLessDirect
-		BCC	@next
+		BCS	@next
 		
 @found:
 		LDA	game + GAME::varG
@@ -14130,7 +14230,7 @@ gamePerfTradeCCCCards:
 		BEQ	@wchance
 
 		LDY	#TRADE::player
-		LDA	trade0, Y
+		LDA	trade1, Y
 		
 		STA 	game + GAME::pGF0Crd
 
@@ -14141,7 +14241,7 @@ gamePerfTradeCCCCards:
 		BEQ	@ochest
 		
 		LDY	#TRADE::player
-		LDA	trade0, Y
+		LDA	trade1, Y
 		
 		STA 	game + GAME::pGF0Crd
 
@@ -14152,7 +14252,7 @@ gamePerfTradeCCCCards:
 		BEQ	@ochance
 
 		LDY	#TRADE::player
-		LDA	trade1, Y
+		LDA	trade0, Y
 		
 		STA 	game + GAME::pGF1Crd
 
@@ -14163,7 +14263,7 @@ gamePerfTradeCCCCards:
 		BEQ	@exit
 		
 		LDY	#TRADE::player
-		LDA	trade1, Y
+		LDA	trade0, Y
 		
 		STA 	game + GAME::pGF1Crd
 
@@ -14454,8 +14554,7 @@ gameDeselect:
 
 ;-------------------------------------------------------------------------------
 gameAmountIsLess:		
-;		D, E < .A, .Y (O, P) -> SEC | CLC
-;***???		IS THIS ROUTINE RETURING CARRY IN A STRANGE WAY?
+;		D, E < .A, .Y (O, P) -> CLC | SEC 
 ;-------------------------------------------------------------------------------
 		STA	game + GAME::varO
 		STY	game + GAME::varP
@@ -14474,17 +14573,16 @@ gameAmountIsLessDirect:
 @LBL1:
 		BMI	@LBL2
 @GE:
-		CLC
+		SEC
 		RTS
 		
 @LESS:
-		SEC
+		CLC
 		RTS
 		
 
 ;-------------------------------------------------------------------------------
 gamePlayerHasFunds:
-;***???		IS THIS ROUTINE RETURING CARRY IN A STRANGE WAY?
 ;-------------------------------------------------------------------------------
 		PHA
 		TYA
@@ -14507,8 +14605,8 @@ gamePlayerHasFunds:
 		TAY
 		PLA
 		
-;		D, E < .A, .Y -> SEC | CLC
-;		So, if money less than A, Y - set carry else clear
+;		D, E < .A, .Y -> CLC | SEC 
+;		So, if money less than A, Y - clear carry else set
 		JSR	gameAmountIsLess
 		
 		RTS
@@ -14517,10 +14615,8 @@ gamePlayerHasFunds:
 ;-------------------------------------------------------------------------------
 gamePlayerHasWealth:
 ;		ASSUMES INPUT VALUE IS POSITIVE 16BIT
-;		ASSUMES -VE WEALTH IS FAIL (SEC)
-;		ASSUMES 16BOVRFLW IS SUCCESS (CLC)
-;
-;***???		IS THIS ROUTINE RETURING CARRY IN A STRANGE WAY?
+;		ASSUMES -VE WEALTH IS FAIL (CLC)
+;		ASSUMES 16BOVRFLW IS SUCCESS (SEC)
 ;-------------------------------------------------------------------------------
 		STA	game + GAME::varM
 		STY	game + GAME::varN
@@ -14564,18 +14660,18 @@ gamePlayerHasWealth:
 
 		JMP	@test
 @fail:
-		SEC
+		CLC
 		RTS
 		
 @success:
-		CLC
+		SEC
 		RTS
 
 @test:
 		LDA	game + GAME::varM
 		LDY	game + GAME::varN
 		
-;		D, E < .A, .Y -> SEC | CLC
+;		D, E < .A, .Y -> CLC | SEC
 ;		So, if wealth less than A, Y - set carry else clear
 		JSR	gameAmountIsLess
 
@@ -18456,9 +18552,9 @@ doDialogTrdSelAddCash:
 		LDA	game + GAME::varM
 		LDY	game + GAME::varN
 		
-;		D, E (max) < .A, .Y (new) -> SEC | CLC
+;		D, E (max) < .A, .Y (new) -> CLC | SEC
 		JSR	gameAmountIsLess
-		BCS	@max
+		BCC	@max
 
 		LDX	#TRADE::money
 		LDA	game + GAME::varM
@@ -24856,9 +24952,9 @@ rulesToggleMrtg:
 		LDA	game + GAME::varD
 		LDY	game + GAME::varE
 		
-;		So, if money less than A, Y - set carry else clear
+;		So, if money less than A, Y - clear carry else set
 		JSR	gamePlayerHasFunds
-		BCC	@havefunds
+		BCS	@havefunds
 		
 		JMP	@buzz
 
@@ -25677,14 +25773,74 @@ rulesDoCommitMrtg:
 ;		varJ	= group
 ;		varK	= player
 
-		LDX	#$00
-		STX	game + GAME::varI
-@loop:		
-		STX	game + GAME::varH
+		LDA	#$00
+		STA	game + GAME::varL
 		
-		LDA	rulesSqr0, X
-		CMP	game + GAME::varJ
-		BNE	@next
+@loop0:
+		LDX	game + GAME::varL
+		BPL	@fetchsqr
+		
+		JMP	@complete
+		
+@fetchsqr:
+		LDA	game + GAME::varJ
+		CMP	#$09
+		BNE	@tstutil
+		
+		JSR	rulesStnSqrForIndex
+		JMP	@begin0
+		
+@tstutil:
+		CMP	#$0A
+		BNE	@street
+		
+		CPX	#$02
+		BPL	@skipidx
+
+		JSR	rulesUtilSqrForIndex
+		JMP	@begin0
+
+@street:
+		CPX	#$03
+		BNE	@docalc
+		
+@skipidx:
+		INC	game + GAME::varL
+		JMP	@loop0
+		
+@docalc:
+		LDA	#$1C
+		LDX	game + GAME::varL
+		
+
+@loop1:
+		INX
+		CPX	#$03
+		BEQ	@cont0
+		
+		SEC
+		SBC	#$0E
+		JMP	@loop1
+		
+@cont0:
+		CLC
+		ADC	game + GAME::varJ
+		
+		TAX
+		LDA	rulesGrpSqrs0, X
+		
+		CMP	#$FF
+		BNE	@begin0
+		
+		DEC	game + GAME::varL
+		JMP	@loop0
+
+@begin0:
+		STA	game + GAME::varI
+		
+		ASL
+		TAX
+		STX	game + GAME::varH
 		
 		LDA	sqr00, X
 		CMP	game + GAME::varK
@@ -25694,9 +25850,18 @@ rulesDoCommitMrtg:
 		LDA	rulesSqrImprv, X
 		AND	#$80
 		BNE	@next
+
+		LDX	game + GAME::varJ
+		LDY	#$FF
+
+		JSR	rulesDoCollateImprv
 		
+		LDA	game + GAME::varA
+		BNE	@next
+		
+		LDX	game + GAME::varI
 		LDA	rulesSqrImprv, X
-		AND	#$7F
+		ORA	#$80
 		STA	rulesSqrImprv, X
 		
 		LDA	#UI_ACT_MRTG
@@ -25723,18 +25888,17 @@ rulesDoCommitMrtg:
 		STA	game + GAME::varE
 		
 		JSR	gameAmountIsLessDirect
-		BCC	@complete
+		BCS	@complete
 		
 @next:
-		LDX	game + GAME::varH
+		INC	game + GAME::varA
+		LDA	game + GAME::varA
+		CMP	#$04
+		BEQ	@incomplete
 		
-		INC	game + GAME::varI
-		
-		INX
-		INX
-		CPX 	#$50
-		BNE	@loop
-		
+		JMP	@loop0
+
+@incomplete:
 		LDA	#$00
 		RTS
 		
@@ -25929,7 +26093,7 @@ rulesDoCommitSellAtLevel:
 		BMI	@donext
 		
 		JSR	gameAmountIsLessDirect
-		BCS	@donext
+		BCC	@donext
 		
 @complete:
 		LDA	#$01
@@ -25972,7 +26136,7 @@ rulesDoCommitSellHouses:
 		BMI	@loop
 
 		JSR	gameAmountIsLessDirect
-		BCS	@loop
+		BCC	@loop
 
 @complete:
 		LDA	#$01
@@ -26315,7 +26479,7 @@ rulesAutoBuy:
 
 ;		D, E < (O, P) -> SEC | CLC
 		JSR	gameAmountIsLessDirect
-		BCC	@tstwant
+		BCS	@tstwant
 		
 		JMP	@purchase
 
@@ -26371,9 +26535,9 @@ rulesAutoBuy:
 		ROR	game + GAME::varE
 		ROR	game + GAME::varD
 		
-;		D, E < (O, P) -> SEC | CLC
+;		D, E < (O, P) -> CLC | SEC
 		JSR	gameAmountIsLessDirect
-		BCC	@tstplease
+		BCS	@tstplease
 	
 		JSR	rulesDoGetOwnCount
 		BEQ	@purchase
@@ -26390,9 +26554,9 @@ rulesAutoBuy:
 		ROR	game + GAME::varE
 		ROR	game + GAME::varD
 
-;		D, E < (O, P) -> SEC | CLC
+;		D, E < (O, P) -> CLC | SEC
 		JSR	gameAmountIsLessDirect
-		BCC	@pass
+		BCS	@pass
 
 		LDA	game + GAME::varU
 		ASL
@@ -26470,9 +26634,9 @@ rulesAutoBuy:
 		
 
 rulesUpdateValueIfLess:
-;		D, E < (O, P) -> SEC | CLC
+;		D, E < (O, P) -> CLC | SEC
 		JSR	gameAmountIsLessDirect
-		BCC	@exit
+		BCS	@exit
 		
 		LDA	game + GAME::varO
 		STA	game + GAME::varD
@@ -26802,7 +26966,7 @@ rulesSuggestBaseReserve:
 		LDX	#$18
 		LDA	sqr00, X
 		CMP	game + GAME::pActive
-		BEQ	@exit
+		BEQ	@purchases
 		
 		TAY
 		LDA	plrLo, Y
@@ -26825,6 +26989,66 @@ rulesSuggestBaseReserve:
 		STA	game + GAME::varD
 		LDA	game + GAME::varE
 		ADC	#$00
+		STA	game + GAME::varE
+
+@purchases:
+;	Find number deeds owned
+		JSR	rulesCountOwnedDeeds
+
+;	All 28
+		LDA	game + GAME::varA
+		CMP	#$1C
+		BNE	@tst16
+		
+;		Increase value by 150
+		LDA	#<150
+		STA	game + GAME::varM
+		LDA	#>150
+		STA	game + GAME::varN
+		
+		JMP	@bump
+		
+@tst16:
+;	Or more than 20
+		CMP	#$14
+		BMI	@tst11
+
+;		Increase value by 200
+		LDA	#<200
+		STA	game + GAME::varM
+		LDA	#>200
+		STA	game + GAME::varN
+
+		JMP	@bump
+
+@tst11:
+;	Or more than 12
+		CMP	#$0C
+		BMI	@default
+		
+;		Increase value by 300
+		LDA	#<300
+		STA	game + GAME::varM
+		LDA	#>300
+		STA	game + GAME::varN
+
+		JMP	@bump
+
+@default:
+;	Or
+;		Increase value by 400
+		LDA	#<400
+		STA	game + GAME::varM
+		LDA	#>400
+		STA	game + GAME::varN
+
+@bump:
+		CLC
+		LDA	game + GAME::varD
+		ADC	game + GAME::varM
+		STA	game + GAME::varD
+		LDA	game + GAME::varE
+		ADC	game + GAME::varN
 		STA	game + GAME::varE
 
 @exit:
@@ -26981,6 +27205,16 @@ rulesDoConstructAtLevel:
 		STA	rulesSqrImprv, X
 
 @improve:
+		LDY	#GROUP::pImprv
+		LDA	($FD), Y
+		STA	game + GAME::varO
+		LDA	#$00
+		STA	game + GAME::varP
+		
+;		D, E < (O, P) -> CLC | SEC
+		JSR	gameAmountIsLessDirect
+		BCC	@complete
+		
 		LDA	#UI_ACT_BUYI
 		STA	$68
 		LDA	game + GAME::varK
@@ -26991,13 +27225,6 @@ rulesDoConstructAtLevel:
 		JSR	uiEnqueueAction
 		
 		SEC
-		LDY	#GROUP::pImprv
-		LDA	($FD), Y
-		STA	game + GAME::varO
-		LDA	#$00
-		STA	game + GAME::varP
-		
-		SEC
 		LDA	game + GAME::varD
 		SBC	game + GAME::varO
 		STA	game + GAME::varD
@@ -27006,9 +27233,9 @@ rulesDoConstructAtLevel:
 		STA	game + GAME::varE
 		
 @tstnext:
-;		D, E < (O, P) -> SEC | CLC
+;		D, E < (O, P) -> CLC | SEC
 		JSR	gameAmountIsLessDirect
-		BCC	@donext
+		BCS	@donext
 		
 @complete:
 		LDA	#$01
@@ -27205,7 +27432,7 @@ rulesAutoRepayGroup:
 		STA	game + GAME::varE
 
 		JSR	gameAmountIsLessDirect
-		BCS	@repay
+		BCC	@repay
 		
 @incomplete:
 		LDA	#$00
@@ -27299,65 +27526,6 @@ rulesAutoImprove:
 ;	Find base rent value needed
 		JSR	rulesSuggestBaseReserve
 		
-;	Find number deeds owned
-		JSR	rulesCountOwnedDeeds
-
-;	All 28
-		LDA	game + GAME::varA
-		CMP	#$1C
-		BNE	@tst16
-		
-;		Increase value by 150
-		LDA	#<150
-		STA	game + GAME::varM
-		LDA	#>150
-		STA	game + GAME::varN
-		
-		JMP	@bump
-		
-@tst16:
-;	Or more than 20
-		CMP	#$14
-		BMI	@tst11
-
-;		Increase value by 200
-		LDA	#<200
-		STA	game + GAME::varM
-		LDA	#>200
-		STA	game + GAME::varN
-
-		JMP	@bump
-
-@tst11:
-;	Or more than 12
-		CMP	#$0C
-		BMI	@default
-		
-;		Increase value by 300
-		LDA	#<300
-		STA	game + GAME::varM
-		LDA	#>300
-		STA	game + GAME::varN
-
-		JMP	@bump
-
-@default:
-;	Or
-;		Increase value by 400
-		LDA	#<400
-		STA	game + GAME::varM
-		LDA	#>400
-		STA	game + GAME::varN
-
-@bump:
-		CLC
-		LDA	game + GAME::varD
-		ADC	game + GAME::varM
-		STA	game + GAME::varD
-		LDA	game + GAME::varE
-		ADC	game + GAME::varN
-		STA	game + GAME::varE
-
 ;	Subtract value from money store as value
 		LDY	#PLAYER::money
 		SEC
@@ -27410,6 +27578,47 @@ rulesAutoImprove:
 ;	Else
 ;		Return 0
 		LDA	#$00
+		RTS
+
+
+rulesDoTapValue:
+;		.Y = min # taps (0 - 8 value increment)
+;		.X = max # taps
+
+		STY	game + GAME::varA
+		LDY	#$00
+		
+		DEX
+		BMI	@exit
+		
+@loop:
+		LDA	sidV2EnvOu
+		LSR
+		LSR
+		LSR
+		LSR
+		LSR
+		CLC
+		ADC	game + GAME::varD
+		STA	game + GAME::varD
+		LDA	#$00
+		ADC	game + GAME::varE
+		STA	game + GAME::varE
+		
+@next:
+		DEX
+
+		INY
+		CPY	game + GAME::varA
+		BMI	@loop
+
+		CPX	#$FF
+		BEQ	@exit
+		
+		LDA	sidV2EnvOu
+		BPL	@loop
+		
+@exit:
 		RTS
 
 
@@ -27480,6 +27689,9 @@ rulesAutoGaol:
 ;***TODO:	Could do this properly now, get a base reserve by rental
 ;		expectations.
 
+		LDA	game + GAME::dieRld
+		BNE	@next
+		
 ;	if have $770+(2->5nudge), post
 		LDA	#<770
 		STA	game + GAME::varD
@@ -27503,9 +27715,9 @@ rulesAutoGaol:
 		LDA	($FB), Y
 		STA	game + GAME::varP
 		
-;		D, E < (O, P) -> SEC | CLC
+;		D, E < (O, P) -> CLC | SEC
 		JSR	gameAmountIsLessDirect
-		BCC	@tstroll
+		BCS	@tstroll
 
 		LDA	#UI_ACT_POST
 		STA	$68
@@ -27563,8 +27775,419 @@ rulesAutoGaol:
 		RTS
 
 
-rulesAutoAuction:
+rulesGetGroupOwnInfo:
+;(IN)		varB	=	group
+;(IN)		varK	=	player
+;		varH	=	count owned by player
+;		varI	=	count owned by other player
+;		varJ	= 	temp value
+;		varF	=	only one other player
+;		varG	=	temp value
+
 		LDA	#$00
+		STA	game + GAME::varH
+		STA	game + GAME::varI
+		
+		LDA	#$FF
+		STA	game + GAME::varG
+		
+		LDA	#$01
+		STA	game + GAME::varF
+
+		LDA	#$03
+		STA	game + GAME::varJ
+		
+@loop0:
+		LDX	game + GAME::varJ
+		BPL	@fetchsqr
+		
+		JMP	@complete
+		
+@fetchsqr:
+		LDA	game + GAME::varB
+		CMP	#$09
+		BNE	@tstutil
+		
+		JSR	rulesStnSqrForIndex
+		JMP	@begin0
+		
+@tstutil:
+		CMP	#$0A
+		BNE	@street
+		
+		CPX	#$02
+		BPL	@skipidx
+
+		JSR	rulesUtilSqrForIndex
+		JMP	@begin0
+
+@street:
+		CPX	#$03
+		BNE	@docalc
+		
+@skipidx:
+		DEC	game + GAME::varJ
+		JMP	@loop0
+		
+@docalc:
+		LDA	#$1C
+		LDX	game + GAME::varJ
+
+@loop1:
+		INX
+		CPX	#$03
+		BEQ	@cont0
+		
+		SEC
+		SBC	#$0E
+		JMP	@loop1
+		
+@cont0:
+		CLC
+		ADC	game + GAME::varB
+		
+		TAX
+		LDA	rulesGrpSqrs0, X
+		
+		CMP	#$FF
+		BNE	@begin0
+		
+		DEC	game + GAME::varJ
+		JMP	@loop0
+
+@begin0:
+;	Get square ownership
+		ASL
+		TAX
+		LDA	sqr00, X
+		CMP	#$FF
+		BEQ	@donext
+		
+;	Is it owned by this player?
+		CMP	game + GAME::varK
+		BNE	@other
+
+;	Yes, increment this own count
+		INC	game + GAME::varH
+		JMP	@checkother
+		
+@other:
+;	No, increment other own count
+		INC	game + GAME::varI
+		
+@checkother:
+;	Is it owned by the same as the last?
+		CMP	game + GAME::varG
+		BEQ	@donext
+		
+;	Possibly not...
+		PHA
+		LDA	game + GAME::varG
+		CMP	#$FF
+		BEQ	@checkdone
+
+;	No, unset owned by one player flag
+		LDA	#$00
+		STA	game + GAME::varF
+
+@checkdone:
+		PLA
+		STA	game + GAME::varG
+
+@donext:
+		DEC	game + GAME::varJ
+		LDA	game + GAME::varJ
+		CMP	#$FF
+		BEQ	@complete
+		
+		JMP	@loop0
+		
+@complete:
+		LDA	#$01
+		RTS
+
+
+rulesSuggestDeedValue:
+;(IN)		.A	= 	square
+;		varA	=	square
+;		varB	=	group
+;		varC	=	group index
+;		varD,E  = 	value
+;		varM,N	=	temp value
+;		varS,T	=	temp value
+;(IN)		varK 	=	player
+;		varL	= 	square * 2
+
+		STA	game + GAME::varA
+		
+		ASL
+		STA	game + GAME::varL
+		
+		TAX
+		JSR	gameGetCardPtrForSquareImmed
+		
+		LDY	#DEED::mValue
+		LDA	($FD), Y
+		STA	game + GAME::varS
+		STA	game + GAME::varM
+		INY
+		LDA	($FD), Y
+		STA	game + GAME::varT
+		STA	game + GAME::varN
+		
+		ASL
+		ROR	game + GAME::varN
+		ROR	game + GAME::varM
+
+		LDA	game + GAME::varM
+		STA	game + GAME::varD
+		LDA	game + GAME::varN
+		STA	game + GAME::varE
+
+		ASL
+		ROR	game + GAME::varE
+		ROR	game + GAME::varD
+
+;	Now have deed market value in S,T; half value in M,N and quarter value 
+;	in D,E.  Want 3/4 market value as starting point.
+
+		SEC
+		LDA	game + GAME::varS
+		SBC	game + GAME::varD
+		STA	game + GAME::varD
+		LDA	game + GAME::varT
+		SBC	game + GAME::varE
+		STA	game + GAME::varE
+		
+;	Now have 3/4 market value in D,E.
+		
+;	Need to test ownership info
+		JSR	rulesGetGroupOwnInfo
+
+;	If the group is 1 or 8 and own 1 then pretend like its 2
+		LDA	game + GAME::varC
+		CMP	#$01
+		BEQ	@tstpromote0
+		
+		CMP	#$08
+		BNE	@cont0
+		
+@tstpromote0:		
+		LDA	game + GAME::varH
+		BEQ	@tstpromote1
+		
+		INC	game + GAME::varH
+		
+@tstpromote1:
+		LDA	game + GAME::varI
+		BEQ	@cont0
+		
+		INC	game + GAME::varI
+		
+@cont0:
+		LDA	game + GAME::varF
+		BEQ	@tstmultiown
+		
+		LDA	game + GAME::varH
+		BNE	@tstsingle0
+		
+;	Owned by only 1 player and its not this one
+
+		LDA	game + GAME::varI
+		CMP	#$02
+		BEQ	@wantedvery
+		
+		JMP	@wantedsome
+		
+@tstsingle0:
+;	Owned by only 1 player but its me
+		
+		LDA	game + GAME::varH
+		CMP	#$02
+		BEQ	@wantedvery
+		
+		JMP	@wantedsome
+
+@tstmultiown:
+		LDA	game + GAME::varH
+		CMP	#$02
+		BPL	@wantedsome
+
+;***TODO:	Tap value based on group (more for higher ones)
+
+@wanted:
+		LDX	#$02
+		LDY	#$01
+		JSR	rulesDoTapValue		
+		
+		JMP	@done
+		
+@wantedsome:
+		LDA	game + GAME::varS
+		STA	game + GAME::varD
+		LDA	game + GAME::varT
+		STA	game + GAME::varE
+		
+		LDX	#$02
+		LDY	#$01
+		JSR	rulesDoTapValue		
+
+		JMP	@done
+		
+@wantedvery:
+		CLC
+		LDA	game + GAME::varD
+		ADC	game + GAME::varM
+		STA	game + GAME::varD
+		LDA	game + GAME::varE
+		ADC	game + GAME::varN
+		STA	game + GAME::varE
+		
+		LDX	#$02
+		LDY	#$01
+		JSR	rulesDoTapValue		
+
+@done:
+		RTS
+
+rulesAutoAuction:
+;	Current bid amount in game + GAME::mACurr
+;	Auctioned square in game + GAME::sAuctn	
+
+		LDX	game + GAME::pActive
+		STX	game + GAME::varK		;varK = player
+
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+
+		JSR	rulesDoCopyImprv
+
+;	Find base rent value needed
+		JSR	rulesSuggestBaseReserve
+		
+;	Subtract value from money store as value
+		LDY	#PLAYER::money
+		SEC
+		LDA	($FB), Y
+		SBC	game + GAME::varD
+		STA	game + GAME::varD
+		INY
+		LDA	($FB), Y
+		SBC	game + GAME::varE
+		STA	game + GAME::varE
+		
+;	Have negative aboslute maximum value, forfeit
+		BPL	@begin
+		JMP	@forfeit
+
+@begin:
+;	Copy our absolute maximum to compare
+		LDA	game + GAME::varD
+		STA	game + GAME::varO
+		LDA	game + GAME::varE
+		STA	game + GAME::varP
+		
+;	Get a suggested value
+		LDA	game + GAME::sAuctn
+		JSR	rulesSuggestDeedValue
+		
+;	Test our suggested value, if suggested is < maximum then keep
+;		D, E < (O, P) -> CLC | SEC
+		JSR	gameAmountIsLessDirect
+		BCC	@cont0
+		
+;	Copy our absolute maximum to suggested value
+		LDA	game + GAME::varO
+		STA	game + GAME::varD
+		LDA	game + GAME::varP
+		STA	game + GAME::varE
+		
+@cont0:
+		LDA	game + GAME::mACurr
+		STA	game + GAME::varO
+		LDA	game + GAME::mACurr + 1
+		STA	game + GAME::varP
+		
+;	Test our suggested value, if current is >= then forfeit
+;		D, E < (O, P) -> CLC | SEC
+		JSR	gameAmountIsLessDirect
+		BCS	@forfeit
+		
+;	Swap our values around (for comparisons)
+		LDA	game + GAME::varD
+		STA	game + GAME::varO
+		LDA	game + GAME::varE
+		STA	game + GAME::varP
+		LDA	game + GAME::mACurr
+		STA	game + GAME::varD
+		LDA	game + GAME::mACurr + 1
+		STA	game + GAME::varE
+		
+;	Do we nudge or tap towards our value?
+		LDA	sidV2EnvOu
+		CMP	#$C0
+		BCS	@nudge0
+		
+		LDX	#$02
+		LDY	#$01
+		JSR	rulesDoTapValue
+		
+		JMP	@cont1
+
+@nudge0:
+		LDX	#$02
+		LDY	#$01
+		JSR	rulesDoNudgeValue
+		
+@cont1:
+;	Test our bid value, if larger than our max then reset to max
+;		D, E < (O, P) -> CLC | SEC
+		JSR	gameAmountIsLessDirect
+		BCC	@cont2
+		
+		LDA	game + GAME::varO
+		STA	game + GAME::varD
+		LDA	game + GAME::varP
+		STA	game + GAME::varE
+		
+@cont2:
+;	Make our bid
+		LDA	game + GAME::varD
+		STA	game + GAME::mACurr
+		LDA	game + GAME::varE
+		STA	game + GAME::mACurr + 1
+		
+		LDA	#UI_ACT_SKEY
+		STA	$68
+		LDA	#'B'
+		STA	$69
+		
+		JSR	uiEnqueueAction
+		
+		JMP	@complete
+
+
+@forfeit:
+		LDA	#UI_ACT_SKEY
+		STA	$68
+		LDA	#'F'
+		STA	$69
+		
+		JSR	uiEnqueueAction
+
+@complete:
+		LDA	#UI_ACT_DELY
+		STA	$68
+		LDA	#$00
+		STA	$69
+		STA	$6A
+		STA	$6B
+		
+		JSR	uiEnqueueAction
+		
+		LDA	#$01
 		RTS
 
 
@@ -27761,7 +28384,7 @@ rulesAutoEliminGroup:
 		STA	game + GAME::varE
 
 		JSR	gameAmountIsLessDirect
-		BCS	@select
+		BCC	@select
 		
 		JMP	@donext
 		
@@ -27838,14 +28461,6 @@ rulesAutoEliminate:
 ;	Find base rent value needed
 		JSR	rulesSuggestBaseReserve
 		
-		CLC
-		LDA	game + GAME::varD
-		ADC	#175
-		STA	game + GAME::varD
-		LDA	game + GAME::varE
-		ADC	#$00
-		STA	game + GAME::varE
-
 		LDY	#$02
 		LDX	#$05
 		JSR	rulesDoNudgeValue
@@ -27918,29 +28533,7 @@ numConvHalt:
 		JMP	numConvHalt
 		RTS
 
-numConvInit:
-		LDA 	#$FF 			; maximum frequency value
-		STA 	sidVoc2FLo		; voice 3 frequency low byte
-		STA 	sidVoc2FHi		; voice 3 frequency high byte
-		LDA 	#$80 			; noise waveform, gate bit off
-		STA 	sidVoc2Ctl		; voice 3 control register		
 
-		LDX	#$00
-		LDA	#$00
-@loop:
-		STA	Z:numConvSIGN, X
-		INX
-		CPX	#$1A
-		BNE	@loop
-
-		LDA	#$EA
-		STA	Z:numConvSIGN
-		STA	Z:numConvX2
-		STA	Z:numConvX1
-
-		RTS
-	
-	
 numConvTemp0:	.byte	$00
 
 
@@ -28579,16 +29172,6 @@ initPlayers:
 		
 		
 ;-------------------------------------------------------------------------------
-initUI:
-;-------------------------------------------------------------------------------
-		JSR	uiInitQueue
-		LDA	#$FF
-		LDY	#$00
-		STA	($6D), Y
-		RTS
-
-
-;-------------------------------------------------------------------------------
 initNew:
 ;-------------------------------------------------------------------------------
 		LDA	#$20
@@ -28697,7 +29280,7 @@ initDialog:
 ;HEAP
 ;===============================================================================
 heap0:
-	.assert         heap0 < $CD00, error, "Program too large!"
+	.assert         heap0 < $CE00, error, "Program too large!"
 	
 
 ;===============================================================================
@@ -28729,21 +29312,41 @@ FILENAME_2:
 		.byte	"RULES"
 FILENAME_3:
 
+
+;-------------------------------------------------------------------------------
+initVICII:
+;-------------------------------------------------------------------------------
+		LDA	CIA1_DDRA
+		ORA	#$03
+		STA	CIA1_DDRA
+		
+		LDA	CIA1_PRA
+		AND	#$FC
+		ORA	#$03
+		STA	CIA1_PRA
+		
+		LDA	vicMemCtrl
+		AND	#$0F
+		ORA	#$10
+		STA	vicMemCtrl
+		
+		RTS
+	
+
 ;-------------------------------------------------------------------------------
 initDataLoad:
 ;-------------------------------------------------------------------------------
+		LDA	#$8E			;go to uppercase characters
+		JSR	krnlOutChr
+		LDA	#$08			;disable change character case
+		JSR	krnlOutChr
+		
 		LDA	#<screenLoad0
 		STA	$FD
 		LDA	#>screenLoad0
 		STA	$FE
 		
 		JSR	screenPerformList
-
-		LDA	#$8E			;go to uppercase characters
-		JSR	krnlOutChr
-		
-		LDA	#$08			;disable change character case
-		JSR	krnlOutChr
 
 		LDA	#$01
 		LDX	#$08
@@ -28800,7 +29403,7 @@ initDataLoad:
 ;-------------------------------------------------------------------------------
 initCore:
 		JSR	initMem
-		JSR	keyInit
+		JSR	initKeys
 		JSR	initFirstTime
 		JSR	initBoard
 		JSR	initSprites		
@@ -28812,8 +29415,7 @@ initCore:
 		LDA	#musTuneIntro
 		JSR	SNDBASE + 0		
 		
-		JSR	plyrInit
- 		JSR	plyrInstall
+		JSR	initPlyr
 
 ;		Reset the stack pointer
 		LDX	#$FF
@@ -28870,6 +29472,25 @@ initMem:
 
 
 ;-------------------------------------------------------------------------------
+initKeys:
+;-------------------------------------------------------------------------------
+;		LDA	#<keyEvaluateSpecial
+;		STA	keyModifierVect
+;		LDA	#>keyEvaluateSpecial
+;		STA	keyModifierVect + 1
+		
+		LDA	#$00
+		STA	keyRepeatFlag
+		
+;		LDA	#$80
+;		STA	keyModifierLock
+		
+		LDA	#$0A
+		STA	keyBufferSize
+		RTS
+
+
+;-------------------------------------------------------------------------------
 initFirstTime:
 ;-------------------------------------------------------------------------------
 		LDA  	#$0B			;set screen colours
@@ -28891,16 +29512,81 @@ initFirstTime:
 		STA	game + GAME::lock
 		STA	game + GAME::pVis
 
-		JSR	numConvInit
+		JSR	initNumConv
 
 		JSR	initUI
 
 		JSR	initNew
 
 		RTS
-		
 
+
+;-------------------------------------------------------------------------------
+initNumConv:
+;-------------------------------------------------------------------------------
+		LDA 	#$FF 			; maximum frequency value
+		STA 	sidVoc2FLo		; voice 3 frequency low byte
+		STA 	sidVoc2FHi		; voice 3 frequency high byte
+		LDA 	#$80 			; noise waveform, gate bit off
+		STA 	sidVoc2Ctl		; voice 3 control register		
+
+		LDX	#$00
+		TXA
+@loop:
+		STA	Z:numConvSIGN, X
+		INX
+		CPX	#$1A
+		BNE	@loop
+
+		LDA	#$EA
+		STA	Z:numConvSIGN
+		STA	Z:numConvX2
+		STA	Z:numConvX1
+
+		RTS
+
+
+;-------------------------------------------------------------------------------
+initUI:
+;-------------------------------------------------------------------------------
+		JSR	uiInitQueue
+		LDA	#$FF
+		LDY	#$00
+		STA	($6D), Y
+		RTS
+
+
+;-------------------------------------------------------------------------------
+initPlyr:
+;-------------------------------------------------------------------------------
+		LDX	game + GAME::pActive
+		LDA	vicSprClr1, X
+		STA	irqBlinkSeq0
+		STA	irqBlinkSeq0 + 1
+		
+		STX	irqglob + IRQGLOBS::minPlr
+		LDA	#$00
+		STA	irqglob + IRQGLOBS::minIdx
+		STA	irqglob + IRQGLOBS::minFlg
+		
+		LDA	ui + UI::cJskSns
+		STA	ui + UI::cJskDly
+		
+		LDA	#$01
+		STA	ui + UI::fMseEnb
+		STA	ui + UI::fJskEnb
+		
+		JSR	CMOVEX
+		JSR	CMOVEY
+		
+		JSR	installPlyr
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
 msePointer:
+;-------------------------------------------------------------------------------
 			.byte 	%01010101, %01010000, %00000000
 			.byte 	%01111111, %11010000, %00000000
 			.byte 	%01101010, %10010000, %00000000
@@ -28924,5 +29610,4 @@ msePointer:
 			.byte 	%00000000, %00000000, %00000000
 			.byte	$00
 
-	.assert		(* - heap0) < $0200, error, "Discardable area too large!"
 	.assert         * < $D000, error, "Program too large!"
