@@ -1,6 +1,6 @@
 # MONOPOLY 
 
-VERSION 0.02.02 ALPHA
+VERSION 0.02.39 ALPHA
 
 
 FOR THE COMMODORE 64
@@ -53,8 +53,8 @@ The game is identical to the most recent, standard rules as per my copy
 note here.  When paying, only the amount available to the player is 
 paid in the case where they do not have sufficient wealth (equity + 
 money, see the deductions/observations section).  As to the rule 
-change, having to declare it is nonsense, especially when the board 
-has markers for player ownership.  Also, in this single console 
+change, having to declare it owed all the time is nonsense, especially when
+the board has markers for player ownership.  Also, in this single console 
 implementation, trying to incorporate the standard rule would only 
 serve to drastically reduce the rate of play (as it probably does for 
 the board game) and I feel it could generally only foster the 
@@ -102,7 +102,7 @@ players can pass or forfeit and no one will win the auction, the deed
 will remain unclaimed.  Auctions also start at $10, as per the 
 standard rules and this is the minimum bid value in this version.  The 
 standard rules don't clearly specify if lower opening values are 
-actually permitted or not (its a reserve) but the idea seems to be 
+actually permitted or not (if its a reserve) but the idea seems to be 
 that it is a minimum asking price.
 * The standard debt recovery rules are always applied to their furthest
 extent when a player has insufficient wealth in this version.  The 
@@ -224,7 +224,7 @@ the order they will be required to pay in.
 * When a player has insufficient wealth to pay another player, they have
 lost the game and all houses and hotels will be sold and all deeds 
 mortgaged in order to attempt to pay.  All equity will be converted to
-money and the total, remaining wealth transferred to the defeating 
+money and the total, remaining amount transferred to the defeating 
 player.  This requirement is somewhat vague in the rules (they do 
 state that it is how a debt should be recovered, though).  However,
 trades are supposedly possible "at any time".  I believe the specified 
@@ -253,7 +253,7 @@ a losing state.  The menus will not allow a trade that would cause the
 player to lose due to a catastrophic reduction of wealth and know 
 about fees and repay requirements.  That is, when trading, the 
 repay or payment of fees requirement is placed on both parties for 
-all mortgaged deeds in the trade as well.  You must pay to repay the 
+all mortgaged deeds they receive in the trade, as well.  You must pay to repay the 
 mortgage or keep the deed in a mortgaged state and simply pay the 10%
 fee.  These rules are almost unheard of but are standard rules. 
 Again, I believe this is the only version I have ever known to include 
@@ -266,7 +266,9 @@ this to be fully stated.
 * When offered a trade, if the player cannot afford at least the fee as 
 mentioned above for trading a mortgaged property, any remaining 
 mortgaged properties would not be transferred and the trade would be 
-incomplete.  As such, a player must have sufficient wealth to cover 
+incomplete.  Also, if they have insufficient money when accepting a trade,
+they should not be permitted to mortgage the deeds received to recover it.
+As such, a player must have sufficient money to cover 
 nominated or required fee and repayment charges in order to accept the 
 trade.
 * Players should review the trade information and be satisfied with how 
@@ -290,10 +292,14 @@ while receiving defeated player deeds or in some other way, the player
 is able to mortgage deeds and sell improvements ("manage" their 
 portfolio).  This is to facilitate more timely trade arrangements and 
 because players must be able to utilise their equity to recover 
-commitments to the bank and other players in all instances.  This is
-handled by a special game play interrupt mechanism in this version.  I
-believe this provides a great deal of freedom inside the turn-based 
-structure and is the most logical way of accommodating the possible 
+commitments to the bank and other players in all instances.
+Please note that there is currently a limitation on 
+the construction of improvements -- it cannot be done during trades
+or elimination transfers.  This is to ensure that the state of the board
+does not change such as to cause an invalid trade or transfer and for fairness.
+Out-of-turn debt handling is done by a special game play interrupt mechanism 
+in this version.  I believe this provides a great deal of freedom inside 
+the turn-based structure and is the most logical way of accommodating the possible 
 actions.  When multiple players are in debt out of their turn, they 
 are serviced in play order, starting with the next player after the 
 current player (player "with the dice").  This will affect management 
@@ -307,9 +313,7 @@ it in the most fair manner possible.  In this way, the players can
 retrieve all of their equity which should be the expected outcome. 
 Any of the player's houses can be sold to make up the numbers.  They
 could theoretically juggle them however they liked, according to the
-standard rules.  The player should be especially careful when breaking 
-down multiple hotels in this condition.  It may be more of a problem
-than it seems.
+standard rules and so too, they can also in this version.
 * If paying all players money from the Chance card and the player does 
 not have sufficient wealth, the player will lose to the next player in 
 play order that they cannot pay (not the bank as per other cards, except 
@@ -337,7 +341,7 @@ in some games, especially when no trade arrangements can be made.  I
 permit all players to agree to abandon the current game and a winner 
 is declared, by default, based on the score.  Resignations actually do
 not seem to be permitted by the standard rules. I am not permitting 
-them on a player-by-player basis, either.  Its is calculated by:
+them on a player-by-player basis, either.  The score is calculated by:
  
 		  [equity/2] + [money/8] + [#deeds] + 
 		  [#gofree] + (foreach group [(#ingroup - 1)*2]) +
@@ -402,10 +406,13 @@ RUN
   the game to not update correctly and hang at launch.  It only happens 
   once in a hundred times when loading on VICE (and perhaps a real C64) 
   but on the Mega65, it happens all the time unless the machine is warm 
-  booted prior to loading the game.  I have attempted to fix it but I
-  haven't succeeded.  I will now endeavour to debug if and when it
+  booted prior to loading the game.  I will now endeavour to debug if and when it
   occurs in my testing.  From what I have been able to see, it seems
-  that the IRQ has not been acknowledged correctly when this occurs?
+  that some IRQ is not being acknowledged correctly when this occurs.  I have
+  attempted another fix but I am unsure if I have succeeded.
+* Load times on a real machine will seem extraordinarily long compared with other
+  games due to the fact that I'm currently not using any compression.  I will
+  attempt to fix this before release.
 * SFX often get lost and "music" breaks up because of the limited 
   number of channels (two) available to play sounds on.  The third 
   voice is used for random number generation. Even though it is a more 
@@ -422,10 +429,12 @@ RUN
 * Statistics/Overview from trade approval, must pay.  They should work now.
 * Put AutoPay on play2 menu.
 * Colour gofree items on trdsel0 dialog to indicate availability.
+* Make dialog elimin0 more informative about the elimination (to player/bank?)
+* Shouldn't $FF in current hot button prevent changes?  Joystick up/down is 
+  causing hot button changes on setup7 at game start.
 
 * Should be able to do beta state after above.
 
-* CPU players setup menu setup9 (after setup0).
 * CPU player still needs:  AutoTradeApprove, AutoTradeInitiate
 * "Thinking" menu/prompt when cpu engaged?  Its so fast anyway... 
 * rulesSuggestDeedValue should tap values based on group significance.
@@ -439,6 +448,7 @@ RUN
 * Once have main state stack, can check in roll that the player is the one 
   with the dice (is the player for the normal mode).  Just to be safe?
 * Could also do other mode chain integrity checks.
+
 * Allow players to input name?  Do I have enough memory for the feature??
 * Could now instead of copy name on elimin and gameover dialogs, just refer.
 * gamePlayerHasWealth is unused?
@@ -464,16 +474,21 @@ RUN
 * Fix IRQ handler -- its gotten hacked to death.
 * Game save/load?  Difficult now that the Kernal program and data space is used.
   May not have enough memory.
-* Optimise, optimise, optimise eg. use BIT, self modifying code??  
+* Optimise, optimise, optimise eg. use BIT, self modifying code??
   Need cartridge/ROM support?  Already modify many data items.
 
+
+## Optimisation Targets:
+
+* The trdsel0 dialog currently uses some 3KB of memory.  This is massive.  It 
+  should be optimised somehow.
+* The screen constant data could be loaded into high memory (346 bytes).
+* The prompt constant data could be loaded into high memory (352 bytes).
+
+
 ## For Testing (Needs Confirmation):
-* Player focus restored after player lose to player interrupt?
 * Money cap (32767) not exceeded on addcash?
 * Don't allow leave management when -ve hses, htls at all.
-* Must pay works after trade/elimination xfer?
-* Multiple eliminations in one turn works?
-* Does elimination to bank work at all?
 * Used GO Free cards prevented from appearing in deck until after 
   shuffle (and while owned by a player).
 * Ensure all options/pages are displayed for all menus.
@@ -481,9 +496,21 @@ RUN
 * Trade/elimination xfer working correctly (double check).
 * Trade/elimination xfer correctly calculate remaining cash and enforce positive.
 * Elimination returns to correct player.
+* Must pay works after trade/elimination xfer?
+* Multiple eliminations in one turn works?
+* Does elimination to bank work at all?
 
 ## Change History (Since Version 0.01.99A)
+* 16JUL2018
+	* Fix user input handling issues (at start and when DEBUG_CPU not enabled).
+	* Move keys globals out of globals area.
+	* Move IRQ globals into globals area ($0200-$03FF).
+	* Code clean-up.
 * 15JUL2018
+	* Indicate (border colour red) when an unknown source of IRQs is
+	  encountered (this will cause serious issues).
+	* Move VIC-II IRQ acknowledgement to start of IRQ routine to ensure that it
+	  is always done.
 	* Bump version.
 	* Implement CPU player menu setup9.
 	* Don't allow mortgaging/unmortgaging of deeds in a trade when trading.

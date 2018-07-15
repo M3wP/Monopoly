@@ -24,7 +24,7 @@
 ;Free memory information (as of last update from 0.02.39A):
 ;	* Between strings and rules data, 801 bytes (free for data)
 ;	* Between rules data and action cache, 239 bytes (free for data)
-;	* Between heap and reserved, 4393 bytes (free for program)
+;	* Between heap and reserved, 4534 bytes (free for program)
 ;	* Reserved areas, 768 bytes (unavailable/unused)
 ;
 ;By my calculation, there are 655 bytes unaccounted for somewhere...  Where did
@@ -37,15 +37,19 @@
 ;	0200 - 	03FF	Global state
 ;	0400 - 	07FF	Screen data and sprite pointers
 ;	0800 - 	08FF	Sprite data/bootstrap
-;	0900 -  BCD7	Program area
-;	BCD8 - 	CDFF	Discard/heap
-;	CE00 - 	CFFF	Reserved (may be used for additional discard/heap)
+;	0900 -  BC49	Program area
+;	BC4A - 	CDFF	Discard/heap
+;	CE00 - 	CFFF	Reserved (may be used for discard/heap)
 ;	D000 - 	DFFF	System IO
 ;	E000 -	F3FF	Strings data (ends at F0DF)
 ;	F400 - 	FAFF	Rules data (ends at FA11)
 ;	FB00 - 	FEFF	Action cache
 ;	FF00 -  FFF9	Reserved (unused on purpose)
 ;	FFFA -	FFFF	System vectors
+;
+;
+;I will need to provide a break-down of the use of zero page at some point for
+;clarity, once I have cleaned-up its utilisation (its a slight mess).
 ;
 ;===============================================================================
 
@@ -64,9 +68,61 @@
 
 
 ;-------------------------------------------------------------------------------
-;General definitions
+;machinedefs.inc
 ;-------------------------------------------------------------------------------
-;***	screendefs.inc
+
+VIC     	= 	$D000         		; VIC REGISTERS
+vicSprPos0	=	$D000
+vicSprPos1	=	$D002
+VICXPOS    	= 	VIC + $00      		; LOW ORDER X POSITION
+VICYPOS    	= 	VIC + $01      		; Y POSITION
+VICXPOSMSB 	=	VIC + $10      		; BIT 0 IS HIGH ORDER X POS
+vicSprPosM	=	$D010
+vicCtrlReg	=	$D011
+vicRstrVal	=	$D012
+vicSprEnab	= 	$D015
+vicSprExpY	=	$D017
+vicMemCtrl	=	$D018
+vicIRQFlgs	=	$D019
+vicIRQMask	=	$D01A
+vicSprCMod	= 	$D01C
+vicSprExpX	= 	$D01D
+vicBrdrClr	=	$D020
+vicBkgdClr	= 	$D021
+vicSprMCl0	= 	$D025
+vicSprMCl1	= 	$D026
+vicSprClr0	= 	$D027
+vicSprClr1	= 	$D028
+
+SID     	= 	$D400         		; SID REGISTERS
+sidVoc2FLo	=	$D40E
+sidVoc2FHi	=	$D40F
+sidVoc2Ctl	=	$D412
+sidV2EnvOu	=	$D41B
+SID_ADConv1    	= 	SID + $19
+SID_ADConv2    	= 	SID + $1A
+
+CIA1_PRA        = 	$DC00        ; Port A
+CIA1_PRB	=	$DC01
+CIA1_DDRA	=	$DC02
+CIA1_DDRB	=	$DC03
+cia1IRQCtl	=	$DC0D
+
+cpuIRQ		=	$FFFE
+cpuRESET	=	$FFFC
+cpuNMI		=	$FFFA
+
+krnlOutChr	= 	$E716
+krnlLoad	=	$FFD5
+krnlSetLFS	=	$FFBA
+krnlSetNam	=	$FFBD
+knrlClAll	=	$FFE7
+
+
+;-------------------------------------------------------------------------------
+;screendefs.inc
+;-------------------------------------------------------------------------------
+
 spriteMem20	= 	$0800
 
 spritePtr0	=	$07F8
@@ -134,61 +190,32 @@ offsY		=	50
 	.endstruct
 
 
-;***	machinedefs.inc
-VIC     	= 	$D000         		; VIC REGISTERS
-vicSprPos0	=	$D000
-vicSprPos1	=	$D002
-VICXPOS    	= 	VIC + $00      		; LOW ORDER X POSITION
-VICYPOS    	= 	VIC + $01      		; Y POSITION
-VICXPOSMSB 	=	VIC + $10      		; BIT 0 IS HIGH ORDER X POS
-vicSprPosM	=	$D010
-vicCtrlReg	=	$D011
-vicRstrVal	=	$D012
-vicSprEnab	= 	$D015
-vicSprExpY	=	$D017
-vicMemCtrl	=	$D018
-vicIRQFlgs	=	$D019
-vicIRQMask	=	$D01A
-vicSprCMod	= 	$D01C
-vicSprExpX	= 	$D01D
-vicBrdrClr	=	$D020
-vicBkgdClr	= 	$D021
-vicSprMCl0	= 	$D025
-vicSprMCl1	= 	$D026
-vicSprClr0	= 	$D027
-vicSprClr1	= 	$D028
+;-------------------------------------------------------------------------------
+;uidefs.inc
+;-------------------------------------------------------------------------------
 
-SID     	= 	$D400         		; SID REGISTERS
-sidVoc2FLo	=	$D40E
-sidVoc2FHi	=	$D40F
-sidVoc2Ctl	=	$D412
-sidV2EnvOu	=	$D41B
-SID_ADConv1    	= 	SID + $19
-SID_ADConv2    	= 	SID + $1A
-
-CIA1_PRA        = 	$DC00        ; Port A
-CIA1_PRB	=	$DC01
-CIA1_DDRA	=	$DC02
-CIA1_DDRB	=	$DC03
-cia1IRQCtl	=	$DC0D
-
-cpuIRQ		=	$FFFE
-cpuRESET	=	$FFFC
-cpuNMI		=	$FFFA
-
-krnlOutChr	= 	$E716
-krnlLoad	=	$FFD5
-krnlSetLFS	=	$FFBA
-krnlSetNam	=	$FFBD
-knrlClAll	=	$FFE7
-
-
-;***	uidefs.inc
 buttonLeft	=	$10
 buttonRight	=	$01
 JSTKSENS_LOW	=	27
 JSTKSENS_MED	=	18
 JSTKSENS_HIGH	=	9
+
+UI_ACT_FALT	=	0
+UI_ACT_TRDE	=	1
+UI_ACT_REPY	=	2
+UI_ACT_PFEE	=	3
+UI_ACT_AUCN	=	4
+UI_ACT_MRTG	=	5
+UI_ACT_SELL	=	6
+UI_ACT_BUYD	=	7
+UI_ACT_BUYI	=	8
+UI_ACT_GOFR	=	9
+UI_ACT_POST	=	10
+UI_ACT_ROLL	=	11
+UI_ACT_SKEY	=	12
+UI_ACT_DELY	= 	13
+
+uiActnCache	=	$FB00
 
 	.struct	UI
 		fHveInp .byte
@@ -207,29 +234,34 @@ JSTKSENS_HIGH	=	9
 		
 		fBtUpd0 .byte
 		fBtSta0 .byte
-		
 		fBtUpd1 .byte
 		fBtSta1 .byte
 		
 		cActns	.byte
-		gMdAct	.byte
-		pActBak .byte
+		
+		gMdAct	.byte			;Remove for game state stack
+		pActBak .byte			;Remove for game state stack
+		
 		fActTyp .byte			;type (regular, elimin)
 		fActInt .byte			;interactive
 		
 		fInjKey .byte
+		fUsrInp .byte
 	.endstruct
 
 
-;***	musicdefs.inc
+;-------------------------------------------------------------------------------
+;musicdefs.inc
+;-------------------------------------------------------------------------------
+
 musTuneIntro	=	$00
 musTuneSilence  =	$01
-musTuneDice0    =	$02
-musTuneDice1    =	$03
-musTuneDice2    =	$04
-musTuneDice3    =	$05
-musTuneDice4    =	$06
-musTuneDice5    =	$07
+musTuneRoll0    =	$02
+musTuneRoll1    =	$03
+musTuneRoll2    =	$04
+musTuneRoll3    =	$05
+musTuneRoll4    =	$06
+musTuneRoll5    =	$07
 musTuneGaol     =	$08
 musTuneBuy	=	$09
 musTuneBuyAll   =	$0A
@@ -256,7 +288,61 @@ keyZPKeyScan	= 	$CB			;byte
 keyZPDecodePtr	=	$F5			;word
 
 
-;***	gamedefs.inc
+;-------------------------------------------------------------------------------
+;IRQdefs.inc
+;-------------------------------------------------------------------------------
+	.struct	IRQGLOBS
+		instld	.byte
+		saveA	.byte
+		saveB	.byte
+		saveC	.byte
+		saveD	.byte
+		saveE	.byte
+		brd0X	.byte
+		brd0Y	.byte
+		brd1X	.byte
+		brd1Y	.byte
+		brd2X	.byte
+		brd2Y	.byte
+		brd3Y	.byte
+		brd3X	.byte
+		brd4X	.byte
+		brd4Y	.byte
+		brd5X	.byte
+		brd5Y	.byte
+		brdMX	.byte
+		savMX	.byte
+		min0X	.byte
+		min0Y	.byte
+		min1X	.byte
+		min1Y	.byte
+		min2X	.byte
+		min2Y	.byte
+		min3X	.byte
+		min3Y	.byte
+		min4X	.byte
+		min4Y	.byte
+		min5X	.byte
+		min5Y	.byte
+		varA	.byte
+		varB	.byte
+		varC	.byte
+		varD	.byte
+		varE	.byte
+		varF	.byte
+		varG	.byte
+		varH	.byte
+		minPlr	.byte
+		minIdx	.byte
+		minFlg	.byte
+		keyDly	.byte
+	.endstruct
+
+
+;-------------------------------------------------------------------------------
+;gamedefs.inc
+;-------------------------------------------------------------------------------
+
 	.struct SHRTSTR
 		_COUNT	.byte
 		_0	.byte
@@ -291,7 +377,6 @@ keyZPDecodePtr	=	$F5			;word
 	.struct GAME
 		sig	.byte
 		lock	.byte
-		term	.byte
 		dirty	.byte			;bit 7: Shuffle chest
 						;    6: Shuffle chance
 						;    5: Prompt dirty
@@ -309,8 +394,8 @@ keyZPDecodePtr	=	$F5			;word
 		fShwNxt	.byte
 		pVis	.byte
 		sSelect	.byte
-		kWai	.byte
-		aWai	.word
+		kWai	.byte			;Move into UI?
+		aWai	.word			;Move into UI?
 		dieA	.byte
 		dieB	.byte
 		dieDbl	.byte
@@ -325,8 +410,9 @@ keyZPDecodePtr	=	$F5			;word
 		fFPTax	.byte
 		mFPTax	.word
 
-		gMdActn .byte
-		pRecall	.byte
+		gMdActn .byte			;Remove for game state stack
+		pRecall	.byte			;Remove for game state stack
+		
 		pWAuctn	.byte
 		pAFirst .byte
 		mAuctn	.word
@@ -349,7 +435,7 @@ keyZPDecodePtr	=	$F5			;word
 		sStpDst .byte
 		fStpPsG .byte
 		fPayDbl .byte
-		gMdStep .byte
+		gMdStep .byte			;Remove for game state stack
 		
 		fTrdSlM .byte
 		fTrdSlL .byte
@@ -357,25 +443,25 @@ keyZPDecodePtr	=	$F5			;word
 		aTrdSlH .word
 		cTrdSlB .byte
 		
-		gMdMPyI	.byte			;Back up game mode for must pay
-		pMstPyI	.byte			;Back up of player for must pay
+		gMdMPyI	.byte			;Remove for game state stack
+		pMstPyI	.byte			;Remove for game state stack
+
 		pMPyLst	.byte			;Last player to check in mpay
 		pMPyCur	.byte			;Current player checked in mpay
 		
-		gMdElim	.byte			;Back up game mode for elimin. 
-		pElimin .byte			;Back up player for elimin.
+		gMdElim	.byte			;Remove for game state stack 
+		pElimin .byte			;Remove for game state stack
 		
-		gMdTrdI .byte			;Back up gmode for trade intrpt
-		pTrdICP	.byte			;Back up player for trade intrpt
-		
-		
+		gMdTrdI .byte			;Remove for game state stack
+		pTrdICP	.byte			;Remove for game state stack
+	
 		fTrdStg .byte			;stage
 		iTrdStp .byte			;step
 		fTrdPhs .byte			;phase
 		fTrdTyp .byte			;type (regular, elimin)
 		
-		gMdQuit .byte			
-		pQuitCP	.byte
+		gMdQuit .byte			;Remove for game state stack
+		pQuitCP	.byte			
 		
 		gMode	.byte			;0:  Normal (Play)
 						;1:  Auction
@@ -477,23 +563,26 @@ keyZPDecodePtr	=	$F5			;word
 	
 	
 
-;***	ruledefs.inc
-	.struct	SQRDEED
+;-------------------------------------------------------------------------------
+;ruledefs.inc
+;-------------------------------------------------------------------------------
+
+	.struct	SQRCARD
 		group	.byte
 		index	.byte
 	.endstruct
 	
 	.struct GROUP
 ;		type	.byte			;I was going to use this to 
-						;indicate card/deed/street etc
+						;indicate street/stn/util etc
 		colour	.byte
 		count	.byte
-		pImprv	.byte
+		vImprv	.byte
 		aScrTab .word
-		mDeed1	.word			;***FIXME: Should be "card"?
-		mDeed2	.word
-		mDeed3	.word
-		mDeed4	.word
+		aCard0	.word			
+		aCard1	.word
+		aCard2	.word
+		aCard3	.word
 	.endstruct
 
 ;groups:
@@ -519,16 +608,16 @@ keyZPDecodePtr	=	$F5			;word
 	.endstruct
 
 	.struct	DEED
-		cCard	.tag	CARD
-		pPurch	.word
-		mValue	.word			;could be byte
+		tCard	.tag	CARD
+		mPurch	.word
+		mMrtg	.word			;could be byte
 		mFee	.word			;could be byte
 	.endstruct
 
 	.struct	STREET
-		cCard	.tag	CARD
-		pPurch	.word
-		mValue	.word			;***TODO:  Change to mMrtg
+		tCard	.tag	CARD
+		mPurch	.word
+		mMrtg	.word			;could be byte
 		mFee	.word			;could be byte
 		mRent	.word			;could be byte
 		m1Hse	.word
@@ -539,24 +628,25 @@ keyZPDecodePtr	=	$F5			;word
 	.endstruct
 	
 	.struct	STATION
-		cCard	.tag	CARD
-		pPurch	.word
-		mValue	.word			;could be byte
+		tCard	.tag	CARD
+		mPurch	.word
+		mMrtg	.word			;could be byte
 		mFee	.word			;could be byte
-		rRent	.word			;could be byte
+		mRent	.word			;could be byte
 	.endstruct
 	
 	.struct	UTILITY
-		cCard	.tag	CARD
-		pPurch	.word
-		mValue	.word			;could be byte
+		tCard	.tag	CARD
+		mPurch	.word
+		mMrtg	.word			;could be byte
 		mFee	.word			;could be byte
 	.endstruct
 	
 	
 ;-------------------------------------------------------------------------------
-;Global data defines
+;globaldefs.inc
 ;-------------------------------------------------------------------------------
+
 ui		=	$0200
 game		=	ui + .sizeof(UI)		
 plr0		=	game + .sizeof(GAME)
@@ -567,18 +657,20 @@ plr4		=	plr3 + .sizeof(PLAYER)
 plr5		=	plr4 + .sizeof(PLAYER)
 sqr00		=	plr5 + .sizeof(PLAYER)
 
-keyBuffer0	=	sqr00 + (.sizeof(SQUARE) * 40)
-keyBufferSize 	=	keyBuffer0 + 10
-keyRepeatFlag 	=	keyBufferSize + 1
-keyRepeatSpeed  =	keyRepeatFlag + 1
-keyRepeatDelay	=	keyRepeatSpeed + 1
-keyModifierFlag = 	keyRepeatDelay + 1
-keyModifierLast =	keyModifierFlag + 1
-;keyModifierVect =	keyModifierLast + 1
-;keyModifierLock =	keyModifierVect + 2
+;keyBuffer0	=	sqr00 + (.sizeof(SQUARE) * 40)
+;keyBufferSize 	=	keyBuffer0 + 10
+;keyRepeatFlag 	=	keyBufferSize + 1
+;keyRepeatSpeed  =	keyRepeatFlag + 1
+;keyRepeatDelay	=	keyRepeatSpeed + 1
+;keyModifierFlag = 	keyRepeatDelay + 1
+;keyModifierLast =	keyModifierFlag + 1
+;globalsEnd	=	keyModifierLast + 1
 
-	.assert keyModifierLast < $0400, error, "Global data space too large!"
+irqglob		=	sqr00 + (.sizeof(SQUARE) * 40)
+globalsEnd 	= 	irqglob + .sizeof(IRQGLOBS)
 
+
+	.assert globalsEnd < $0400, error, .concat("Global data space too large! $", .string(.hibyte(globalsEnd)), .string(.lobyte(globalsEnd))) 
 
 
 ;-------------------------------------------------------------------------------
@@ -588,7 +680,7 @@ keyModifierLast =	keyModifierFlag + 1
 
 
 ;-------------------------------------------------------------------------------
-;BASIC launcher
+;BASIC bootstrap
 ;-------------------------------------------------------------------------------
 	.code
 	.org		$07FF			;start 2 before load address so
@@ -624,12 +716,17 @@ bootstrap:
 	
 	.assert         * < $0840, error, "Bootstrap incorrect!"
 	
+	
+;-------------------------------------------------------------------------------
+;Sprite data
+;-------------------------------------------------------------------------------
+
 ;	We need this space in order to use it for the mouse pointer (from $0800)
 	.repeat	($0840 - *), I
 		.byte	$00
 	.endrep
 
-plrToken:
+sprToken:
 			.byte	%00111100, $00, $00
 			.byte 	%01111110, $00, $00
 			.byte	%11111111, $00, $00
@@ -653,7 +750,7 @@ plrToken:
 			.byte	$00, $00, $00
 			.byte	$00
 
-plrMinimap:
+sprMiniPlyr:
 			.byte	$C0, $00, $00
 			.byte	$00, $00, $00
 			.byte	$00, $00, $00
@@ -677,7 +774,7 @@ plrMinimap:
 			.byte	$00, $00, $00
 			.byte	$00
 
-brdMiniMap:
+sprMiniMap:
 			.byte	%10011111, %11111111, %11111001
 			.byte	%10011111, %11100111, %11111001
 			.byte	%10011111, %11100111, %11111001
@@ -725,7 +822,11 @@ brdMiniMap:
 
 	.assert         * = $0900, error, "Program header incorrect!"
 
-;Include the sound driver and music data
+
+;-------------------------------------------------------------------------------
+;Audio driver and SFX
+;-------------------------------------------------------------------------------
+
 SNDBASE:		
 	.include	"tune.s"
 	
@@ -860,27 +961,25 @@ plrNameHi:
 
 	
 ;-------------------------------------------------------------------------------
-;main
+;"Main thread" game loop
 ;-------------------------------------------------------------------------------
 main:
-		CLI				;does this fix the race condition?
+		CLI				
 		
 uloop:
-		SEI				;does this fix the race condition?
+		SEI				
 		LDA	game + GAME::lock
 		BNE	main
 		
 		LDA	#$01
 		STA	game + GAME::sig
-		CLI				;does this fix the race condition?
+		CLI				
 
-		JSR	handleUpdates
+		JSR	mainHandleUpdates
 
-		SEI				;does this fix the race condition?
+		SEI				
 		LDA	#$00
 		STA	game + GAME::sig
-		CLI				;does this fix the race condition?
-
 		JMP	main
 		
 hang:
@@ -888,9 +987,8 @@ hang:
 
 
 ;-------------------------------------------------------------------------------
-;handleUpdates
+mainHandleUpdates:
 ;-------------------------------------------------------------------------------
-handleUpdates:
 		LDX	game + GAME::pActive
 		CPX	game + GAME::pLast
 		BEQ	@tststep
@@ -963,7 +1061,7 @@ handleUpdates:
 		LDA	game + GAME::dlgVis
 		BNE	@updDialog
 		
-		JSR	gameRebuildScreen
+		JSR	mainRebuildScreen
 		JMP	updatesExit
 
 @updTstCont0:
@@ -1137,9 +1235,8 @@ updatesExit:
 
 
 ;-------------------------------------------------------------------------------
-;gameRebuildScreen
+mainRebuildScreen:
 ;-------------------------------------------------------------------------------
-gameRebuildScreen:
 		JSR	screenBeginButtons	
 
 		LDA	#<screenQErase0
@@ -1176,6 +1273,24 @@ gameRebuildScreen:
 ;keyModifierVect =	$028F			;word
 ;keyModifierLock =	$0291			;byte
 
+
+keyBuffer0:
+	.repeat	10, I
+		.byte	$00
+	.endrep
+keyBufferSize:
+		.byte	$00
+keyRepeatFlag:
+		.byte	$00
+keyRepeatSpeed:
+		.byte	$00
+keyRepeatDelay:
+		.byte	$00
+keyModifierFlag:
+		.byte	$00
+keyModifierLast:
+		.byte	$00
+
 keyQueue0:
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 		.byte	$00, $00
@@ -1187,6 +1302,8 @@ keyQueueEnPos:
 
 
 keyEnqueueKey:
+;***FIXME:	Don't allow more keys than will fit in the queue.
+
 		LDX	keyQueueEnPos
 		STA	keyQueue0, X
 		
@@ -1196,8 +1313,14 @@ keyEnqueueKey:
 
 
 keyDequeueKeys:
+		LDA	game + GAME::dlgVis
+		BNE	@loop
+
 		LDA	ui + UI::fInjKey
 		BEQ	@exit
+
+;***FIXME:	Don't permit this routine to inject more keys than will fit in
+;	the buffer!
 
 @loop:
 		LDX	keyQueueDePos
@@ -1223,7 +1346,7 @@ keyDequeueKeys:
 ;-------------------------------------------------------------------------------
 keyInjectKey:	
 ;-------------------------------------------------------------------------------
-;TODO:		Should check buffer size
+;***FIXME:	Don't allow more keys than will fit in the buffer.
 
 		LDX	keyZPKeyCount		;Put a key into the buffer
 		STA	keyBuffer0, X
@@ -1231,7 +1354,10 @@ keyInjectKey:
 		
 		RTS
 
+
+;-------------------------------------------------------------------------------
 keyScanKey:
+;-------------------------------------------------------------------------------
 ;.,EA87 A9 00    clear A
 		LDA 	#$00        
 		
@@ -1606,6 +1732,215 @@ keyTableShifted:
 ;==============================================================================
 ;FOR SCREEN.S
 ;==============================================================================
+
+;-------------------------------------------------------------------------------
+;screen constant data
+;-------------------------------------------------------------------------------
+;***TODO:	Consider moving this data into high memory (after strings?)
+
+screenRowsLo:
+			.byte	<$0400, <$0428, <$0450, <$0478, <$04A0
+			.byte	<$04C8, <$04F0, <$0518, <$0540, <$0568
+			.byte 	<$0590, <$05B8, <$05E0, <$0608, <$0630
+			.byte	<$0658, <$0680, <$06A8, <$06D0, <$06F8
+			.byte	<$0720, <$0748, <$0770, <$0798, <$07C0
+
+screenRowsHi:
+			.byte	>$0400, >$0428, >$0450, >$0478, >$04A0
+			.byte	>$04C8, >$04F0, >$0518, >$0540, >$0568
+			.byte 	>$0590, >$05B8, >$05E0, >$0608, >$0630
+			.byte	>$0658, >$0680, >$06A8, >$06D0, >$06F8
+			.byte	>$0720, >$0748, >$0770, >$0798, >$07C0
+
+colourRowsLo:
+			.byte	<$D800, <$D828, <$D850, <$D878, <$D8A0
+			.byte	<$D8C8, <$D8F0, <$D918, <$D940, <$D968
+			.byte 	<$D990, <$D9B8, <$D9E0, <$DA08, <$DA30
+			.byte	<$DA58, <$DA80, <$DAA8, <$DAD0, <$DAF8
+			.byte	<$DB20, <$DB48, <$DB70, <$DB98, <$DBC0
+
+colourRowsHi:
+			.byte	>$D800, >$D828, >$D850, >$D878, >$D8A0
+			.byte	>$D8C8, >$D8F0, >$D918, >$D940, >$D968
+			.byte 	>$D990, >$D9B8, >$D9E0, >$DA08, >$DA30
+			.byte	>$DA58, >$DA80, >$DAA8, >$DAD0, >$DAF8
+			.byte	>$DB20, >$DB48, >$DB70, >$DB98, >$DBC0
+			
+lineCodes:
+			.byte	$EA, $EF, $F4, $F7
+			.byte	$FF, $A0, $6C, $7E
+			.byte	$20, $6A, $77, $E7
+			.byte	$D0
+			
+pointCodes:
+			.byte	$CF, $D0, $CC, $FA
+			.byte 	$A0, $B1, $B2, $B3
+			.byte	$B4, $88, $20, $F7
+			.byte	$E7, $D7
+			
+screenClear0:
+			.byte	$11, $00, $00, $28, $19
+			.byte	$00
+
+screenQErase0:
+			.byte	$58, $12, $00, $07
+			.byte	$11, $13, $15, $15, $04
+			.byte	$00
+			
+brushRailroad0:		
+			.byte 	$02, $02
+			.byte	$E2, $7E
+			.byte	$D7, $D7
+brushChanceH1:
+			.byte	$03, $01 
+			.byte	$BF, $BF, $BF
+			
+brushTaxH2:
+			.byte	$03, $01 
+			.byte	$94, $81, $98
+
+brushTaxV3:
+			.byte	$01, $03
+			.byte	$94
+			.byte	$81
+			.byte	$98
+			
+brushChestV4:	
+			.byte	$01, $03
+			.byte	$5C
+			.byte	$66
+			.byte	$FE
+
+brushGo5:
+			.byte	$03, $02
+			.byte	$A0, $87, $8F
+			.byte	$9F, $C3, $C3
+			
+brushElectric6:		
+			.byte	$03, $01
+			.byte	$CE, $CD, $CE
+			
+brushChanceV7:
+			.byte	$01, $03
+			.byte	$BF
+			.byte	$BF
+			.byte	$BF
+			
+brushChestH8:	
+			.byte	$03, $01
+			.byte	$EC, $66, $68
+
+brushParking9:
+			.byte	$03, $03
+			.byte	$D5, $C3, $C9
+			.byte	$D7, $68, $D7
+			.byte	$6C, $62, $7B
+			
+brushWaterA:
+			.byte	$02, $03
+			.byte	$A0, $EF
+			.byte	$D5, $DB
+			.byte	$A0, $DD
+			
+brushInGaolB:
+			.byte	$03, $03
+			.byte	$DD, $DD, $DD
+			.byte	$DD, $DD, $DD
+			.byte	$ED, $F1, $F1
+
+brushGoGaolC:
+			.byte   $04, $03
+			.byte	$F0, $F2, $C0, $C9
+			.byte	$FC, $7C, $7F, $C2
+			.byte	$A0, $FC, $C0, $CB
+			
+brushesLo:
+			.byte	<brushRailroad0, <brushChanceH1, <brushTaxH2
+			.byte	<brushTaxV3, <brushChestV4, <brushGo5
+			.byte	<brushElectric6, <brushChanceV7, <brushChestH8
+			.byte	<brushParking9, <brushWaterA, <brushInGaolB
+			.byte	<brushGoGaolC
+brushesHi:
+			.byte	>brushRailroad0, >brushChanceH1, >brushTaxH2
+			.byte	>brushTaxV3, >brushChestV4, >brushGo5
+			.byte	>brushElectric6, >brushChanceV7, >brushChestH8
+			.byte	>brushParking9, >brushWaterA, >brushInGaolB
+			.byte	>brushGoGaolC
+
+
+;	These are BQUADP structs
+bQuadPos0:
+			.byte	$B6
+			.word	$0134
+			.word	$0114
+			.word	$00FC
+			.word	$00E4
+			.word	$00CC
+			.word	$00B4
+			.word	$0134
+			.byte	$36
+			.byte	$4E
+			.byte	$66
+			.byte	$7E
+			.byte	$96
+
+bQuadPos1:
+			.byte	$B6
+			.word	$0144
+			.word	$012C
+			.word	$0114
+			.word	$00FC
+			.word 	$00E4
+			.word	$00BC
+			.word	$00BC
+			.byte	$96
+			.byte	$7E
+			.byte	$66
+			.byte	$4E
+			.byte	$36
+			
+bQuadPos2:
+			.byte	$3E
+			.word	$00BC
+			.word	$00E4
+			.word	$00FC
+			.word	$0114
+			.word	$012C
+			.word	$0144
+			.word	$00BC
+			.byte	$C6
+			.byte	$AE
+			.byte	$96
+			.byte	$7E
+			.byte	$66
+			
+bQuadPos3:
+			.byte	$3E
+			.word	$00B4
+			.word	$00CC
+			.word	$00E4
+			.word	$00FC
+			.word	$011C
+			.word	$0134
+			.word	$0134
+			.byte	$66
+			.byte	$7E
+			.byte	$96
+			.byte	$AE
+			.byte	$C6
+			
+bQuadPosLo:
+			.byte 	<bQuadPos0, <bQuadPos1
+			.byte 	<bQuadPos2, <bQuadPos3
+			
+bQuadPosHi:
+			.byte 	>bQuadPos0, >bQuadPos1
+			.byte 	>bQuadPos2, >bQuadPos3
+
+
+;-------------------------------------------------------------------------------
+;screen variable data
+;-------------------------------------------------------------------------------
 button0:	.tag	BUTTON
 button1:	.tag	BUTTON
 button2:	.tag	BUTTON
@@ -1639,34 +1974,6 @@ screenBtnSglStart:
 			.byte	$00
 screenRedirectNull:
 			.byte	$00
-
-screenRowsLo:
-			.byte	<$0400, <$0428, <$0450, <$0478, <$04A0
-			.byte	<$04C8, <$04F0, <$0518, <$0540, <$0568
-			.byte 	<$0590, <$05B8, <$05E0, <$0608, <$0630
-			.byte	<$0658, <$0680, <$06A8, <$06D0, <$06F8
-			.byte	<$0720, <$0748, <$0770, <$0798, <$07C0
-
-screenRowsHi:
-			.byte	>$0400, >$0428, >$0450, >$0478, >$04A0
-			.byte	>$04C8, >$04F0, >$0518, >$0540, >$0568
-			.byte 	>$0590, >$05B8, >$05E0, >$0608, >$0630
-			.byte	>$0658, >$0680, >$06A8, >$06D0, >$06F8
-			.byte	>$0720, >$0748, >$0770, >$0798, >$07C0
-
-colourRowsLo:
-			.byte	<$D800, <$D828, <$D850, <$D878, <$D8A0
-			.byte	<$D8C8, <$D8F0, <$D918, <$D940, <$D968
-			.byte 	<$D990, <$D9B8, <$D9E0, <$DA08, <$DA30
-			.byte	<$DA58, <$DA80, <$DAA8, <$DAD0, <$DAF8
-			.byte	<$DB20, <$DB48, <$DB70, <$DB98, <$DBC0
-
-colourRowsHi:
-			.byte	>$D800, >$D828, >$D850, >$D878, >$D8A0
-			.byte	>$D8C8, >$D8F0, >$D918, >$D940, >$D968
-			.byte 	>$D990, >$D9B8, >$D9E0, >$DA08, >$DA30
-			.byte	>$DA58, >$DA80, >$DAA8, >$DAD0, >$DAF8
-			.byte	>$DB20, >$DB48, >$DB70, >$DB98, >$DBC0
 
 
 ;-------------------------------------------------------------------------------
@@ -2896,173 +3203,80 @@ screenFillRowVExit:
 		RTS
 		
 	
-;-------------------------------------------------------------------------------
-;screen data
-;-------------------------------------------------------------------------------
-lineCodes:
-			.byte	$EA, $EF, $F4, $F7
-			.byte	$FF, $A0, $6C, $7E
-			.byte	$20, $6A, $77, $E7
-			.byte	$D0
-			
-pointCodes:
-			.byte	$CF, $D0, $CC, $FA
-			.byte 	$A0, $B1, $B2, $B3
-			.byte	$B4, $88, $20, $F7
-			.byte	$E7, $D7
-			
-screenClear0:
-			.byte	$11, $00, $00, $28, $19
-			.byte	$00
-
-screenQErase0:
-;			.byte	$58, $00, $00, $06
-			.byte	$58, $12, $00, $07
-			.byte	$11, $13, $15, $15, $04
-			.byte	$00
-			
-			
-;-------------------------------------------------------------------------------
-;square face brushes
-;-------------------------------------------------------------------------------
-brushRailroad0:		
-			.byte 	$02, $02
-			.byte	$E2, $7E
-			.byte	$D7, $D7
-brushChanceH1:
-			.byte	$03, $01 
-			.byte	$BF, $BF, $BF
-			
-brushTaxH2:
-			.byte	$03, $01 
-			.byte	$94, $81, $98
-
-brushTaxV3:
-			.byte	$01, $03
-			.byte	$94
-			.byte	$81
-			.byte	$98
-			
-brushChestV4:	
-			.byte	$01, $03
-			.byte	$5C
-			.byte	$66
-			.byte	$FE
-
-brushGo5:
-			.byte	$03, $02
-			.byte	$A0, $87, $8F
-			.byte	$9F, $C3, $C3
-			
-brushElectric6:		
-			.byte	$03, $01
-			.byte	$CE, $CD, $CE
-			
-brushChanceV7:
-			.byte	$01, $03
-			.byte	$BF
-			.byte	$BF
-			.byte	$BF
-			
-brushChestH8:	
-			.byte	$03, $01
-			.byte	$EC, $66, $68
-
-brushParking9:
-			.byte	$03, $03
-			.byte	$D5, $C3, $C9
-			.byte	$D7, $68, $D7
-			.byte	$6C, $62, $7B
-			
-brushWaterA:
-			.byte	$02, $03
-			.byte	$A0, $EF
-			.byte	$D5, $DB
-			.byte	$A0, $DD
-			
-brushInGaolB:
-			.byte	$03, $03
-			.byte	$DD, $DD, $DD
-			.byte	$DD, $DD, $DD
-			.byte	$ED, $F1, $F1
-
-brushGoGaolC:
-			.byte   $04, $03
-			.byte	$F0, $F2, $C0, $C9
-			.byte	$FC, $7C, $7F, $C2
-			.byte	$A0, $FC, $C0, $CB
-			
-brushesLo:
-			.byte	<brushRailroad0, <brushChanceH1, <brushTaxH2
-			.byte	<brushTaxV3, <brushChestV4, <brushGo5
-			.byte	<brushElectric6, <brushChanceV7, <brushChestH8
-			.byte	<brushParking9, <brushWaterA, <brushInGaolB
-			.byte	<brushGoGaolC
-brushesHi:
-			.byte	>brushRailroad0, >brushChanceH1, >brushTaxH2
-			.byte	>brushTaxV3, >brushChestV4, >brushGo5
-			.byte	>brushElectric6, >brushChanceV7, >brushChestH8
-			.byte	>brushParking9, >brushWaterA, >brushInGaolB
-			.byte	>brushGoGaolC
-
-
 ;==============================================================================
 ;FOR PLAYER.S
 ;==============================================================================
 
-	.struct	IRQGLOBS
-		instld	.byte
-;		vector	.word
-		saveA	.byte
-		saveB	.byte
-		saveC	.byte
-		saveD	.byte
-		saveE	.byte
-		brd0X	.byte
-		brd0Y	.byte
-		brd1X	.byte
-		brd1Y	.byte
-		brd2X	.byte
-		brd2Y	.byte
-		brd3Y	.byte
-		brd3X	.byte
-		brd4X	.byte
-		brd4Y	.byte
-		brd5X	.byte
-		brd5Y	.byte
-		brdMX	.byte
-		savMX	.byte
-		min0X	.byte
-		min0Y	.byte
-		min1X	.byte
-		min1Y	.byte
-		min2X	.byte
-		min2Y	.byte
-		min3X	.byte
-		min3Y	.byte
-		min4X	.byte
-		min4Y	.byte
-		min5X	.byte
-		min5Y	.byte
-		varA	.byte
-		varB	.byte
-		varC	.byte
-		varD	.byte
-		varE	.byte
-		varF	.byte
-		varG	.byte
-		varH	.byte
-		minPlr	.byte
-		minIdx	.byte
-		minFlg	.byte
-		keyDly	.byte
-	.endstruct
-
-
-irqglob:	.tag	IRQGLOBS
+;irqglob:	.tag	IRQGLOBS
 irqBlinkSeq0:
 		.byte	$00, $00, $0C, $0C, $0F, $0F, $01, $01, $0F, $0F, $0C, $0C
 
+
+;-------------------------------------------------------------------------------
+;Input driver variables
+;-------------------------------------------------------------------------------
+OldPotX:        
+	.byte    	0               	;Old hw counter values
+OldPotY:        
+	.byte    	0
+
+XPos:           
+	.word    	0               	;Current mouse position, X
+YPos:           
+	.word    	0               	;Current mouse position, Y
+XMin:           
+	.word    	0               	;X1 value of bounding box
+YMin:           
+	.word    	0               	;Y1 value of bounding box
+XMax:           
+	.word    	319               	;X2 value of bounding box
+YMax:           
+	.word    	199           		;Y2 value of bounding box
+	
+JoyUp:
+	.byte		$00
+JoyDown:
+	.byte		$00
+JoyLeft:
+	.byte		$00
+JoyRight:
+	.byte		$00
+JoyButton:
+	.byte		$00
+JoyUsed:
+	.byte		$00
+ButtonJClick:
+	.byte		$00
+	
+Buttons:        
+	.byte    	0               	;button status bits
+ButtonsOld:
+	.byte		0
+ButtonLClick:
+	.byte		0
+ButtonRClick:
+	.byte		0
+MouseUsed:
+	.byte		$00
+
+OldValue:       
+	.byte    	0               	;Temp for MoveCheck routine
+NewValue:       
+	.byte    	0               	;Temp for MoveCheck routine
+
+tempValue:	
+	.word		0
+
+mouseCheck:
+	.byte		$00
+mouseTemp0:
+	.word		$0000
+mouseXCol:
+	.byte		$00
+mouseYRow:
+	.byte		$00
+mouseLastY:
+	.word           $0000
 
 
 ;-------------------------------------------------------------------------------
@@ -3118,15 +3332,14 @@ plyrNOP:
 ;-------------------------------------------------------------------------------
 plyrIRQ:
 ;-------------------------------------------------------------------------------
-;***TODO:		Should use self-patching in IRQ routine.  Use RAM!
-;***FIXME:		Perhaps way it does so much testing is reason for 
-;			occassional failure?
-;***FIXME:		Don't do third interrupt?  Process its code after
-;			second?
+;***TODO:	Should use self-patching in IRQ routine.  Use RAM!
+;***FIXME:	Perhaps way it does so much testing is reason for occassional 
+;		failure?
+;***FIXME:	Don't do last interrupt?  Process its code after the middle?
 
 		PHP				;save the initial state
 		PHA
-		TXA				;de This is done in the kernal
+		TXA				
 		PHA
 		TYA
 		PHA
@@ -3135,7 +3348,7 @@ plyrIRQ:
 		
 ;***FIXME:	I've decided that the overhead is really quite huge.  I need to 
 ;	refactor this routine so that it is more efficient on time consumption.  
-;	I'm having to share the same zero page addresses with the front end??
+;	I'm having to time-share the zero page addresses with the front end??
 
 	.if	DEBUG_IRQ
 		LDA	vicBrdrClr
@@ -3145,13 +3358,24 @@ plyrIRQ:
 		STA	vicBrdrClr
 	.endif
 	
+;	Is the VIC-II needing service?
 		LDA	vicIRQFlgs
 		AND	#$01
 		BNE	@1
 		
+;	Some other interrupt source??  Peculiar...  And possibly a problem!  How
+;	do I acknowledge it if its not a BRK when I don't know what it would be?
+@debug_trap0:
+		LDA	#$02
+		STA	vicBrdrClr
+
 		JMP 	@done
 		
 @1:
+;	Clear the VIC-II interrupt here, instead of later to make sure it always
+;	happens.
+		ASL	vicIRQFlgs
+		
 		LDA	$FB
 		STA	irqglob + IRQGLOBS::saveA
 		LDA	$FC
@@ -3171,10 +3395,9 @@ plyrIRQ:
 		BEQ	@tstjoystick
 		
 		JSR	plyrProcessMouse
-;		JMP	@procsound		;Don't skip the joystick even
-						;though I don't like it, it will
-						;only ever happen all the time
-						;at the start
+		
+;	Don't skip the joystick even though I don't like it, it will only ever 
+;	happen all the time at the start
 		
 @tstjoystick:
 		LDA	ui + UI::fJskEnb
@@ -3195,9 +3418,10 @@ plyrIRQ:
 		STA	vicBrdrClr
 	.endif
 	
-		
-		LDA	game + GAME::sig	;Don't process the mouse click
-		BNE	@skipThis		;or keys if the FrontEnd is busy
+	
+;	Don't process the mouse click or keys if the FrontEnd is busy
+		LDA	game + GAME::sig	
+		BNE	@skipThis		
 ;
 	.if	DEBUG_IRQ
 		LDA	#$02
@@ -3208,6 +3432,9 @@ plyrIRQ:
 
 	.if 	DEBUG_CPU
 	.else
+		LDA	ui + UI::fUsrInp
+		BNE	@doUserInput
+	
 		LDX	game + GAME::pActive
 		LDA	plrLo, X
 		STA	$FB
@@ -3216,9 +3443,10 @@ plyrIRQ:
 		
 		LDY	#PLAYER::fCPU
 		LDA	($FB), Y
-		BNE	@skipJstk
+		BNE	@skipUserInput
 	.endif
 
+@doUserInput:
 		JSR	keyScanKey
 
 		LDA	ui + UI::fMseEnb	
@@ -3234,11 +3462,11 @@ plyrIRQ:
 	
 @skipMouse:
 		LDA	ui + UI::fJskEnb
-		BEQ	@skipJstk
+		BEQ	@skipUserInput
 
 		JSR	handleJoystick
 
-@skipJstk:
+@skipUserInput:
 		JSR	handleKeys
 
 		JSR	handleHotBlink
@@ -3357,8 +3585,6 @@ plyrIRQ:
 		LDA	irqglob + IRQGLOBS::varA
 		STA	vicRstrVal
 
-		ASL	vicIRQFlgs
-
 	.if	DEBUG_IRQ
 						;Restore colour
 		LDA  	irqglob + IRQGLOBS::saveE	
@@ -3371,7 +3597,6 @@ plyrIRQ:
 		PLA             
 		TAX             
 		PLA             
-		
 		PLP
 
 		RTI
@@ -3422,63 +3647,6 @@ plyrCheckStepping:
 
 @exit:
 		RTS
-
-
-;-------------------------------------------------------------------------------
-;Mouse driver variables
-;-------------------------------------------------------------------------------
-OldPotX:        
-	.byte    	0               	;Old hw counter values
-OldPotY:        
-	.byte    	0
-
-XPos:           
-	.word    	0               	;Current mouse position, X
-YPos:           
-	.word    	0               	;Current mouse position, Y
-XMin:           
-	.word    	0               	;X1 value of bounding box
-YMin:           
-	.word    	0               	;Y1 value of bounding box
-XMax:           
-	.word    	319               	;X2 value of bounding box
-YMax:           
-	.word    	199           		;Y2 value of bounding box
-	
-JoyUp:
-	.byte		$00
-JoyDown:
-	.byte		$00
-JoyLeft:
-	.byte		$00
-JoyRight:
-	.byte		$00
-JoyButton:
-	.byte		$00
-JoyUsed:
-	.byte		$00
-ButtonJClick:
-	.byte		$00
-	
-Buttons:        
-	.byte    	0               	;button status bits
-ButtonsOld:
-	.byte		0
-ButtonLClick:
-	.byte		0
-ButtonRClick:
-	.byte		0
-MouseUsed:
-	.byte		$00
-
-OldValue:       
-	.byte    	0               	;Temp for MoveCheck routine
-NewValue:       
-	.byte    	0               	;Temp for MoveCheck routine
-
-tempValue:	
-	.word		0
-
 
 
 ;-------------------------------------------------------------------------------
@@ -4294,6 +4462,8 @@ handleJoystick:
 		STA	ButtonJClick
 		
 		LDX	ui + UI::iSelBtn
+		CPX	#$FF
+		BEQ	@exit
 		
 		LDA	buttonLo, X
 		STA	$32
@@ -4354,18 +4524,6 @@ handleJoystickUpdateUI:
 
 @exit:
 		RTS
-
-;-------------------------------------------------------------------------------
-mouseCheck:
-	.byte		$00
-mouseTemp0:
-	.word		$0000
-mouseXCol:
-	.byte		$00
-mouseYRow:
-	.byte		$00
-mouseLastY:
-	.word           $0000
 
 
 ;-------------------------------------------------------------------------------
@@ -5168,80 +5326,6 @@ plyrDispUpdShort:
 		RTS
 
 
-;-------------------------------------------------------------------------------
-;consts/tables
-;-------------------------------------------------------------------------------
-;dengland	These are BQUADP structs
-
-bQuadPos0:
-			.byte	$B6
-			.word	$0134
-			.word	$0114
-			.word	$00FC
-			.word	$00E4
-			.word	$00CC
-			.word	$00B4
-			.word	$0134
-			.byte	$36
-			.byte	$4E
-			.byte	$66
-			.byte	$7E
-			.byte	$96
-
-bQuadPos1:
-			.byte	$B6
-			.word	$0144
-			.word	$012C
-			.word	$0114
-			.word	$00FC
-			.word 	$00E4
-			.word	$00BC
-			.word	$00BC
-			.byte	$96
-			.byte	$7E
-			.byte	$66
-			.byte	$4E
-			.byte	$36
-			
-bQuadPos2:
-			.byte	$3E
-			.word	$00BC
-			.word	$00E4
-			.word	$00FC
-			.word	$0114
-			.word	$012C
-			.word	$0144
-			.word	$00BC
-			.byte	$C6
-			.byte	$AE
-			.byte	$96
-			.byte	$7E
-			.byte	$66
-			
-bQuadPos3:
-			.byte	$3E
-			.word	$00B4
-			.word	$00CC
-			.word	$00E4
-			.word	$00FC
-			.word	$011C
-			.word	$0134
-			.word	$0134
-			.byte	$66
-			.byte	$7E
-			.byte	$96
-			.byte	$AE
-			.byte	$C6
-			
-bQuadPosLo:
-			.byte 	<bQuadPos0, <bQuadPos1
-			.byte 	<bQuadPos2, <bQuadPos3
-			
-bQuadPosHi:
-			.byte 	>bQuadPos0, >bQuadPos1
-			.byte 	>bQuadPos2, >bQuadPos3
-
-
 ;===============================================================================
 ;FOR PROMPT.S
 ;===============================================================================
@@ -5251,13 +5335,8 @@ prmpt0Clr0	=	$DB83
 prmpt1Txt0	=	prmpt0Txt0 + 40
 prmpt1Clr0	=	prmpt0Clr0 + 40
 
-prmptTemp0:
-		.byte	$00, $00
-prmptTemp2:
-		.byte 	$00
-prmptTemp3:
-		.byte	$00
-
+;***TODO:	Consider moving this constant data into high memory (after 
+;		strings?)
 
 tokPrmptRolled:		;ROLLED 
 			.byte 	$51, $12, $0F, $0C, $0C, $05, $04, $20
@@ -5327,10 +5406,17 @@ tokPrmptInTrade:	;BEING TRADED!
 			.byte 	$12, $01, $04, $05, $04, $21, $20, $20
 
 
-;-------------------------------------------------------------------------------
-;prmptClear
+prmptTemp0:
+		.byte	$00, $00
+prmptTemp2:
+		.byte 	$00
+prmptTemp3:
+		.byte	$00
+
+
 ;-------------------------------------------------------------------------------
 prmptClear:
+;-------------------------------------------------------------------------------
 		LDA 	#$20
 		LDX	#$1F
 @loop1:
@@ -5361,7 +5447,9 @@ prmptClear:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 prmptClear2:
+;-------------------------------------------------------------------------------
 		LDX	#$0F
 		LDA	#$20
 @loop0:
@@ -5380,7 +5468,9 @@ prmptClear2:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 prmptDisplay:
+;-------------------------------------------------------------------------------
 		LDX	#$0F
 @loop0:
 		LDA	prmptTok0, X
@@ -5399,7 +5489,9 @@ prmptDisplay:
 		RTS
 	
 	
+;-------------------------------------------------------------------------------
 prmptUpdate:
+;-------------------------------------------------------------------------------
 		LDA	prmptTemp2
 		BNE	@begin
 		
@@ -5514,7 +5606,9 @@ prmptUpdate:
 		RTS
 	
 		
+;-------------------------------------------------------------------------------
 prmptRolled:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 
@@ -5554,7 +5648,9 @@ prmptRolled:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 prmptManage:
+;-------------------------------------------------------------------------------
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptManage, X
@@ -5580,7 +5676,9 @@ prmptManage:
 		RTS
 	
 	
+;-------------------------------------------------------------------------------
 prmptClearOrRoll:
+;-------------------------------------------------------------------------------
 		LDA	prmptTemp3
 		BNE	@roll
 		
@@ -5592,7 +5690,9 @@ prmptClearOrRoll:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 prmptMustSell:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 		
@@ -5621,7 +5721,9 @@ prmptMustSell:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 prmptGoneGaol:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 		
@@ -5650,7 +5752,9 @@ prmptGoneGaol:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 prmptDoSubCash:
+;-------------------------------------------------------------------------------
 		PLA
 		STA	prmptClr1
 		
@@ -5675,7 +5779,9 @@ prmptDoSubCash:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 prmptDoAddCash:
+;-------------------------------------------------------------------------------
 		PLA
 		STA	prmptClr1
 		
@@ -5697,7 +5803,9 @@ prmptDoAddCash:
 		RTS
 
 	
+;-------------------------------------------------------------------------------
 prmptRent:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 
@@ -5715,7 +5823,9 @@ prmptRent:
 		JMP	prmptDoSubCash
 		
 
+;-------------------------------------------------------------------------------
 prmptBought:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 
@@ -5733,7 +5843,9 @@ prmptBought:
 		JMP	prmptDoSubCash
 		
 		
+;-------------------------------------------------------------------------------
 prmptPostBail:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 
@@ -5751,7 +5863,9 @@ prmptPostBail:
 		JMP	prmptDoSubCash
 		
 		
+;-------------------------------------------------------------------------------
 prmptTax:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 
@@ -5769,7 +5883,9 @@ prmptTax:
 		JMP	prmptDoSubCash
 
 
+;-------------------------------------------------------------------------------
 prmptFee:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 
@@ -5787,7 +5903,9 @@ prmptFee:
 		JMP	prmptDoSubCash
 
 
+;-------------------------------------------------------------------------------
 prmptSalary:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 
@@ -5805,7 +5923,9 @@ prmptSalary:
 		JMP	prmptDoAddCash
 
 
+;-------------------------------------------------------------------------------
 prmptFParking:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 
@@ -5823,7 +5943,9 @@ prmptFParking:
 		JMP	prmptDoAddCash
 
 
+;-------------------------------------------------------------------------------
 prmptSold:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 
@@ -5841,7 +5963,9 @@ prmptSold:
 		JMP	prmptDoAddCash
 		
 		
+;-------------------------------------------------------------------------------
 prmptMortgage:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 
@@ -5859,7 +5983,9 @@ prmptMortgage:
 		JMP	prmptDoAddCash
 		
 		
+;-------------------------------------------------------------------------------
 prmptRepay:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 
@@ -5877,7 +6003,9 @@ prmptRepay:
 		JMP	prmptDoSubCash
 
 
+;-------------------------------------------------------------------------------
 prmptChestSub:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 
@@ -5895,7 +6023,9 @@ prmptChestSub:
 		JMP	prmptDoSubCash
 
 
+;-------------------------------------------------------------------------------
 prmptChanceSub:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 
@@ -5913,7 +6043,9 @@ prmptChanceSub:
 		JMP	prmptDoSubCash
 
 
+;-------------------------------------------------------------------------------
 prmptChestAdd:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 
@@ -5931,7 +6063,9 @@ prmptChestAdd:
 		JMP	prmptDoAddCash
 
 
+;-------------------------------------------------------------------------------
 prmptChanceAdd:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 
@@ -5949,7 +6083,9 @@ prmptChanceAdd:
 		JMP	prmptDoAddCash
 
 
+;-------------------------------------------------------------------------------
 prmptShuffle:
+;-------------------------------------------------------------------------------
 		LDX	#$0F
 @loop0:
 		LDA	#$20
@@ -5980,7 +6116,9 @@ prmptShuffle:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 prmptForSale:
+;-------------------------------------------------------------------------------
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptForSale, X
@@ -6000,7 +6138,9 @@ prmptForSale:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 prmptForfeit:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 		
@@ -6029,7 +6169,9 @@ prmptForfeit:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 prmptPass:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 		
@@ -6058,7 +6200,9 @@ prmptPass:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 prmptBid:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 
@@ -6076,7 +6220,9 @@ prmptBid:
 		JMP	prmptDoAddCash
 
 
+;-------------------------------------------------------------------------------
 prmptInTrade:
+;-------------------------------------------------------------------------------
 		LDX	#$0F
 @loop1:
 		LDA	tokPrmptInTrade, X
@@ -6102,17 +6248,10 @@ prmptInTrade:
 		RTS
 		
 
-;==============================================================================
+;===============================================================================
 ;FOR STATUS.S
-;==============================================================================
+;===============================================================================
 
-statsPlrCntr:	
-		.byte	$00
-statsScnOffs:
-		.byte	$00
-statsStrLen:
-		.byte	$00
-		
 statsPerfLstH:
 		.byte	$20, $02, $00, $11
 		.byte	$00
@@ -6122,10 +6261,18 @@ statsPerfLstV:
 		.byte	$3F, $01, $00, $06
 		.byte	$00
 		
-;------------------------------------------------------------------------------
-;statsClear
-;------------------------------------------------------------------------------
+		
+statsPlrCntr:	
+		.byte	$00
+statsScnOffs:
+		.byte	$00
+statsStrLen:
+		.byte	$00
+		
+		
+;-------------------------------------------------------------------------------
 statsClear:
+;-------------------------------------------------------------------------------
 		LDX	#$00			;Colour each line in the 
 @loop:						;player's colour
 		STX	statsPlrCntr
@@ -6172,10 +6319,9 @@ statsClear:
 		RTS
 
 
-;------------------------------------------------------------------------------
-;statsDisplay
-;------------------------------------------------------------------------------
+;-------------------------------------------------------------------------------
 statsDisplay:
+;-------------------------------------------------------------------------------
 		LDX	#$00
 		
 @loopPlr:
@@ -6347,24 +6493,9 @@ statsDisplay:
 
 		
 
-;==============================================================================
+;===============================================================================
 ;FOR UI.S
-;==============================================================================
-
-UI_ACT_FALT	=	0
-UI_ACT_TRDE	=	1
-UI_ACT_REPY	=	2
-UI_ACT_PFEE	=	3
-UI_ACT_AUCN	=	4
-UI_ACT_MRTG	=	5
-UI_ACT_SELL	=	6
-UI_ACT_BUYD	=	7
-UI_ACT_BUYI	=	8
-UI_ACT_GOFR	=	9
-UI_ACT_POST	=	10
-UI_ACT_ROLL	=	11
-UI_ACT_SKEY	=	12
-UI_ACT_DELY	= 	13
+;===============================================================================
 
 
 uiActionCallsLo:
@@ -6384,11 +6515,6 @@ uiActionCallsHi:
 		.byte	>(uiActionPost - 1), >(uiActionRoll - 1)
 		.byte	>(uiActionSendKey - 1), >(uiActionDelay - 1)
 		
-uiActnCache	=	$FB00
-;	.repeat		256, I
-;			.byte	$FF, $00, $00, $00
-;	.endrep
-;
 
 ;-------------------------------------------------------------------------------
 uiInitQueue:
@@ -6571,7 +6697,6 @@ uiProcessActions:
 		JSR	uiActionDeselect
 		
 		JSR	uiDequeueAction
-		
 		JSR	uiPerformAction
 		
 ;		DEC	ui + UI::cActns
@@ -6810,98 +6935,65 @@ uiActionFault:
 ;-------------------------------------------------------------------------------
 uiActionTrade:
 ;-------------------------------------------------------------------------------
-;		LDY	#TRADE::player
-;		LDA	trade0, Y
-
 		LDA	$69			;byte 01 = player
 
 		STA	game + GAME::pLast
 		STA	game + GAME::pActive
 
-;			- phase 0 - transfer deed
-;		LDX	game + GAME::iTrdStp 
-;		LDA	trddeeds1, X
-		
 		LDA	$6A			;byte 02 = square
 		
 		JSR	uiActionFocusSquare
 		
-;		LDA	trddeeds1, X
-;		TAX
-
 		LDX	$6A
 
 		JSR	rulesTradeTitleDeed
 		
 		RTS
 
-uiActionRepay:
-;		LDY	#TRADE::player
-;		LDA	trade0, Y
 
+;-------------------------------------------------------------------------------
+uiActionRepay:
+;-------------------------------------------------------------------------------
 		LDA	$69			;byte 01 = player
 
 		STA	game + GAME::pLast
 		STA	game + GAME::pActive
 
-;		LDX	game + GAME::iTrdStp 
-;		LDA	trddeeds1, X
-
 		LDA	$6A
 		JSR	uiActionFocusSquare
 
-;		LDA	trddeeds1, X
 		LDA	$6A
 		JSR	rulesUnmortgageImmed
 		
-;		JSR	gamePerfTradeDeselect
-
 		RTS
 		
-uiActionFee:
-;		LDY	#TRADE::player
-;		LDA	trade0, Y
 
+;-------------------------------------------------------------------------------
+uiActionFee:
+;-------------------------------------------------------------------------------
 		LDA	$69			;byte 01 = player
 
 		STA	game + GAME::pLast
 		STA	game + GAME::pActive
 		
-;			- phase 1 - fee/repay deed
-;		LDX	game + GAME::iTrdStp 
-;		LDA	trdrepay1, X
-;		AND	#$01
-;		BNE	@stage0ph1repay
-
-;		LDX	game + GAME::iTrdStp 
-;		LDA	trddeeds1, X
-
 		LDA	$6A
 		JSR	uiActionFocusSquare
 
-;		LDA	trddeeds1, X
-		
 		LDA	$6A
 		JSR	rulesMortgageFeeImmed
 
 		RTS
 		
+;-------------------------------------------------------------------------------
 uiActionAuction:
+;-------------------------------------------------------------------------------
 ;***TODO:	Probably should make a routine that toggles off interactive and
 ;		sets this, too.
 		LDA	#$00
 		STA	game + GAME::kWai
 		
-;		LDY	game + GAME::iTrdStp
-;		LDA	trddeeds0, Y
-
 		LDA	$6A
 		STA	game + GAME::sAuctn
-
-;		INC	game + GAME::iTrdStp
-
-;		LDY	#TRADE::player
-;		LDA	trade0, Y
 
 		LDA	$69
 
@@ -6917,7 +7009,9 @@ uiActionAuction:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 uiActionMrtg:
+;-------------------------------------------------------------------------------
 		LDA	$69
 
 		STA	game + GAME::pActive
@@ -6926,11 +7020,6 @@ uiActionMrtg:
 		LDA	$6A
 		JSR	uiActionFocusSquare
 		
-;		LDA	$6A
-;		ASL
-;		TAX
-;		JSR	rulesMortgageImmed
-
 		LDA	#$00
 		STA	menuManage0CheckTrade
 		
@@ -6939,7 +7028,9 @@ uiActionMrtg:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 uiActionSell:
+;-------------------------------------------------------------------------------
 		LDA	$69
 
 		STA	game + GAME::pActive
@@ -6954,7 +7045,9 @@ uiActionSell:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 uiActionBuy:
+;-------------------------------------------------------------------------------
 		LDA	$69
 
 		STA	game + GAME::pActive
@@ -7002,28 +7095,12 @@ uiActionBuy:
 
 		JSR	rulesDoPurchDeed
 
-;***TODO:	There is a bug somewhere causing this to go awry
-		LDY	#PLAYER::money
-		LDA	($FB), Y
-		CMP	game + GAME::varS
-		BNE	@exit
-		INY
-		LDA	($FB), Y
-		CMP	game + GAME::varT
-		BNE	@exit
-		
-		LDA	#<uiActionBuy
-		STA	$6A
-		LDA	#>uiActionBuy
-		STA	$6B
-
-		JSR	uiActionFault
-		
-@exit:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 uiActionImprv:
+;-------------------------------------------------------------------------------
 		LDA	$69
 
 		STA	game + GAME::pActive
@@ -7038,7 +7115,9 @@ uiActionImprv:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 uiActionGOFree:
+;-------------------------------------------------------------------------------
 		LDA	$69
 
 		STA	game + GAME::pActive
@@ -7049,7 +7128,9 @@ uiActionGOFree:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 uiActionPost:
+;-------------------------------------------------------------------------------
 		LDA	$69
 
 		STA	game + GAME::pActive
@@ -7061,7 +7142,9 @@ uiActionPost:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 uiActionRoll:
+;-------------------------------------------------------------------------------
 		LDA	game + GAME::fMBuy
 		BNE	@fault
 
@@ -7085,19 +7168,23 @@ uiActionRoll:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 uiActionSendKey:
+;-------------------------------------------------------------------------------
 		LDA	$69
 		JSR	keyEnqueueKey
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 uiActionDelay:
+;-------------------------------------------------------------------------------
 		RTS
 
 
-;==============================================================================
+;===============================================================================
 ;FOR CPU.S
-;==============================================================================
+;===============================================================================
 cpuLastActCnt:
 		.byte	$00
 cpuHaveMenuUpdate:
@@ -7120,7 +7207,9 @@ cpuFlagFault:
 		.byte	$00
 		
 
+;-------------------------------------------------------------------------------
 cpuEngageBehaviour:
+;-------------------------------------------------------------------------------
 		LDA	cpuHaveFault
 		BNE	@havefault
 		
@@ -7200,7 +7289,9 @@ cpuEngageBehaviour:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 cpuPerformFault:
+;-------------------------------------------------------------------------------
 		LDA	#$01
 		STA	cpuHaveFault
 		STA	cpuFlagFault
@@ -7217,13 +7308,18 @@ cpuPerformFault:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 cpuPerformIdle:
+;-------------------------------------------------------------------------------
 		LDA	#$01
 		STA	cpuIsIdle
 		
 		RTS
-		
+
+
+;-------------------------------------------------------------------------------
 cpuPerformPlay:
+;-------------------------------------------------------------------------------
 		LDA	game + GAME::fMBuy
 		BEQ	@continue
 		
@@ -7265,7 +7361,9 @@ cpuPerformPlay:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 cpuPerformBuy:
+;-------------------------------------------------------------------------------
 		LDX	game + GAME::pActive
 		LDA	plrLo, X
 		STA	$FB
@@ -7292,13 +7390,17 @@ cpuPerformBuy:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 cpuPerformAuction:
+;-------------------------------------------------------------------------------
 		JSR	rulesAutoAuction
 		
 		RTS
 
 
+;-------------------------------------------------------------------------------
 cpuPerformTrade:
+;-------------------------------------------------------------------------------
 ;***TODO:	Try to evaluate and accept
 
 		LDA	#UI_ACT_SKEY
@@ -7314,7 +7416,9 @@ cpuPerformTrade:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 cpuPerformElimin:
+;-------------------------------------------------------------------------------
 		LDY	#TRADE::player
 		LDA	trade1, Y
 		TAX
@@ -7323,7 +7427,9 @@ cpuPerformElimin:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 cpuPerformGoneGaol:
+;-------------------------------------------------------------------------------
 		LDA	#UI_ACT_SKEY
 		STA	$68
 		LDA	#'N'
@@ -7343,13 +7449,17 @@ cpuPerformGoneGaol:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 cpuPerformInGaol:
+;-------------------------------------------------------------------------------
 		JSR	rulesAutoGaol
 
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 cpuPerformGaolMustPost:
+;-------------------------------------------------------------------------------
 		LDA	#UI_ACT_SKEY
 		STA	$68
 		LDA	#'P'
@@ -7360,13 +7470,17 @@ cpuPerformGaolMustPost:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 cpuPerformMustPay:
+;-------------------------------------------------------------------------------
 		JSR	rulesAutoPay
 
 		RTS
 
 
+;-------------------------------------------------------------------------------
 cpuPerformQuit:
+;-------------------------------------------------------------------------------
 		LDA	#UI_ACT_SKEY
 		STA	$68
 		LDA	#'Y'
@@ -7377,7 +7491,9 @@ cpuPerformQuit:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 cpuPerformSelectColour:
+;-------------------------------------------------------------------------------
 		LDA	sidV2EnvOu
 		LSR
 		LSR
@@ -7422,7 +7538,9 @@ cpuPerformSelectColour:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 cpuPerformStartRoll:
+;-------------------------------------------------------------------------------
 		LDA	#'R'
 		JSR	keyEnqueueKey
 		
@@ -7432,27 +7550,11 @@ cpuPerformStartRoll:
 		RTS
 
 
-;==============================================================================
+;===============================================================================
 ;FOR MENU.S
-;==============================================================================
+;===============================================================================
 
 
-menuTemp0:
-			.byte	$00
-			.byte	$00
-menuTemp3:
-			.byte	$00, $00, $00, $00, $00, $00
-menuTemp9:
-			.byte	$00, $00, $00, $00, $00, $00
-menuTempF:
-			.byte	$00
-
-menuLastSelBtn:
-		.byte	$FF
-		
-menuLastDrawFunc:
-		.word	$0000
-		
 menuDefWindow0:		
 			.byte	$12, $01, $07, $11, $11
 			.byte	$46, $00, $06, $12
@@ -7468,8 +7570,24 @@ menuDefWindow0:
 			.byte	$23, $01, $08, $11
 
 			.byte	$00
+			
+menuTemp0:
+			.byte	$00
+			.byte	$00
+menuTemp3:
+			.byte	$00, $00, $00, $00, $00, $00
+menuTemp9:
+			.byte	$00, $00, $00, $00, $00, $00
+menuTempF:
+			.byte	$00
 
+menuLastSelBtn:
+		.byte	$FF
 		
+menuLastDrawFunc:
+		.word	$0000
+
+
 menuPageBlank0:
 		.word	menuPageBlank0Keys
 		.word	menuDefDraw
@@ -7543,7 +7661,7 @@ menuPageTrade1:
 		.byte	$01
 		.word	cpuPerformTrade
 		
-;***TODO:	Rename and retext this menu
+;***TODO:	Rename this menu to jump1
 menuPageTrade6:
 		.word	menuPageTrade6Keys
 		.word	menuPageTrade6Draw
@@ -7729,6 +7847,9 @@ menuDisplay:
 		LDA	($FB), Y
 		BEQ	@disp
 		
+		LDA	#$01
+		STA	ui + UI::fUsrInp
+		
 		LDA	game + GAME::gMode
 		CMP	#$08
 		BEQ	@disp
@@ -7738,6 +7859,9 @@ menuDisplay:
 		
 		LDA	#$01
 		STA	screenRedirectNull
+		
+		LDA	#$00
+		STA	ui + UI::fUsrInp
 
 @disp:
 		LDA	#>(@farreturn - 1)
@@ -7805,6 +7929,7 @@ menuDisplay:
 		
 @exit:
 		RTS
+
 
 ;-------------------------------------------------------------------------------
 menuSetPage:
@@ -8467,7 +8592,7 @@ menuPageSetup4Keys:
 		LSR
 		LSR			
 		CLC
-		ADC	#musTuneDice0
+		ADC	#musTuneRoll0
 		JSR	SNDBASE + 0	
 
 		INC	menuTemp0
@@ -9665,7 +9790,7 @@ menuPagePlay1Draw:
 
 		JSR	gameGetCardPtrForSquare
 
-		LDY	#DEED::pPurch
+		LDY	#DEED::mPurch
 		LDA	($FD), Y
 		STA	menuTemp0
 		INY
@@ -11090,7 +11215,7 @@ menuTrade0RWealthRecalc:
 		AND	#$01
 		BEQ	@next
 		
-		LDY	#DEED::mValue
+		LDY	#DEED::mMrtg
 		
 		LDA	($FD), Y
 		STA	game + GAME::varD
@@ -11109,7 +11234,7 @@ menuTrade0RWealthRecalc:
 		JMP	@next
 		
 @equity:
-		LDY	#DEED::mValue		;Gain equity if not mrtg
+		LDY	#DEED::mMrtg		;Gain equity if not mrtg
 		LDA	($FD), Y
 		STA	game + GAME::varD
 		INY	
@@ -11157,7 +11282,7 @@ menuTrade0RWealthRecalc:
 		AND	#$80
 		BNE	@next1
 
-		LDY	#DEED::mValue		;Lose equity if not mrtg
+		LDY	#DEED::mMrtg		;Lose equity if not mrtg
 		LDA	($FD), Y
 		STA	game + GAME::varD
 		INY	
@@ -11504,7 +11629,7 @@ menuTrade1RWealthRecalc:
 		AND	#$01
 		BEQ	@next
 		
-		LDY	#DEED::mValue		;And mValue for repay
+		LDY	#DEED::mMrtg		;And mMrtg for repay
 		LDA	($FD), Y
 		STA	game + GAME::varD
 		INY	
@@ -11516,7 +11641,7 @@ menuTrade1RWealthRecalc:
 		JMP	@next
 
 @equity:
-		LDY	#DEED::mValue		;Gain equity if not mrtg
+		LDY	#DEED::mMrtg		;Gain equity if not mrtg
 		LDA	($FD), Y
 		STA	game + GAME::varD
 		INY	
@@ -11567,7 +11692,7 @@ menuTrade1RWealthRecalc:
 		LDA	trddeeds1, X
 		JSR	gameGetCardPtrForSquare
 
-		LDY	#DEED::mValue		;Lose equity if not mrtg
+		LDY	#DEED::mMrtg		;Lose equity if not mrtg
 		LDA	($FD), Y
 		STA	game + GAME::varD
 		INY	
@@ -11827,7 +11952,7 @@ menuElimin0RemWlthRecalc:
 		AND	#$01
 		BEQ	@next
 		
-		LDY	#DEED::mValue		;And mValue for repay
+		LDY	#DEED::mMrtg		;And mMrtg for repay
 		LDA	($FD), Y
 		STA	game + GAME::varD
 		INY	
@@ -12919,7 +13044,7 @@ doGameScoreImprvBonus:
 		PLA
 		TAX
 		
-		LDY	#GROUP::pImprv
+		LDY	#GROUP::vImprv
 		LDA	($FD), Y
 		BEQ	@next
 
@@ -13237,7 +13362,7 @@ gameGetCardPtrForSquareImmed:
 		LDA	game + GAME::varC	;group index
 		ASL
 		CLC
-		ADC	#GROUP::mDeed1
+		ADC	#GROUP::aCard0
 		TAY
 		
 		LDA	($FD), Y		;now pts to card
@@ -13595,7 +13720,7 @@ gameUpdateMenu:
 
 		JSR	gameGetCardPtrForSquare
 
-		LDY	#DEED::pPurch
+		LDY	#DEED::mPurch
 		LDA	($FD), Y
 		STA	game + GAME::varD
 		INY
@@ -15508,7 +15633,7 @@ gameRollDice:
 @nodbl:		
 		PLA
 		CLC
-		ADC	#musTuneDice0
+		ADC	#musTuneRoll0
 		JSR	SNDBASE + 0	
 
 		LDY	#PLAYER::status		;they don't move if in gaol
@@ -15783,9 +15908,9 @@ gameCheckChanceShuffle:
 		RTS
 
 		
-;==============================================================================
+;===============================================================================
 ;FOR DIALOG.S
-;==============================================================================
+;===============================================================================
 	
 dialogDefWindow0:		
 			.byte	$13, $08, $05, $18, $0C
@@ -15973,6 +16098,8 @@ dialogDisplay:
 		STA	menuLastDrawFunc + 1
 		
 		LDA	#$01
+		STA	ui + UI::fUsrInp
+		
 		CMP	dialogDrawDefDraw
 		BNE	@cont
 
@@ -16708,7 +16835,7 @@ dialogDlgElimin0Keys:
 		
 dialogDlgElimin0Draw:
 ;***TODO:	Make this message more informative - did they lose
-;		to another player (which) or to the bank.
+;		to another player (which) or to the bank?
 
 		LDX	dialogTempElimin0P
 		LDA	plrLo, X
@@ -18476,7 +18603,7 @@ doDialogTrdSelTstRfndSel:
 		AND	#$01
 		BEQ	@exit
 		
-		LDY	#DEED::mValue
+		LDY	#DEED::mMrtg
 		JSR	doDialogTrdSelAddRCashA
 		
 		RTS
@@ -18488,7 +18615,7 @@ doDialogTrdSelTstRfndSel:
 		AND	#$01
 		BEQ	@exit
 		
-		LDY	#DEED::mValue
+		LDY	#DEED::mMrtg
 		JSR	doDialogTrdSelAddRCashI
 		
 		
@@ -18499,12 +18626,12 @@ doDialogTrdSelTstRfndSel:
 ;-------------------------------------------------------------------------------
 doDialogTrdSelChrgWlthMVal:
 ;-------------------------------------------------------------------------------
-;		Directly charge the mvalue on the remaining wealth for square in .X
+;		Directly charge mMrtg on the remaining wealth for square in .X
 
 		TXA
 		JSR	gameGetCardPtrForSquare
 		
-		LDY	#DEED::mValue
+		LDY	#DEED::mMrtg
 		
 		LDA	($FD), Y
 		STA	game + GAME::varD
@@ -18527,12 +18654,12 @@ doDialogTrdSelChrgWlthMVal:
 ;-------------------------------------------------------------------------------
 doDialogTrdSelChrgCashMVal:
 ;-------------------------------------------------------------------------------
-;		Directly charge the mvalue on the remaining cash for square in .X
+;		Directly charge mMrtg on the remaining cash for square in .X
 
 		TXA
 		JSR	gameGetCardPtrForSquare
 		
-		LDY	#DEED::mValue
+		LDY	#DEED::mMrtg
 		
 		LDA	($FD), Y
 		STA	game + GAME::varD
@@ -18555,14 +18682,14 @@ doDialogTrdSelChrgCashMVal:
 ;-------------------------------------------------------------------------------
 doDialogTrdSelRfndWlthMVal:
 ;-------------------------------------------------------------------------------
-;		Directly refund the mvalue on the remaining wealth for square in .X
+;		Directly refund mMrtg on the remaining wealth for square in .X
 
 		TXA
 
 		JSR	gameGetCardPtrForSquare
 
 doDialogTrdSelRfndWlthMValAlt:
-		LDY	#DEED::mValue
+		LDY	#DEED::mMrtg
 		
 		LDA	dialogTrdSelDoApprv
 		BEQ	@initial
@@ -18578,14 +18705,14 @@ doDialogTrdSelRfndWlthMValAlt:
 ;-------------------------------------------------------------------------------
 doDialogTrdSelRfndCashMVal:
 ;-------------------------------------------------------------------------------
-;		Directly refund the mvalue on the remaining cash for square in .X
+;		Directly refund mMrtg on the remaining cash for square in .X
 
 		TXA
 
 		JSR	gameGetCardPtrForSquare
 
 doDialogTrdSelRfndCashMValAlt:
-		LDY	#DEED::mValue
+		LDY	#DEED::mMrtg
 		
 		LDA	dialogTrdSelDoApprv
 		BEQ	@initial
@@ -20335,7 +20462,7 @@ doDialogSqrInfoGetVal:
 doDialogSqrInfoGetRepay:
 		DEY
 		DEY
-		LDA	($FD), Y		;mValue
+		LDA	($FD), Y		;mMrtg
 		STA	game + GAME::varD
 		INY
 		LDA	($FD), Y
@@ -20364,7 +20491,7 @@ doDialogSqrInfoGetRepay:
 		
 
 doDialogSqrInfoUtil:
-		LDY	#UTILITY::pPurch
+		LDY	#UTILITY::mPurch
 		
 		JSR	doDialogSqrInfoGetVal	;market purchase
 		
@@ -20478,7 +20605,7 @@ doDialogSqrInfoStn:
 		DEX
 		BPL	@loop3
 
-		LDY	#STATION::pPurch
+		LDY	#STATION::mPurch
 		
 		JSR	doDialogSqrInfoGetVal	;market purchase
 		
@@ -20581,7 +20708,7 @@ doDialogSqrInfoStreet:
 		DEX
 		BPL	@loop5
 		
-		LDY	#STREET::pPurch
+		LDY	#STREET::mPurch
 		
 		JSR	doDialogSqrInfoGetVal	;market purchase
 		
@@ -20661,14 +20788,14 @@ dialogDlgSqrInfo0Draw:
 		STA	dialogWindowSqrInfoC1
 		STA	dialogWindowSqrInfoC2
 		
-		LDY	#GROUP::pImprv
+		LDY	#GROUP::vImprv
 		LDA	($FD), Y
 		STA	game + GAME::varA
 
 		LDA	game + GAME::varC
 		ASL
 		CLC
-		ADC	#GROUP::mDeed1
+		ADC	#GROUP::aCard0
 		TAY
 		
 		LDA	($FD), Y		;now pts to card
@@ -21171,1036 +21298,13 @@ dialogDlgNull0Draw:
 		JSR	screenResetSelBtn
 		RTS
 
+
 ;===============================================================================
 ;FOR BOARD.S
 ;===============================================================================
 
-;-------------------------------------------------------------------------------
-boardDisplayQuad:
-;-------------------------------------------------------------------------------
-		STX	game + GAME::varL
-		CPX	#$01
-		BNE	@doFull
-	
-		JMP	@doSelState
-		
-@doFull:
-		LDX	game + GAME::qVis
-		LDA	boardQuadsLo, X
-		STA	$FD
-		LDA	boardQuadsHi, X
-		STA	$FE
-		
-		JSR	screenPerformList
-
-@doSelState:
-		LDX	game + GAME::qVis
-		LDA	#<heap0
-		STA	$A3
-		LDA	#>heap0
-		STA	$A4
-		
-		LDA	#$00
-		STA	game + GAME::varH
-
-		JSR	boardCollateState
-
-		LDA	#<heap0
-		STA	$FD
-		LDA	#>heap0
-		STA	$FE
-		
-		JSR	screenPerformList
-		
-		RTS
-	
-	
-;-------------------------------------------------------------------------------
-boardCollateState:
-;-------------------------------------------------------------------------------
-		CPX	#$00
-		BNE	@test1
-
-		JSR	boardCollateQ0
-		JMP	@done
-@test1:
-		CPX	#$01
-		BNE	@test2
-		
-		JSR	boardCollateQ1
-		JMP	@done
-		
-@test2:
-		CPX	#$02
-		BNE	@test3
-		
-		JSR	boardCollateQ2
-		JMP	@done
-		
-@test3:
-		CPX	#$03
-		BNE	@done
-
-		JSR	boardCollateQ3
-;		JMP	@done
-		
-		
-@done:
-		LDA	#$00
-		LDY	game + GAME::varH
-		STA	($A3), Y
-		INC	game + GAME::varH
-		
-		RTS
-
-
-;-------------------------------------------------------------------------------
-boardCollateQ0:
-;-------------------------------------------------------------------------------
-		LDA	#<boardQ0SqrOffs
-		STA	$FB
-		LDA	#>boardQ0SqrOffs
-		STA	$FC
-
-		LDA	#<boardQ0HSqr00
-		STA	$FD
-		LDA	#>boardQ0HSqr00
-		STA	$FE
-		
-		LDA	#$00
-		STA	game + GAME::varJ
-		STA	game + GAME::varK
-		
-		LDX	#$00
-		
-@loopH:
-		STX	game + GAME::varG
-		TXA
-		ASL
-		STA	game + GAME::varI
-		
-		JSR	boardCollateHSqr
-		
-		INC	game + GAME::varK
-		INC	game + GAME::varK
-		
-		LDX	game + GAME::varG
-		INX
-		CPX	#$06
-		BNE	@loopH
-		
-		LDA	#<boardQ0VSqr23
-		STA	$FD
-		LDA	#>boardQ0VSqr23
-		STA	$FE
-
-		LDA	#$00
-;		STA	game + GAME::varJ
-		STA	game + GAME::varK
-		
-		LDX	#$23
-
-@loopV:
-		STX	game + GAME::varG
-		TXA
-		ASL
-		STA	game + GAME::varI
-		
-		JSR	boardCollateVSqr
-		
-		INC	game + GAME::varK
-		INC	game + GAME::varK
-		
-		LDX	game + GAME::varG
-		INX
-		CPX	#$28
-		BNE	@loopV
-		
-		RTS
-		
 ;------------------------------------------------------------------------------
-;boardCollateQ1
-;------------------------------------------------------------------------------
-boardCollateQ1:
-		LDA	#<boardQ1SqrOffs
-		STA	$FB
-		LDA	#>boardQ1SqrOffs
-		STA	$FC
-		
-		LDA	#<boardQ1HSqr05
-		STA	$FD
-		LDA	#>boardQ1HSqr05
-		STA	$FE
-
-		LDA	#$00	
-		STA	game + GAME::varJ
-		STA	game + GAME::varK
-		
-		LDX	#$05
-		
-@loopH:
-		STX	game + GAME::varG
-		TXA
-		ASL
-		STA	game + GAME::varI
-		
-		JSR	boardCollateHSqr
-		
-		INC	game + GAME::varK
-		INC	game + GAME::varK
-		
-		LDX	game + GAME::varG
-		INX
-		CPX	#$0B
-		BNE	@loopH
-		
-		LDA	#<boardQ1VSqr0B
-		STA	$FD
-		LDA	#>boardQ1VSqr0B
-		STA	$FE
-
-		LDA	#$00
-		STA	game + GAME::varK
-
-		LDA	#$01
-		STA	game + GAME::varJ
-		
-		LDX	#$0B
-
-@loopV:
-		STX	game + GAME::varG
-		TXA
-		ASL
-		STA	game + GAME::varI
-		
-		JSR	boardCollateVSqr
-		
-		INC	game + GAME::varK
-		INC	game + GAME::varK
-		
-		LDX	game + GAME::varG
-		INX
-		CPX	#$10
-		BNE	@loopV
-		
-		RTS
-		
-		
-;------------------------------------------------------------------------------
-;boardCollateQ2
-;------------------------------------------------------------------------------
-boardCollateQ2:
-		LDA	#<boardQ2SqrOffs
-		STA	$FB
-		LDA	#>boardQ2SqrOffs
-		STA	$FC
-		
-		LDA	#<boardQ2HSqr14
-		STA	$FD
-		LDA	#>boardQ2HSqr14
-		STA	$FE
-
-		LDA	#$00
-		STA	game + GAME::varK
-
-		LDA	#$01	
-		STA	game + GAME::varJ
-
-		LDX	#$14
-		
-@loopH:
-		STX	game + GAME::varG
-		TXA
-		ASL
-		STA	game + GAME::varI
-		
-		JSR	boardCollateHSqr
-		
-		INC	game + GAME::varK
-		INC	game + GAME::varK
-		
-		LDX	game + GAME::varG
-		INX
-		CPX	#$1A
-		BNE	@loopH
-		
-		LDA	#<boardQ2VSqr0F
-		STA	$FD
-		LDA	#>boardQ2VSqr0F
-		STA	$FE
-
-		LDA	#$00
-		STA	game + GAME::varK
-
-		LDA	#$01
-		STA	game + GAME::varJ
-		
-		LDX	#$0F
-
-@loopV:
-		STX	game + GAME::varG
-		TXA
-		ASL
-		STA	game + GAME::varI
-		
-		JSR	boardCollateVSqr
-		
-		INC	game + GAME::varK
-		INC	game + GAME::varK
-		
-		LDX	game + GAME::varG
-		INX
-		CPX	#$14
-		BNE	@loopV
-		
-		RTS
-		
-		
-;------------------------------------------------------------------------------
-;boardCollateQ3
-;------------------------------------------------------------------------------
-boardCollateQ3:
-		LDA	#<boardQ3SqrOffs
-		STA	$FB
-		LDA	#>boardQ3SqrOffs
-		STA	$FC
-		
-		LDA	#<boardQ3HSqr19
-		STA	$FD
-		LDA	#>boardQ3HSqr19
-		STA	$FE
-
-		LDA	#$00
-		STA	game + GAME::varK
-
-		LDA	#$01	
-		STA	game + GAME::varJ
-
-		LDX	#$19
-		
-@loopH:
-		STX	game + GAME::varG
-		TXA
-		ASL
-		STA	game + GAME::varI
-		
-		JSR	boardCollateHSqr
-		
-		INC	game + GAME::varK
-		INC	game + GAME::varK
-		
-		LDX	game + GAME::varG
-		INX
-		CPX	#$1F
-		BNE	@loopH
-		
-		LDA	#<boardQ3VSqr1F
-		STA	$FD
-		LDA	#>boardQ3VSqr1F
-		STA	$FE
-
-		LDA	#$00
-		STA	game + GAME::varK
-
-;		LDA	#$00
-		STA	game + GAME::varJ
-		
-		LDX	#$1F
-
-@loopV:
-		STX	game + GAME::varG
-		TXA
-		ASL
-		STA	game + GAME::varI
-		
-		JSR	boardCollateVSqr
-		
-		INC	game + GAME::varK
-		INC	game + GAME::varK
-		
-		LDX	game + GAME::varG
-		INX
-		CPX	#$24
-		BNE	@loopV
-		
-		RTS
-		
-
-;------------------------------------------------------------------------------
-;boardCollateHSqr
-;------------------------------------------------------------------------------
-boardCollateHSqr:		
-		LDY	#$00			;set up mrtg points (get Y)
-		LDA	($FB), Y
-		STA	game + GAME::varB
-		
-		LDY	game + GAME::varK	;get X
-		LDA	($FD), Y
-		STA	game + GAME::varA	;This gets up mrtg pt
-		
-		LDA	#$04			;default height
-		STA	game + GAME::varC
-		
-		INY				;Check height
-		LDA	($FD), Y
-		CMP	#$FF
-		BNE	@1
-		
-		INC	game + GAME::varC
-		
-@1:
-		LDX	game + GAME::varL
-		CPX	#$01
-		BNE	@doAll
-
-		JSR	boardGenMrtgSelH
-		JMP	@exit
-		
-@doAll:
-		LDX	#$00
-		JSR	boardGenMrtgSelH
-		JSR	boardGenAllH
-		JSR	boardGenOwnH
-		JSR	boardGenImprvH
-
-@exit:
-		RTS
-		
-		
-;------------------------------------------------------------------------------
-;boardCollateVSqr
-;------------------------------------------------------------------------------
-boardCollateVSqr:
-		LDY	#$01			;set up mrtg points (get X)
-		LDA	($FB), Y
-		STA	game + GAME::varA
-		
-		LDY	game + GAME::varK	;get Y
-		LDA	($FD), Y
-		STA	game + GAME::varB	;This gets up mrtg pt
-		
-		LDA	#$04			;default height
-		STA	game + GAME::varC
-		
-		INY				;Check height
-		LDA	($FD), Y
-		CMP	#$FF
-		BNE	@1
-		
-		INC	game + GAME::varC
-		
-@1:
-		LDX	game + GAME::varL
-		CPX	#$01
-		BNE	@doAll
-
-		JSR	boardGenMrtgSelV
-		JMP	@exit
-		
-@doAll:
-		LDX	#$00
-		JSR	boardGenMrtgSelV
-		JSR	boardGenAllV
-		JSR	boardGenOwnV
-		JSR	boardGenImprvV
-		
-@exit:
-		RTS
-		
-		
-;------------------------------------------------------------------------------
-;boardGenAllH
-;------------------------------------------------------------------------------
-boardGenAllH:
-		LDX	game + GAME::varI	;get imprv
-		INX
-		LDA	sqr00, X
-		
-		AND	#$40
-		BEQ	@done
-		
-		LDA	#$45			;compute command for own
-		LDY	game + GAME::varH	;store on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-		
-		LDA	game + GAME::varA	;get X
-		INY				;store on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-		
-		LDA	game + GAME::varJ	;check orientation
-		BEQ	@1
-		
-		LDX	game + GAME::varB	;Get Y Pos for own
-		DEX
-		TXA
-		JMP	@cont
-		
-@1:
-		LDA	game + GAME::varB	;Get Y Pos for own
-		CLC
-		ADC	#$05			;
-		
-@cont:
-		INY				;store on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-						
-		LDA	#$03			;width
-		INY				;store on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-		
-@done:
-		RTS
-		
-;------------------------------------------------------------------------------
-;boardGenAllV
-;------------------------------------------------------------------------------
-boardGenAllV:
-		LDX	game + GAME::varI	;get imprv
-		INX
-		LDA	sqr00, X
-		
-		AND	#$40
-		BEQ	@done
-		
-		LDA	#$55			;compute command for own
-		LDY	game + GAME::varH	;store on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-		
-		LDA	game + GAME::varJ	;check orientation
-		BEQ	@1
-		
-		LDX	game + GAME::varA	;Get X Pos for own
-		DEX
-		TXA
-		JMP	@cont
-		
-@1:
-		LDA	game + GAME::varA	;Get X Pos for own
-		CLC
-		ADC	#$05			;
-		
-@cont:
-		INY				;store on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-						
-		LDA	game + GAME::varB	;get Y
-		INY				;store on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-		
-		LDA	#$03			;height
-		INY				;store on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-		
-@done:
-		RTS
-		
-;------------------------------------------------------------------------------
-;boardGenOwnH
-;------------------------------------------------------------------------------
-boardGenOwnH:
-		LDX	game + GAME::varI	;get owner player
-		LDA	sqr00, X
-		
-		CMP	#$FF
-		BEQ	@done
-		
-		STA	game + GAME::varD
-		
-		TAX				;get owner colour
-		LDA	plrLo, X
-		STA	$A7
-		LDA	plrHi, X
-		STA	$A8
-		
-		LDY	#PLAYER::colour
-		LDA	($A7), Y
-		
-		ORA	#$20			;compute command for own
-		LDY	game + GAME::varH	;store on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-		
-		LDA	game + GAME::varA	;get X
-		INY				;store on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-		
-		LDA	game + GAME::varJ	;check orientation
-		BEQ	@1
-		
-		LDX	game + GAME::varB	;Get Y Pos for own
-		DEX
-		TXA
-		JMP	@cont
-		
-@1:
-		LDA	game + GAME::varB	;Get Y Pos for own
-		CLC
-		ADC	#$05			;
-		
-@cont:
-		
-		INY				;store on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-						
-		LDA	#$03			;width
-		INY				;store on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-		
-@done:
-		RTS
-
-;------------------------------------------------------------------------------
-;boardGenOwnV
-;------------------------------------------------------------------------------
-boardGenOwnV:
-		LDX	game + GAME::varI	;get owner player
-		LDA	sqr00, X
-		
-		CMP	#$FF
-		BEQ	@done
-		
-		STA	game + GAME::varD
-		
-		TAX				;get owner colour
-		LDA	plrLo, X
-		STA	$A7
-		LDA	plrHi, X
-		STA	$A8
-		
-		LDY	#PLAYER::colour
-		LDA	($A7), Y
-		
-		ORA	#$30			;compute command for own
-		LDY	game + GAME::varH	;store on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-		
-		LDA	game + GAME::varJ	;check orientation
-		BEQ	@1
-		
-		LDX	game + GAME::varA	;Get X Pos for own
-		DEX
-		TXA
-		JMP	@cont
-		
-@1:
-		LDA	game + GAME::varA	;Get X Pos for own
-		CLC
-		ADC	#$05			;
-		
-@cont:
-		
-		INY				;store on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-						
-		LDA	game + GAME::varB	;get Y
-		INY				;store on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-
-		LDA	#$03			;height
-		INY				;store on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-		
-@done:
-		RTS
-		
-		
-;------------------------------------------------------------------------------
-;boardGenMrtgSelH
-;------------------------------------------------------------------------------
-boardGenMrtgSelH:
-		LDX	game + GAME::varI	;get imprv
-
-		LDA	sqr00 + 1, X
-		AND	#$A0
-		BNE	@doClr
-
-		LDY	game + GAME::varL
-		BNE	@begin
-		
-		JMP	@done
-		
-@begin:
-		LDA	#$33
-		JMP	@cont0
-
-@doClr:
-		LDA	sqr00 + 1, X
-		AND	#$20
-		BEQ	@mrtg
-		
-		LDA	sqr00 + 1, X
-		AND	#$80
-		BNE	@mrtgsel
-		
-		LDA	#$31
-		JMP 	@cont0
-@mrtgsel:
-		LDA	#$3F
-		JMP 	@cont0
-		
-@mrtg:
-		LDA	#$3B
-		
-@cont0:
-		STA	game + GAME::varF
-
-		LDA	game + GAME::varG
-		BEQ	@chkcnr
-		
-		CMP	#$0A
-		BEQ	@chkcnr
-		
-		CMP	#$14
-		BEQ	@chkcnr
-		
-		CMP	#$1E
-		BEQ	@chkcnr
-		
-		LDA	#$03
-		JMP	@cont1
-
-@chkcnr:
-		LDA	#$05
-
-@cont1:
-		STA	$A7
-		
-		LDA	game + GAME::varB	;compute y
-		STA	game + GAME::varE
-		
-		LDA	game + GAME::varC
-		CMP	#$05
-		BEQ	@1
-		
-		LDA	game + GAME::varJ	;check orientation
-		BNE	@1
-		
-		INC	game + GAME::varE	
-		
-@1:
-		LDA	game + GAME::varA	;copy x
-		STA	game + GAME::varD	
-		
-		LDY	game + GAME::varH
-		LDX	#$00
-@loop:
-		LDA	game + GAME::varF	;store cmd on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-		INY
-		
-		LDA	game + GAME::varD	;store x on heap and next
-		INC	game + GAME::varD
-		STA	($A3), Y
-		INC	game + GAME::varH
-		INY
-		
-		LDA	game + GAME::varE	;store y on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-		INY
-		
-		LDA	game + GAME::varC	;store h on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-		INY
-
-		INX
-	
-		CPX	$A7
-		BNE	@loop
-
-@done:
-		RTS
-
-
-;------------------------------------------------------------------------------
-;boardGenMrtgSelV
-;------------------------------------------------------------------------------
-boardGenMrtgSelV:
-		LDX	game + GAME::varI	;get imprv
-
-		LDA	sqr00 + 1, X
-		AND	#$A0
-		BNE	@doClr
-
-		LDY	game + GAME::varL
-		BNE	@begin
-		
-		JMP	@done
-		
-@begin:
-		
-		LDA	#$23
-		JMP	@cont0
-
-@doClr:
-		LDA	sqr00 + 1, X
-		AND	#$20
-		BEQ	@mrtg
-		
-		LDA	sqr00 + 1, X
-		AND	#$80
-		BNE	@mrtgsel
-		
-		LDA	#$21
-		JMP 	@cont0
-@mrtgsel:
-		LDA	#$2F
-		JMP 	@cont0
-		
-@mrtg:
-		LDA	#$2B
-		
-@cont0:
-		STA	game + GAME::varF
-
-		LDA	game + GAME::varG
-		BEQ	@chkcnr
-		
-		CMP	#$0A
-		BEQ	@chkcnr
-		
-		CMP	#$14
-		BEQ	@chkcnr
-		
-		CMP	#$1E
-		BEQ	@chkcnr
-		
-		LDA	#$03
-		JMP	@cont1
-
-@chkcnr:
-		LDA	#$05
-
-@cont1:
-		STA	$A7
-		
-		LDA	game + GAME::varA	;compute x
-		STA	game + GAME::varD
-		
-		LDA	game + GAME::varC
-		CMP	#$05
-		BEQ	@1
-		
-		LDA	game + GAME::varJ	;check orientation
-		BNE	@1
-		
-		INC	game + GAME::varD	
-		
-@1:
-		LDA	game + GAME::varB	;copy y
-		STA	game + GAME::varE	
-		
-		LDY	game + GAME::varH
-		LDX	#$00
-@loop:
-		LDA	game + GAME::varF	;store cmd on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-		INY
-		
-		LDA	game + GAME::varD	;store x on heap and next
-		STA	($A3), Y
-		INC	game + GAME::varH
-		INY
-		
-		LDA	game + GAME::varE	;store y on heap
-		INC	game + GAME::varE
-		STA	($A3), Y
-		INC	game + GAME::varH
-		INY
-		
-		LDA	game + GAME::varC	;store W on heap
-		STA	($A3), Y
-		INC	game + GAME::varH
-		INY
-
-		INX
-	
-		CPX	$A7
-		BNE	@loop
-
-@done:
-		RTS
-		
-		
-;------------------------------------------------------------------------------
-;boardGenImprvH
-;------------------------------------------------------------------------------
-boardGenImprvH:
-		LDX	game + GAME::varI	;get imprv
-		LDA	sqr00  + 1, X
-
-		AND	#$0F
-		BNE	@test
-		RTS
-	
-@test:
-		STA	game + GAME::varF
-		
-		LDY	game + GAME::varK	;get imprv X
-		INY
-		LDA	($FD), Y
-		
-		CMP	#$FF
-		BNE	@begin
-		RTS
-		
-@begin:
-		STA	game + GAME::varD
-		
-		LDA	game + GAME::varB
-		STA	game + GAME::varE
-		
-		LDA	game + GAME::varJ	;check orientation
-		BEQ	@cont0
-
-;		DEC	game + GAME::varE
-;		JMP	@cont0
-
-@1:
-		CLC
-		LDA	#$04
-		ADC	game + GAME::varE
-		STA	game + GAME::varE
-
-@cont0:
-		JMP	boardGenImprvPerf
-		
-
-;------------------------------------------------------------------------------
-;boardGenImprvV
-;------------------------------------------------------------------------------
-boardGenImprvV:
-		LDX	game + GAME::varI	;get imprv
-		LDA	sqr00 + 1, X
-
-		AND	#$0F
-		BNE	@test
-		RTS
-	
-@test:
-		STA	game + GAME::varF
-		
-		LDY	game + GAME::varK	;get imprv Y
-		INY
-		LDA	($FD), Y
-		
-		CMP	#$FF
-		BNE	@begin
-		RTS
-		
-@begin:
-		STA	game + GAME::varE
-		
-		LDA	game + GAME::varA
-		STA	game + GAME::varD
-		
-		LDA	game + GAME::varJ	;check orientation
-		BEQ	@cont0
-
-;		DEC	game + GAME::varE
-;		JMP	@cont0
-
-@1:
-		CLC
-		LDA	#$04
-		ADC	game + GAME::varD
-		STA	game + GAME::varD
-
-@cont0:
-		JMP	boardGenImprvPerf
-		
-		
-		
-;------------------------------------------------------------------------------
-;boardGenImprvPerf
-;------------------------------------------------------------------------------
-boardGenImprvPerf:
-		LDY	game + GAME::varH
-
-		LDA	game + GAME::varF
-		CMP	#$08
-		BPL	@hotelclr
-		
-		LDA	#$2D
-		JMP	@draw
-@hotelclr:
-		LDA	#$2A
-
-@draw:
-		STA	($A3), Y		;store cmd on heap
-		INC	game + GAME::varH
-		INY
-
-		LDA	game + GAME::varD	;get x
-		STA	($A3), Y		;store x on heap
-		INC	game + GAME::varH
-		INY
-		LDA	game + GAME::varE	;get y
-		STA	($A3), Y		;store y on heap
-		INC	game + GAME::varH
-		INY
-		
-		LDA	#$01
-		STA	($A3), Y		;store w on heap
-		INC	game + GAME::varH
-		INY
-		
-		LDA	game + GAME::varF
-		CMP	#$08
-		BPL	@hotelchr
-		
-		AND	#$07
-		CLC
-		ADC	#$04
-		
-		JMP	@cont1
-		
-@hotelchr:
-		LDA	#$09
-	
-@cont1:
-		ORA	#$60
-		STA	($A3), Y		;store cmd on heap
-		INC	game + GAME::varH
-		INY
-		
-		LDA	game + GAME::varD	;get x
-		STA	($A3), Y		;store x on heap
-		INC	game + GAME::varH
-		INY
-		LDA	game + GAME::varE	;get y
-		STA	($A3), Y		;store y on heap
-		INC	game + GAME::varH
-		INY
-		
-		LDA	#$FF
-		STA	($A3), Y		;store term on heap
-		INC	game + GAME::varH
-		
-@done:
-		RTS
-
-
-;------------------------------------------------------------------------------
-;game board description
+;game board constants
 ;------------------------------------------------------------------------------
 boardQuad0:
 			.byte	$10, $13, $00, $14, $14		;clear
@@ -22552,35 +21656,1020 @@ boardQ3VSqr23:
 			.byte	$FF
 
 
-;==============================================================================
+;-------------------------------------------------------------------------------
+boardDisplayQuad:
+;-------------------------------------------------------------------------------
+		STX	game + GAME::varL
+		CPX	#$01
+		BNE	@doFull
+	
+		JMP	@doSelState
+		
+@doFull:
+		LDX	game + GAME::qVis
+		LDA	boardQuadsLo, X
+		STA	$FD
+		LDA	boardQuadsHi, X
+		STA	$FE
+		
+		JSR	screenPerformList
+
+@doSelState:
+		LDX	game + GAME::qVis
+		LDA	#<heap0
+		STA	$A3
+		LDA	#>heap0
+		STA	$A4
+		
+		LDA	#$00
+		STA	game + GAME::varH
+
+		JSR	boardCollateState
+
+		LDA	#<heap0
+		STA	$FD
+		LDA	#>heap0
+		STA	$FE
+		
+		JSR	screenPerformList
+		
+		RTS
+	
+	
+;-------------------------------------------------------------------------------
+boardCollateState:
+;-------------------------------------------------------------------------------
+		CPX	#$00
+		BNE	@test1
+
+		JSR	boardCollateQ0
+		JMP	@done
+@test1:
+		CPX	#$01
+		BNE	@test2
+		
+		JSR	boardCollateQ1
+		JMP	@done
+		
+@test2:
+		CPX	#$02
+		BNE	@test3
+		
+		JSR	boardCollateQ2
+		JMP	@done
+		
+@test3:
+		CPX	#$03
+		BNE	@done
+
+		JSR	boardCollateQ3
+;		JMP	@done
+		
+		
+@done:
+		LDA	#$00
+		LDY	game + GAME::varH
+		STA	($A3), Y
+		INC	game + GAME::varH
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
+boardCollateQ0:
+;-------------------------------------------------------------------------------
+		LDA	#<boardQ0SqrOffs
+		STA	$FB
+		LDA	#>boardQ0SqrOffs
+		STA	$FC
+
+		LDA	#<boardQ0HSqr00
+		STA	$FD
+		LDA	#>boardQ0HSqr00
+		STA	$FE
+		
+		LDA	#$00
+		STA	game + GAME::varJ
+		STA	game + GAME::varK
+		
+		LDX	#$00
+		
+@loopH:
+		STX	game + GAME::varG
+		TXA
+		ASL
+		STA	game + GAME::varI
+		
+		JSR	boardCollateHSqr
+		
+		INC	game + GAME::varK
+		INC	game + GAME::varK
+		
+		LDX	game + GAME::varG
+		INX
+		CPX	#$06
+		BNE	@loopH
+		
+		LDA	#<boardQ0VSqr23
+		STA	$FD
+		LDA	#>boardQ0VSqr23
+		STA	$FE
+
+		LDA	#$00
+;		STA	game + GAME::varJ
+		STA	game + GAME::varK
+		
+		LDX	#$23
+
+@loopV:
+		STX	game + GAME::varG
+		TXA
+		ASL
+		STA	game + GAME::varI
+		
+		JSR	boardCollateVSqr
+		
+		INC	game + GAME::varK
+		INC	game + GAME::varK
+		
+		LDX	game + GAME::varG
+		INX
+		CPX	#$28
+		BNE	@loopV
+		
+		RTS
+		
+;-------------------------------------------------------------------------------
+boardCollateQ1:
+;-------------------------------------------------------------------------------
+		LDA	#<boardQ1SqrOffs
+		STA	$FB
+		LDA	#>boardQ1SqrOffs
+		STA	$FC
+		
+		LDA	#<boardQ1HSqr05
+		STA	$FD
+		LDA	#>boardQ1HSqr05
+		STA	$FE
+
+		LDA	#$00	
+		STA	game + GAME::varJ
+		STA	game + GAME::varK
+		
+		LDX	#$05
+		
+@loopH:
+		STX	game + GAME::varG
+		TXA
+		ASL
+		STA	game + GAME::varI
+		
+		JSR	boardCollateHSqr
+		
+		INC	game + GAME::varK
+		INC	game + GAME::varK
+		
+		LDX	game + GAME::varG
+		INX
+		CPX	#$0B
+		BNE	@loopH
+		
+		LDA	#<boardQ1VSqr0B
+		STA	$FD
+		LDA	#>boardQ1VSqr0B
+		STA	$FE
+
+		LDA	#$00
+		STA	game + GAME::varK
+
+		LDA	#$01
+		STA	game + GAME::varJ
+		
+		LDX	#$0B
+
+@loopV:
+		STX	game + GAME::varG
+		TXA
+		ASL
+		STA	game + GAME::varI
+		
+		JSR	boardCollateVSqr
+		
+		INC	game + GAME::varK
+		INC	game + GAME::varK
+		
+		LDX	game + GAME::varG
+		INX
+		CPX	#$10
+		BNE	@loopV
+		
+		RTS
+		
+		
+;-------------------------------------------------------------------------------
+boardCollateQ2:
+;-------------------------------------------------------------------------------
+		LDA	#<boardQ2SqrOffs
+		STA	$FB
+		LDA	#>boardQ2SqrOffs
+		STA	$FC
+		
+		LDA	#<boardQ2HSqr14
+		STA	$FD
+		LDA	#>boardQ2HSqr14
+		STA	$FE
+
+		LDA	#$00
+		STA	game + GAME::varK
+
+		LDA	#$01	
+		STA	game + GAME::varJ
+
+		LDX	#$14
+		
+@loopH:
+		STX	game + GAME::varG
+		TXA
+		ASL
+		STA	game + GAME::varI
+		
+		JSR	boardCollateHSqr
+		
+		INC	game + GAME::varK
+		INC	game + GAME::varK
+		
+		LDX	game + GAME::varG
+		INX
+		CPX	#$1A
+		BNE	@loopH
+		
+		LDA	#<boardQ2VSqr0F
+		STA	$FD
+		LDA	#>boardQ2VSqr0F
+		STA	$FE
+
+		LDA	#$00
+		STA	game + GAME::varK
+
+		LDA	#$01
+		STA	game + GAME::varJ
+		
+		LDX	#$0F
+
+@loopV:
+		STX	game + GAME::varG
+		TXA
+		ASL
+		STA	game + GAME::varI
+		
+		JSR	boardCollateVSqr
+		
+		INC	game + GAME::varK
+		INC	game + GAME::varK
+		
+		LDX	game + GAME::varG
+		INX
+		CPX	#$14
+		BNE	@loopV
+		
+		RTS
+		
+		
+;-------------------------------------------------------------------------------
+boardCollateQ3:
+;-------------------------------------------------------------------------------
+		LDA	#<boardQ3SqrOffs
+		STA	$FB
+		LDA	#>boardQ3SqrOffs
+		STA	$FC
+		
+		LDA	#<boardQ3HSqr19
+		STA	$FD
+		LDA	#>boardQ3HSqr19
+		STA	$FE
+
+		LDA	#$00
+		STA	game + GAME::varK
+
+		LDA	#$01	
+		STA	game + GAME::varJ
+
+		LDX	#$19
+		
+@loopH:
+		STX	game + GAME::varG
+		TXA
+		ASL
+		STA	game + GAME::varI
+		
+		JSR	boardCollateHSqr
+		
+		INC	game + GAME::varK
+		INC	game + GAME::varK
+		
+		LDX	game + GAME::varG
+		INX
+		CPX	#$1F
+		BNE	@loopH
+		
+		LDA	#<boardQ3VSqr1F
+		STA	$FD
+		LDA	#>boardQ3VSqr1F
+		STA	$FE
+
+		LDA	#$00
+		STA	game + GAME::varK
+
+;		LDA	#$00
+		STA	game + GAME::varJ
+		
+		LDX	#$1F
+
+@loopV:
+		STX	game + GAME::varG
+		TXA
+		ASL
+		STA	game + GAME::varI
+		
+		JSR	boardCollateVSqr
+		
+		INC	game + GAME::varK
+		INC	game + GAME::varK
+		
+		LDX	game + GAME::varG
+		INX
+		CPX	#$24
+		BNE	@loopV
+		
+		RTS
+		
+
+;-------------------------------------------------------------------------------
+boardCollateHSqr:		
+;-------------------------------------------------------------------------------
+		LDY	#$00			;set up mrtg points (get Y)
+		LDA	($FB), Y
+		STA	game + GAME::varB
+		
+		LDY	game + GAME::varK	;get X
+		LDA	($FD), Y
+		STA	game + GAME::varA	;This gets up mrtg pt
+		
+		LDA	#$04			;default height
+		STA	game + GAME::varC
+		
+		INY				;Check height
+		LDA	($FD), Y
+		CMP	#$FF
+		BNE	@1
+		
+		INC	game + GAME::varC
+		
+@1:
+		LDX	game + GAME::varL
+		CPX	#$01
+		BNE	@doAll
+
+		JSR	boardGenMrtgSelH
+		JMP	@exit
+		
+@doAll:
+		LDX	#$00
+		JSR	boardGenMrtgSelH
+		JSR	boardGenAllH
+		JSR	boardGenOwnH
+		JSR	boardGenImprvH
+
+@exit:
+		RTS
+		
+		
+;-------------------------------------------------------------------------------
+boardCollateVSqr:
+;-------------------------------------------------------------------------------
+		LDY	#$01			;set up mrtg points (get X)
+		LDA	($FB), Y
+		STA	game + GAME::varA
+		
+		LDY	game + GAME::varK	;get Y
+		LDA	($FD), Y
+		STA	game + GAME::varB	;This gets up mrtg pt
+		
+		LDA	#$04			;default height
+		STA	game + GAME::varC
+		
+		INY				;Check height
+		LDA	($FD), Y
+		CMP	#$FF
+		BNE	@1
+		
+		INC	game + GAME::varC
+		
+@1:
+		LDX	game + GAME::varL
+		CPX	#$01
+		BNE	@doAll
+
+		JSR	boardGenMrtgSelV
+		JMP	@exit
+		
+@doAll:
+		LDX	#$00
+		JSR	boardGenMrtgSelV
+		JSR	boardGenAllV
+		JSR	boardGenOwnV
+		JSR	boardGenImprvV
+		
+@exit:
+		RTS
+		
+		
+;-------------------------------------------------------------------------------
+boardGenAllH:
+;-------------------------------------------------------------------------------
+		LDX	game + GAME::varI	;get imprv
+		INX
+		LDA	sqr00, X
+		
+		AND	#$40
+		BEQ	@done
+		
+		LDA	#$45			;compute command for own
+		LDY	game + GAME::varH	;store on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+		
+		LDA	game + GAME::varA	;get X
+		INY				;store on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+		
+		LDA	game + GAME::varJ	;check orientation
+		BEQ	@1
+		
+		LDX	game + GAME::varB	;Get Y Pos for own
+		DEX
+		TXA
+		JMP	@cont
+		
+@1:
+		LDA	game + GAME::varB	;Get Y Pos for own
+		CLC
+		ADC	#$05			;
+		
+@cont:
+		INY				;store on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+						
+		LDA	#$03			;width
+		INY				;store on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+		
+@done:
+		RTS
+		
+;-------------------------------------------------------------------------------
+boardGenAllV:
+;-------------------------------------------------------------------------------
+		LDX	game + GAME::varI	;get imprv
+		INX
+		LDA	sqr00, X
+		
+		AND	#$40
+		BEQ	@done
+		
+		LDA	#$55			;compute command for own
+		LDY	game + GAME::varH	;store on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+		
+		LDA	game + GAME::varJ	;check orientation
+		BEQ	@1
+		
+		LDX	game + GAME::varA	;Get X Pos for own
+		DEX
+		TXA
+		JMP	@cont
+		
+@1:
+		LDA	game + GAME::varA	;Get X Pos for own
+		CLC
+		ADC	#$05			;
+		
+@cont:
+		INY				;store on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+						
+		LDA	game + GAME::varB	;get Y
+		INY				;store on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+		
+		LDA	#$03			;height
+		INY				;store on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+		
+@done:
+		RTS
+		
+;-------------------------------------------------------------------------------
+boardGenOwnH:
+;-------------------------------------------------------------------------------
+		LDX	game + GAME::varI	;get owner player
+		LDA	sqr00, X
+		
+		CMP	#$FF
+		BEQ	@done
+		
+		STA	game + GAME::varD
+		
+		TAX				;get owner colour
+		LDA	plrLo, X
+		STA	$A7
+		LDA	plrHi, X
+		STA	$A8
+		
+		LDY	#PLAYER::colour
+		LDA	($A7), Y
+		
+		ORA	#$20			;compute command for own
+		LDY	game + GAME::varH	;store on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+		
+		LDA	game + GAME::varA	;get X
+		INY				;store on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+		
+		LDA	game + GAME::varJ	;check orientation
+		BEQ	@1
+		
+		LDX	game + GAME::varB	;Get Y Pos for own
+		DEX
+		TXA
+		JMP	@cont
+		
+@1:
+		LDA	game + GAME::varB	;Get Y Pos for own
+		CLC
+		ADC	#$05			;
+		
+@cont:
+		
+		INY				;store on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+						
+		LDA	#$03			;width
+		INY				;store on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+		
+@done:
+		RTS
+
+;-------------------------------------------------------------------------------
+boardGenOwnV:
+;-------------------------------------------------------------------------------
+		LDX	game + GAME::varI	;get owner player
+		LDA	sqr00, X
+		
+		CMP	#$FF
+		BEQ	@done
+		
+		STA	game + GAME::varD
+		
+		TAX				;get owner colour
+		LDA	plrLo, X
+		STA	$A7
+		LDA	plrHi, X
+		STA	$A8
+		
+		LDY	#PLAYER::colour
+		LDA	($A7), Y
+		
+		ORA	#$30			;compute command for own
+		LDY	game + GAME::varH	;store on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+		
+		LDA	game + GAME::varJ	;check orientation
+		BEQ	@1
+		
+		LDX	game + GAME::varA	;Get X Pos for own
+		DEX
+		TXA
+		JMP	@cont
+		
+@1:
+		LDA	game + GAME::varA	;Get X Pos for own
+		CLC
+		ADC	#$05			;
+		
+@cont:
+		
+		INY				;store on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+						
+		LDA	game + GAME::varB	;get Y
+		INY				;store on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+
+		LDA	#$03			;height
+		INY				;store on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+		
+@done:
+		RTS
+		
+		
+;-------------------------------------------------------------------------------
+boardGenMrtgSelH:
+;-------------------------------------------------------------------------------
+		LDX	game + GAME::varI	;get imprv
+
+		LDA	sqr00 + 1, X
+		AND	#$A0
+		BNE	@doClr
+
+		LDY	game + GAME::varL
+		BNE	@begin
+		
+		JMP	@done
+		
+@begin:
+		LDA	#$33
+		JMP	@cont0
+
+@doClr:
+		LDA	sqr00 + 1, X
+		AND	#$20
+		BEQ	@mrtg
+		
+		LDA	sqr00 + 1, X
+		AND	#$80
+		BNE	@mrtgsel
+		
+		LDA	#$31
+		JMP 	@cont0
+@mrtgsel:
+		LDA	#$3F
+		JMP 	@cont0
+		
+@mrtg:
+		LDA	#$3B
+		
+@cont0:
+		STA	game + GAME::varF
+
+		LDA	game + GAME::varG
+		BEQ	@chkcnr
+		
+		CMP	#$0A
+		BEQ	@chkcnr
+		
+		CMP	#$14
+		BEQ	@chkcnr
+		
+		CMP	#$1E
+		BEQ	@chkcnr
+		
+		LDA	#$03
+		JMP	@cont1
+
+@chkcnr:
+		LDA	#$05
+
+@cont1:
+		STA	$A7
+		
+		LDA	game + GAME::varB	;compute y
+		STA	game + GAME::varE
+		
+		LDA	game + GAME::varC
+		CMP	#$05
+		BEQ	@1
+		
+		LDA	game + GAME::varJ	;check orientation
+		BNE	@1
+		
+		INC	game + GAME::varE	
+		
+@1:
+		LDA	game + GAME::varA	;copy x
+		STA	game + GAME::varD	
+		
+		LDY	game + GAME::varH
+		LDX	#$00
+@loop:
+		LDA	game + GAME::varF	;store cmd on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+		INY
+		
+		LDA	game + GAME::varD	;store x on heap and next
+		INC	game + GAME::varD
+		STA	($A3), Y
+		INC	game + GAME::varH
+		INY
+		
+		LDA	game + GAME::varE	;store y on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+		INY
+		
+		LDA	game + GAME::varC	;store h on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+		INY
+
+		INX
+	
+		CPX	$A7
+		BNE	@loop
+
+@done:
+		RTS
+
+
+;-------------------------------------------------------------------------------
+boardGenMrtgSelV:
+;-------------------------------------------------------------------------------
+		LDX	game + GAME::varI	;get imprv
+
+		LDA	sqr00 + 1, X
+		AND	#$A0
+		BNE	@doClr
+
+		LDY	game + GAME::varL
+		BNE	@begin
+		
+		JMP	@done
+		
+@begin:
+		
+		LDA	#$23
+		JMP	@cont0
+
+@doClr:
+		LDA	sqr00 + 1, X
+		AND	#$20
+		BEQ	@mrtg
+		
+		LDA	sqr00 + 1, X
+		AND	#$80
+		BNE	@mrtgsel
+		
+		LDA	#$21
+		JMP 	@cont0
+@mrtgsel:
+		LDA	#$2F
+		JMP 	@cont0
+		
+@mrtg:
+		LDA	#$2B
+		
+@cont0:
+		STA	game + GAME::varF
+
+		LDA	game + GAME::varG
+		BEQ	@chkcnr
+		
+		CMP	#$0A
+		BEQ	@chkcnr
+		
+		CMP	#$14
+		BEQ	@chkcnr
+		
+		CMP	#$1E
+		BEQ	@chkcnr
+		
+		LDA	#$03
+		JMP	@cont1
+
+@chkcnr:
+		LDA	#$05
+
+@cont1:
+		STA	$A7
+		
+		LDA	game + GAME::varA	;compute x
+		STA	game + GAME::varD
+		
+		LDA	game + GAME::varC
+		CMP	#$05
+		BEQ	@1
+		
+		LDA	game + GAME::varJ	;check orientation
+		BNE	@1
+		
+		INC	game + GAME::varD	
+		
+@1:
+		LDA	game + GAME::varB	;copy y
+		STA	game + GAME::varE	
+		
+		LDY	game + GAME::varH
+		LDX	#$00
+@loop:
+		LDA	game + GAME::varF	;store cmd on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+		INY
+		
+		LDA	game + GAME::varD	;store x on heap and next
+		STA	($A3), Y
+		INC	game + GAME::varH
+		INY
+		
+		LDA	game + GAME::varE	;store y on heap
+		INC	game + GAME::varE
+		STA	($A3), Y
+		INC	game + GAME::varH
+		INY
+		
+		LDA	game + GAME::varC	;store W on heap
+		STA	($A3), Y
+		INC	game + GAME::varH
+		INY
+
+		INX
+	
+		CPX	$A7
+		BNE	@loop
+
+@done:
+		RTS
+		
+		
+;-------------------------------------------------------------------------------
+boardGenImprvH:
+;-------------------------------------------------------------------------------
+		LDX	game + GAME::varI	;get imprv
+		LDA	sqr00  + 1, X
+
+		AND	#$0F
+		BNE	@test
+		RTS
+	
+@test:
+		STA	game + GAME::varF
+		
+		LDY	game + GAME::varK	;get imprv X
+		INY
+		LDA	($FD), Y
+		
+		CMP	#$FF
+		BNE	@begin
+		RTS
+		
+@begin:
+		STA	game + GAME::varD
+		
+		LDA	game + GAME::varB
+		STA	game + GAME::varE
+		
+		LDA	game + GAME::varJ	;check orientation
+		BEQ	@cont0
+
+;		DEC	game + GAME::varE
+;		JMP	@cont0
+
+@1:
+		CLC
+		LDA	#$04
+		ADC	game + GAME::varE
+		STA	game + GAME::varE
+
+@cont0:
+		JMP	boardGenImprvPerf
+		
+
+;-------------------------------------------------------------------------------
+boardGenImprvV:
+;-------------------------------------------------------------------------------
+		LDX	game + GAME::varI	;get imprv
+		LDA	sqr00 + 1, X
+
+		AND	#$0F
+		BNE	@test
+		RTS
+	
+@test:
+		STA	game + GAME::varF
+		
+		LDY	game + GAME::varK	;get imprv Y
+		INY
+		LDA	($FD), Y
+		
+		CMP	#$FF
+		BNE	@begin
+		RTS
+		
+@begin:
+		STA	game + GAME::varE
+		
+		LDA	game + GAME::varA
+		STA	game + GAME::varD
+		
+		LDA	game + GAME::varJ	;check orientation
+		BEQ	@cont0
+
+;		DEC	game + GAME::varE
+;		JMP	@cont0
+
+@1:
+		CLC
+		LDA	#$04
+		ADC	game + GAME::varD
+		STA	game + GAME::varD
+
+@cont0:
+		JMP	boardGenImprvPerf
+		
+		
+		
+;-------------------------------------------------------------------------------
+boardGenImprvPerf:
+;-------------------------------------------------------------------------------
+		LDY	game + GAME::varH
+
+		LDA	game + GAME::varF
+		CMP	#$08
+		BPL	@hotelclr
+		
+		LDA	#$2D
+		JMP	@draw
+@hotelclr:
+		LDA	#$2A
+
+@draw:
+		STA	($A3), Y		;store cmd on heap
+		INC	game + GAME::varH
+		INY
+
+		LDA	game + GAME::varD	;get x
+		STA	($A3), Y		;store x on heap
+		INC	game + GAME::varH
+		INY
+		LDA	game + GAME::varE	;get y
+		STA	($A3), Y		;store y on heap
+		INC	game + GAME::varH
+		INY
+		
+		LDA	#$01
+		STA	($A3), Y		;store w on heap
+		INC	game + GAME::varH
+		INY
+		
+		LDA	game + GAME::varF
+		CMP	#$08
+		BPL	@hotelchr
+		
+		AND	#$07
+		CLC
+		ADC	#$04
+		
+		JMP	@cont1
+		
+@hotelchr:
+		LDA	#$09
+	
+@cont1:
+		ORA	#$60
+		STA	($A3), Y		;store cmd on heap
+		INC	game + GAME::varH
+		INY
+		
+		LDA	game + GAME::varD	;get x
+		STA	($A3), Y		;store x on heap
+		INC	game + GAME::varH
+		INY
+		LDA	game + GAME::varE	;get y
+		STA	($A3), Y		;store y on heap
+		INC	game + GAME::varH
+		INY
+		
+		LDA	#$FF
+		STA	($A3), Y		;store term on heap
+		INC	game + GAME::varH
+		
+@done:
+		RTS
+
+
+;===============================================================================
 ;FOR RULES.S
-;==============================================================================
+;===============================================================================
 
-rulesPriMrtg:
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-rulesPriAll:
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00
-rulesSqrImprv:
-	.repeat	40, I
-		.byte	$00
-	.endrep
-
-rulesChestCrds0:
-			.byte	$00, $00, $00, $00, $00, $00, $00, $00 
-			.byte	$00, $00, $00, $00, $00, $00, $00, $00
-rulesChanceCrds0:
-			.byte	$00, $00, $00, $00, $00, $00, $00, $00
-			.byte	$00, $00, $00, $00, $00, $00, $00, $00
-rulesChestIdx:
-			.byte	$00
-rulesChanceIdx:	
-			.byte	$00
-
-
-
-	.include	"rules.inc"
-	
-	
 rulesCCCrdProcsLo:
 			.byte	<rulesCCCrdProcDummy	;none
 			.byte	<rulesCCCrdProcInc	;get cash
@@ -22608,13 +22697,36 @@ rulesCCCrdProcsHi:
 			.byte	>rulesCCCrdProcGBk	;go back spaces
 			.byte	>rulesCCCrdProcBrb	;pay all players
 			.byte	>rulesCCCrdProcAUT	;adv to util pay 10x
+			
+			
+rulesPriMrtg:
+		.byte	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+rulesPriAll:
+		.byte	$00, $00, $00, $00, $00, $00, $00, $00, $00, $00
+rulesSqrImprv:
+	.repeat	40, I
+		.byte	$00
+	.endrep
+
+rulesChestCrds0:
+			.byte	$00, $00, $00, $00, $00, $00, $00, $00 
+			.byte	$00, $00, $00, $00, $00, $00, $00, $00
+rulesChanceCrds0:
+			.byte	$00, $00, $00, $00, $00, $00, $00, $00
+			.byte	$00, $00, $00, $00, $00, $00, $00, $00
+rulesChestIdx:
+			.byte	$00
+rulesChanceIdx:	
+			.byte	$00
 
 
 
-;-------------------------------------------------------------------------------
-;rulesGenRnd0F
+	.include	"rules.inc"
+	
+
 ;-------------------------------------------------------------------------------
 rulesGenRnd0F:
+;-------------------------------------------------------------------------------
 ;***FIXME:  I can't quite recall how I came up with the algorythm used 
 ;	here.  It attempts to divide the random value (0-255) down to the range 
 ;	(0-15).  There was an issue, however.  Values above 15 were being
@@ -23884,7 +23996,7 @@ rulesLandStreet:
 		LDA	game + GAME::varC	;group index
 		ASL
 		CLC
-		ADC	#GROUP::mDeed1
+		ADC	#GROUP::aCard0
 		TAY
 		
 		LDA	($FD), Y		;now pts to card
@@ -23946,7 +24058,7 @@ rulesLandStatn:
 		LDA	game + GAME::varC	;group index
 		ASL
 		CLC
-		ADC	#GROUP::mDeed1
+		ADC	#GROUP::aCard0
 		TAY
 		
 		LDA	($FD), Y		;now pts to card
@@ -23958,7 +24070,7 @@ rulesLandStatn:
 		PLA
 		STA	$FD
 
-		LDY	#STATION::rRent
+		LDY	#STATION::mRent
 		LDA	($FD), Y
 		STA	game + GAME::varD
 		INY
@@ -25064,7 +25176,7 @@ rulesDoPurchDeed:
 		LDA	game + GAME::varC	;group index
 		ASL
 		CLC
-		ADC	#GROUP::mDeed1
+		ADC	#GROUP::aCard0
 		TAY
 		
 		LDA	($FD), Y		;now pts to card
@@ -25075,7 +25187,7 @@ rulesDoPurchDeed:
 		PLA
 		STA	$FD
 		
-		LDY	#DEED::pPurch
+		LDY	#DEED::mPurch
 		LDA	($FD), Y
 		STA	game + GAME::varD
 		INY
@@ -25103,7 +25215,7 @@ rulesDoPurchDeed:
 		JSR	prmptBought
 	
 @begin:
-		LDY	#DEED::mValue
+		LDY	#DEED::mMrtg
 		LDA	($FD), Y
 		STA	game + GAME::varD
 		INY
@@ -25366,7 +25478,7 @@ rulesNextImprv:
 		JMP	@buzzbreak
 
 @tstCash:
-		LDY	#GROUP::pImprv		;Get cost
+		LDY	#GROUP::vImprv		;Get cost
 		LDA	($FD), Y
 		STA	game + GAME::varD
 		LDA	#$00
@@ -25531,7 +25643,7 @@ rulesPriorImprv:
 		ORA	game + GAME::varA
 		STA	sqr00 + 1, X
 
-		LDY	#GROUP::pImprv
+		LDY	#GROUP::vImprv
 		LDA	($FD), Y
 
 		LSR
@@ -25610,7 +25722,7 @@ rulesUnmortgageImmed:
 		LDA	game + GAME::varC	;group index
 		ASL
 		CLC
-		ADC	#GROUP::mDeed1
+		ADC	#GROUP::aCard0
 		TAY
 		
 		LDA	($FD), Y		;now pts to card
@@ -25632,7 +25744,7 @@ rulesUnmortgageImmed:
 		LDA	($FD), Y
 		STA	game + GAME::varE
 
-		LDY	#DEED::mValue
+		LDY	#DEED::mMrtg
 		CLC
 		LDA	($FD), Y
 		ADC	game + GAME::varD
@@ -25650,7 +25762,7 @@ rulesUnmortgageImmed:
 		TAX
 		JSR	prmptRepay
 		
-		LDY	#DEED::mValue
+		LDY	#DEED::mMrtg
 		LDA	($FD), Y
 		STA	game + GAME::varD
 		INY
@@ -25726,7 +25838,7 @@ rulesMortgageFeeImmed:
 		LDA	game + GAME::varC	;group index
 		ASL
 		CLC
-		ADC	#GROUP::mDeed1
+		ADC	#GROUP::aCard0
 		TAY
 		
 		LDA	($FD), Y		;now pts to card
@@ -25760,64 +25872,6 @@ rulesMortgageFeeImmed:
 		RTS
 		
 		
-rulesMortgageImmed:
-		LDA	sqr00 + 1, X
-		EOR	#$80
-		STA	game + GAME::varA	;imprv
-
-;***TODO:	Test for improvements here, too.
-
-		STA	sqr00 + 1, X
-
-		JSR	gameGetCardPtrForSquareImmed
-
-		LDA	game + GAME::varA
-		AND	#$80
-		BNE	@mrtg
-
-		RTS
-
-@mrtg:
-		LDY	#DEED::mValue
-		LDA	($FD), Y
-		STA	game + GAME::varD
-		INY
-		LDA	($FD), Y
-		STA	game + GAME::varE
-
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
-		JSR	rulesAddCash
-		
-		JSR	rulesSubEquity
-
-		LDA	#<SFXSLIDELOW
-		LDY	#>SFXSLIDELOW
-		LDX	#$07
-		JSR	SNDBASE + 6
-		
-		LDY	#PLAYER::colour
-		LDA	($FB), Y
-		TAX
-		JSR	prmptMortgage
-		
-@toggle:
-		LDX	game + GAME::varG
-		LDA	game + GAME::varA
-		STA	sqr00 + 1, X
-		
-		LDA	#$01
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty
-		
-@exit:
-		RTS
-
-
 ;-------------------------------------------------------------------------------
 rulesMrtgCheckTrade:
 ;-------------------------------------------------------------------------------
@@ -25947,7 +26001,7 @@ rulesToggleMrtg:
 		LDA	game + GAME::varC	;group index
 		ASL
 		CLC
-		ADC	#GROUP::mDeed1
+		ADC	#GROUP::aCard0
 		TAY
 		
 		LDA	($FD), Y		;now pts to card
@@ -25969,7 +26023,7 @@ rulesToggleMrtg:
 		LDA	($FD), Y
 		STA	game + GAME::varE
 
-		LDY	#DEED::mValue
+		LDY	#DEED::mMrtg
 		CLC
 		LDA	($FD), Y
 		ADC	game + GAME::varD
@@ -26004,7 +26058,7 @@ rulesToggleMrtg:
 		TAX
 		JSR	prmptRepay
 		
-		LDY	#DEED::mValue
+		LDY	#DEED::mMrtg
 		LDA	($FD), Y
 		STA	game + GAME::varD
 		INY
@@ -26021,7 +26075,7 @@ rulesToggleMrtg:
 		JMP	@toggle
 		
 @mrtg:
-		LDY	#DEED::mValue
+		LDY	#DEED::mMrtg
 		LDA	($FD), Y
 		STA	game + GAME::varD
 		INY
@@ -26106,7 +26160,7 @@ rulesDoXferDeed:
 		LDA	game + GAME::varC	;group index
 		ASL
 		CLC
-		ADC	#GROUP::mDeed1
+		ADC	#GROUP::aCard0
 		TAY
 		
 		LDA	($FD), Y		;now pts to card
@@ -26118,7 +26172,7 @@ rulesDoXferDeed:
 		PLA
 		STA	$FD
 
-		LDY	#DEED::mValue
+		LDY	#DEED::mMrtg
 		LDA	($FD), Y
 		STA	game + GAME::varD
 		INY
@@ -26908,7 +26962,7 @@ rulesDoCommitMrtg:
 		LDA	game + GAME::varI
 		JSR	gameGetCardPtrForSquare
 		
-		LDY	#DEED::mValue
+		LDY	#DEED::mMrtg
 		
 		CLC
 		LDA	($FD), Y
@@ -27109,7 +27163,7 @@ rulesDoCommitSellAtLevel:
 		STA	rulesSqrImprv, X
 		
 @cont2:
-		LDY	#GROUP::pImprv
+		LDY	#GROUP::vImprv
 		LDA	($FD), Y
 		LSR
 		CLC
@@ -27474,7 +27528,7 @@ rulesAutoBuy:
 		TXA
 		JSR	gameGetCardPtrForSquare
 	
-		LDY	#DEED::pPurch
+		LDY	#DEED::mPurch
 		LDA	($FD), Y
 		STA	game + GAME::varM
 		INY
@@ -27610,7 +27664,7 @@ rulesAutoBuy:
 
 @purchase:
 ;	On purchase wanted
-;		Check cash (cost - cash > 0) is sufficient
+;	Check cash (cost - cash > 0) is sufficient
 
 		SEC
 		LDA	game + GAME::varM
@@ -27627,8 +27681,7 @@ rulesAutoBuy:
 		BEQ	@cont
 		
 @recover:
-@debug_trap0:
-;			Recover calculated amt
+;	Recover calculated amt
 		LDA	game + GAME::varD		;.A,.Y = amount
 		LDY	game + GAME::varE
 		LDX	game + GAME::pActive		;.X = player
@@ -27636,7 +27689,7 @@ rulesAutoBuy:
 		JSR	rulesAutoRecover
 			
 @cont:
-;		Buy deed
+;	Buy deed
 		LDA	#UI_ACT_BUYD
 		STA	$68
 		LDA	game + GAME::pActive
@@ -28237,7 +28290,7 @@ rulesDoConstructAtLevel:
 		STA	rulesSqrImprv, X
 
 @improve:
-		LDY	#GROUP::pImprv
+		LDY	#GROUP::vImprv
 		LDA	($FD), Y
 		STA	game + GAME::varO
 		LDA	#$00
@@ -28446,7 +28499,7 @@ rulesAutoRepayGroup:
 		LDX	game + GAME::varL
 		JSR	gameGetCardPtrForSquareImmed
 		
-		LDY	#DEED::mValue
+		LDY	#DEED::mMrtg
 		LDA	($FD), Y
 		STA	game + GAME::varD
 		INY
@@ -28958,7 +29011,7 @@ rulesSuggestDeedValue:
 		TAX
 		JSR	gameGetCardPtrForSquareImmed
 		
-		LDY	#DEED::mValue
+		LDY	#DEED::mMrtg
 		LDA	($FD), Y
 		STA	game + GAME::varS
 		STA	game + GAME::varM
@@ -29398,7 +29451,7 @@ rulesAutoEliminGroup:
 @begin1:
 		JSR	gameGetCardPtrForSquareImmed
 		
-		LDY	#DEED::mValue
+		LDY	#DEED::mMrtg
 		LDA	($FD), Y
 		STA	game + GAME::varD
 		INY
@@ -29525,9 +29578,9 @@ rulesAutoEliminate:
 		RTS
 
 
-;==============================================================================
+;===============================================================================
 ;FOR NUMCONV.S
-;==============================================================================
+;===============================================================================
 
 numConvLEAD0	=	$A5
 numConvDIGIT   	=	$A6
@@ -30470,12 +30523,12 @@ initMem:
 		DEX
 		BPL	@loop
 		
-		LDA	#<msePointer		;Set-up player token loc		
+		LDA	#<sprPointer		
 		STA	$FB
-		LDA	#>msePointer
+		LDA	#>sprPointer
 		STA	$FC
 		
-		LDA	#<spriteMem20		;Set-up sprite data loc
+		LDA	#<spriteMem20		
 		STA	$FD
 		LDA	#>spriteMem20
 		STA	$FE
@@ -30486,7 +30539,7 @@ initMem:
 		STA	($FD), Y
 		
 		INY
-		CPY	#$3F
+		CPY	#$40
 		BNE	@loop5
 
 		RTS
@@ -30521,7 +30574,6 @@ initFirstTime:
 		
 		LDA	#$00			;init game
 		STA	game + GAME::sig
-		STA	game + GAME::term
 		STA	game + GAME::qVis		
 		STA	game + GAME::dlgVis
 		STA	ui + UI::fHveInp
@@ -30532,6 +30584,7 @@ initFirstTime:
 		LDA	#$01
 		STA	game + GAME::lock
 		STA	game + GAME::pVis
+		STA	ui + UI::fInjKey
 
 		JSR	initNumConv
 
@@ -30606,7 +30659,7 @@ initPlyr:
 
 
 ;-------------------------------------------------------------------------------
-msePointer:
+sprPointer:
 ;-------------------------------------------------------------------------------
 			.byte 	%01010101, %01010000, %00000000
 			.byte 	%01111111, %11010000, %00000000
