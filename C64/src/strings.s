@@ -24,9 +24,9 @@ strDesc3Titles0:	;ECCLESTIAL
 strDesc4Titles0:	;SOLUTIONS
 			.byte $09, $93, $8F, $8C, $95, $94, $89, $8F
 			.byte $8E, $93	
-strDesc8Titles0:	;VERSION 0.02.02A
+strDesc8Titles0:	;VERSION 0.02.39A
 			.byte $10, $96, $85, $92, $93, $89, $8F, $8E
-			.byte $A0, $B0, $AE, $B0, $B2, $AE, $B1, $B9
+			.byte $A0, $B0, $AE, $B0, $B2, $AE, $B3, $B9
 			.byte $81			
 strDesc5Titles0:	;(C) 1935, 2016
 			.byte $0E, $A8, $83, $A9, $A0, $B1, $B9, $B3
@@ -225,6 +225,18 @@ strOptn1Setup8:		;M - MEDIUM
 strOptn2Setup8:		;H - HIGH
 			.byte $08, $88, $A0, $AD, $A0, $88, $89, $87
 			.byte $88
+
+strDescSetup9:		;SET CPU PLAYERS
+			.byte $0F, $93, $85, $94, $A0, $83, $90, $95
+			.byte $A0, $90, $8C, $81, $99, $85, $92, $93
+			
+strOptn0Setup9:		;0 - NO CPU
+			.byte $0A, $B0, $A0, $AD, $A0, $8E, $8F, $A0
+			.byte $83, $90, $95
+
+strOptn1Setup9:		;1 - 1 PLAYER
+			.byte $0C, $B1, $A0, $AD, $A0, $B1, $A0, $90
+			.byte $8C, $81, $99, $85, $92
 
 
 strHeaderStart0:	;GAME STARTING
@@ -489,15 +501,13 @@ strText2Trade5:		;PAY FEES FOR.
 			.byte $93, $A0, $86, $8F, $92, $AE
 			
 			
-strHeaderTrade6:	;TRADE PROCESSING
-			.byte $10, $94, $92, $81, $84, $85, $A0, $90
-			.byte $92, $8F, $83, $85, $93, $93, $89, $8E
-			.byte $87
+strHeaderTrade6:	;GAME UPDATING
+			.byte $0D, $87, $81, $8D, $85, $A0, $95, $90
+			.byte $84, $81, $94, $89, $8E, $87
 
-strText0Trade6:		;YOU MAY COMPLETE
-			.byte $10, $99, $8F, $95, $A0, $8D, $81, $99
-			.byte $A0, $83, $8F, $8D, $90, $8C, $85, $94
-			.byte $85
+strText0Trade6:		;YOU MAY FINISH
+			.byte $0E, $99, $8F, $95, $A0, $8D, $81, $99
+			.byte $A0, $86, $89, $8E, $89, $93, $88
 strText1Trade6:		;IMMEDIATELY.
 			.byte $0C, $89, $8D, $8D, $85, $84, $89, $81
 			.byte $94, $85, $8C, $99, $AE
@@ -551,15 +561,16 @@ strText1TrdSel0:	;+  UIO
 			.byte $06, $2B, $20, $20, $95, $89, $8F
 strText2TrdSel0:	;-  JKL
 			.byte $06, $2D, $20, $20, $8A, $8B, $8C
-strText3TrdSel0:	;CASH
-			.byte $04, $03, $01, $13, $08
+strText3TrdSel0:	;MONEY
+			.byte $05, $0D, $0F, $0E, $05, $19
 strText4TrdSel0:	;R.WLTH
 			.byte $06, $12, $2E, $17, $0C, $14, $08
 strText5TrdSel0:	;INVLD!
 			.byte $06, $09, $0E, $16, $0C, $04, $21
 strText6TrdSel0:	;OVRFLW
 			.byte $06, $0F, $16, $12, $06, $0C, $17
-			
+strText7TrdSel0:	;R.MNY
+			.byte $05, $12, $2E, $0D, $0E, $19
 
 strHeaderJump0:		;PLAYER MOVING
 			.byte $0D, $90, $8C, $81, $99, $85, $92, $A0

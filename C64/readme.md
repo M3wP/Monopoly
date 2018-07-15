@@ -420,30 +420,37 @@ RUN
 ## TODO
 
 * Statistics/Overview from trade approval, must pay.  They should work now.
-* Put AutoPay on play menu.
+* Put AutoPay on play2 menu.
+* Colour gofree items on trdsel0 dialog to indicate availability.
 
-* Should be able to do beta release state after above.
+* Should be able to do beta state after above.
 
-* CPU players setup menu.
-* Change trade6 menu naming to action jump menu.
-* Consolidate all the backup/retrievals of game mode + player into a single main
-  state stack.
-* Once have main state stack, can check in roll that the player is the one 
-  with the dice (is the player for the normal mode).  Just to be safe?
-* Could also do other mode chain integrity checks.
-* Allow players to input name.
-* Could now instead of copy name on elimin and gameover dialogs, just refer.
-* gamePlayerHasWealth is unused?
-
+* CPU players setup menu setup9 (after setup0).
 * CPU player still needs:  AutoTradeApprove, AutoTradeInitiate
 * "Thinking" menu/prompt when cpu engaged?  Its so fast anyway... 
 * rulesSuggestDeedValue should tap values based on group significance.
 * AutoAuction should commit equity like AutoBuy does and perhaps not bail so 
   early (push value upwards if its less than what they and other players currently 
   have).
+  
+* Change trade6 menu naming to action jump menu.
+* Consolidate all the backup/retrievals of game mode + player into a single main
+  state stack.
+* Once have main state stack, can check in roll that the player is the one 
+  with the dice (is the player for the normal mode).  Just to be safe?
+* Could also do other mode chain integrity checks.
+* Allow players to input name?  Do I have enough memory for the feature??
+* Could now instead of copy name on elimin and gameover dialogs, just refer.
+* gamePlayerHasWealth is unused?
+* Optimise trade calculations -- too large!
+* Do not overflow action cache when enqueue (shouldn't be possible at maximum
+  utilisation in trades/elimination xfers).
+* Do not overflow heap??  Shouldn't ever happen.  Should gather statistics 
+  in order to check actual maximum requirements.
 
 * Player sprites on overview dialog.  Would look pretty.  IRQ is a mess.
 * Get exomiser working.
+* Allow construct from manage menu in trade if not doing so for group in trade?
 
 * Should be able to do release state after above and all testing items passed.
 
@@ -452,28 +459,42 @@ RUN
 * Is rent3 SFX still a little lame?  Does it matter?  Are the sounds okay on 
   Android (where the emulation is terrible)?
 * Properly divide game and rule routines.  Hmm...
-* CPU difficulty settings?
+* CPU player personalities?
 * Fix ZPage variable use, in particular active player pointer and IRQ.
 * Fix IRQ handler -- its gotten hacked to death.
 * Game save/load?  Difficult now that the Kernal program and data space is used.
-* Optimise, optimise, optimise (eg. BIT instead of LDA, AND/ORA trains).
-  Self modifying code??  Need cartridge/ROM support?  Already modify many data 
-  items.
+  May not have enough memory.
+* Optimise, optimise, optimise eg. use BIT, self modifying code??  
+  Need cartridge/ROM support?  Already modify many data items.
 
 ## For Testing (Needs Confirmation):
 * Player focus restored after player lose to player interrupt?
 * Money cap (32767) not exceeded on addcash?
 * Don't allow leave management when -ve hses, htls at all.
-* Must pay works after trade/elimination?
+* Must pay works after trade/elimination xfer?
 * Multiple eliminations in one turn works?
+* Does elimination to bank work at all?
 * Used GO Free cards prevented from appearing in deck until after 
   shuffle (and while owned by a player).
 * Ensure all options/pages are displayed for all menus.
-* In elmination, trdsel dialog doesn't show cash value.
 * GOFree cards properly traded in trades.
-
+* Trade/elimination xfer working correctly (double check).
+* Trade/elimination xfer correctly calculate remaining cash and enforce positive.
+* Elimination returns to correct player.
 
 ## Change History (Since Version 0.01.99A)
+* 15JUL2018
+	* Bump version.
+	* Implement CPU player menu setup9.
+	* Don't allow mortgaging/unmortgaging of deeds in a trade when trading.
+	* Don't allow construct improvements from manage menu when coming from trade.
+	* Add manage option to trade0, trade1 and elimin0 menus.  Recalculate
+	  remaining wealth and cash when utilised.  These last few changes 
+	  required nearly 1.5KB so were very expensive.
+	* Do not allow trade/elimination xfer if remaining money is negative.
+	* Now include remaining money on trdsel dialog and update with changes made.
+	* Return to correct player after elmination and must pay.
+	* Change text "cash" on trdsel0 dialog to "money".
 * 14JUL2018
 	* Normalise VIC-II settings in bootstrap.
 	* Add strings for CPU players menu (setup9).

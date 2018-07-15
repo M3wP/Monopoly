@@ -21,27 +21,27 @@
 ;Please see readme.md for further information.
 ;
 ;
-;Free memory information (as of last update from 0.02.19A):
-;	* Between strings and rules data, 843 bytes (free for data)
+;Free memory information (as of last update from 0.02.39A):
+;	* Between strings and rules data, 801 bytes (free for data)
 ;	* Between rules data and action cache, 239 bytes (free for data)
-;	* Between heap and reserved, 5596 bytes (free for program)
+;	* Between heap and reserved, 4393 bytes (free for program)
 ;	* Reserved areas, 768 bytes (unavailable/unused)
 ;
 ;By my calculation, there are 655 bytes unaccounted for somewhere...  Where did
 ;they go?
 ;
 ;
-;Memory map (as of last update from 0.02.19A):
+;Memory map (as of last update from 0.02.39A):
 ;	0000 -	00FF	Zero page
 ;	0100 -	01FF	System stack
 ;	0200 - 	03FF	Global state
 ;	0400 - 	07FF	Screen data and sprite pointers
 ;	0800 - 	08FF	Sprite data/bootstrap
-;	0900 -  B823	Program area
-;	B824 - 	CDFF	Discard/heap
+;	0900 -  BCD7	Program area
+;	BCD8 - 	CDFF	Discard/heap
 ;	CE00 - 	CFFF	Reserved (may be used for additional discard/heap)
 ;	D000 - 	DFFF	System IO
-;	E000 -	F3FF	Strings data (ends at F0B5)
+;	E000 -	F3FF	Strings data (ends at F0DF)
 ;	F400 - 	FAFF	Rules data (ends at FA11)
 ;	FB00 - 	FEFF	Action cache
 ;	FF00 -  FFF9	Reserved (unused on purpose)
@@ -528,7 +528,7 @@ keyZPDecodePtr	=	$F5			;word
 	.struct	STREET
 		cCard	.tag	CARD
 		pPurch	.word
-		mValue	.word			;could be byte
+		mValue	.word			;***TODO:  Change to mMrtg
 		mFee	.word			;could be byte
 		mRent	.word			;could be byte
 		m1Hse	.word
@@ -5322,6 +5322,9 @@ tokPrmptPass:		;PASS
 tokPrmptBid:		;BID
 			.byte 	$51, $02, $09, $04, $20, $20, $20, $20
 			.byte	$20, $24, $20, $20, $20, $20, $20, $20
+tokPrmptInTrade:	;BEING TRADED!
+			.byte 	$51, $02, $05, $09, $0E, $07, $20, $14
+			.byte 	$12, $01, $04, $05, $04, $21, $20, $20
 
 
 ;-------------------------------------------------------------------------------
@@ -6073,6 +6076,32 @@ prmptBid:
 		JMP	prmptDoAddCash
 
 
+prmptInTrade:
+		LDX	#$0F
+@loop1:
+		LDA	tokPrmptInTrade, X
+		STA	prmptTok1, X
+
+		LDA	#$0F
+		STA	prmptClr1, X
+
+		DEX
+		BPL	@loop1
+		
+		LDA	#$0F
+		STA	prmptClr1
+		
+		LDA	prmptTemp2
+		AND	#$F0
+		STA	prmptTemp2
+		
+		LDA	#$20
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+
+		RTS
+		
+
 ;==============================================================================
 ;FOR STATUS.S
 ;==============================================================================
@@ -6680,6 +6709,8 @@ uiProcessTerminate:
 		STA	game + GAME::fStpSig
 		STA	game + GAME::kWai
 		
+		JSR	rulesDoNextPlyr
+		
 		JSR	rulesFocusOnActive
 		JSR	gamePlayersDirty
 		
@@ -6688,14 +6719,7 @@ uiProcessTerminate:
 		BEQ	@alreadympay
 		
 		JSR	uiProcessChkAllMPay
-		
-		LDA	game + GAME::gMode
-		CMP	#$03
-		BEQ	@complete
-		
-		JSR	rulesDoNextPlyr
 		JMP	@complete
-		
 		
 @alreadympay:
 		LDA	game + GAME::pActive	;Check them all again
@@ -6907,6 +6931,9 @@ uiActionMrtg:
 ;		TAX
 ;		JSR	rulesMortgageImmed
 
+		LDA	#$00
+		STA	menuManage0CheckTrade
+		
 		JSR	rulesToggleMrtg
 
 		RTS
@@ -7613,6 +7640,12 @@ menuPageSetup8:
 		.byte	$01
 		.word	cpuPerformIdle
 		
+menuPageSetup9:
+		.word	menuPageSetup9Keys
+		.word	menuPageSetup9Draw
+		.byte	$01
+		.word	cpuPerformIdle
+		
 menuPageMustPay0:
 		.word	menuPageMustPay0Keys
 		.word	menuPageMustPay0Draw
@@ -7871,6 +7904,25 @@ menuPageBlank0Keys:
 		RTS
 
 
+menuWindowSetup0:	
+			.byte	$90, $01, $07
+			.word	     strHeaderSetup0
+			.byte	$90, $01, $08
+			.word        strDescSetup0
+			.byte	$A1, $0A, $01, $12, $32, $02, $0A
+			.word	     strOptn0Setup0
+			.byte	$A1, $0C, $01, $12, $33, $02, $0C
+			.word	     strOptn1Setup0
+			.byte	$A1, $0E, $01, $12, $34, $02, $0E
+			.word	     strOptn2Setup0
+			.byte	$A1, $10, $01, $12, $35, $02, $10
+			.word	     strOptn3Setup0
+			.byte	$A1, $12, $01, $12, $36, $02, $12
+			.word	     strOptn4Setup0
+			
+			.byte	$00
+			
+			
 menuPageSetup0Keys:
 		CMP	#'2'
 		BMI	@exit
@@ -7884,10 +7936,9 @@ menuPageSetup0Keys:
 			
 		LDA	#$00
 		STA	menuTemp0
-		JSR	menuPageSetup1EnbAll
 
-		LDA 	#<menuPageSetup1
-		LDY	#>menuPageSetup1
+		LDA 	#<menuPageSetup9
+		LDY	#>menuPageSetup9
 		
 		JSR	menuSetPage
 
@@ -7936,25 +7987,6 @@ menuPageSetup0Keys:
 		RTS
 
 						
-menuWindowSetup0:	
-			.byte	$90, $01, $07
-			.word	     strHeaderSetup0
-			.byte	$90, $01, $08
-			.word        strDescSetup0
-			.byte	$A1, $0A, $01, $12, $32, $02, $0A
-			.word	     strOptn0Setup0
-			.byte	$A1, $0C, $01, $12, $33, $02, $0C
-			.word	     strOptn1Setup0
-			.byte	$A1, $0E, $01, $12, $34, $02, $0E
-			.word	     strOptn2Setup0
-			.byte	$A1, $10, $01, $12, $35, $02, $10
-			.word	     strOptn3Setup0
-			.byte	$A1, $12, $01, $12, $36, $02, $12
-			.word	     strOptn4Setup0
-			
-			.byte	$00
-			
-			
 menuPageSetup0Draw:
 		LDA	#<menuWindowSetup0
 		STA	$FD
@@ -8928,6 +8960,170 @@ menuPageSetup8Draw:
 		RTS
 
 
+menuWindowSetup9BN:
+		.byte	(menuWindowSetup9B0 - menuWindowSetup9)
+		.byte	(menuWindowSetup9B1 - menuWindowSetup9)
+		.byte	(menuWindowSetup9B2 - menuWindowSetup9)
+		.byte	(menuWindowSetup9B3 - menuWindowSetup9)
+		.byte	(menuWindowSetup9B4 - menuWindowSetup9)
+		.byte	(menuWindowSetup9B5 - menuWindowSetup9)
+
+menuWindowSetup9:	
+			.byte	$90, $01, $07
+			.word	     strHeaderSetup0
+			.byte	$90, $01, $08
+			.word        strDescSetup9
+			
+menuWindowSetup9B0:
+			.byte	$A1, $0A, $01, $12, $30, $02, $0A
+			.word	     strOptn0Setup9
+menuWindowSetup9B1:
+			.byte	$A1, $0C, $01, $12, $31, $02, $0C
+			.word	     strOptn1Setup9
+menuWindowSetup9B2:
+			.byte	$A1, $0E, $01, $12, $32, $02, $0E
+			.word	     strOptn0Setup0
+menuWindowSetup9B3:
+			.byte	$A1, $10, $01, $12, $33, $02, $10
+			.word	     strOptn1Setup0
+menuWindowSetup9B4:
+			.byte	$A1, $12, $01, $12, $34, $02, $12
+			.word	     strOptn2Setup0
+menuWindowSetup9B5:
+			.byte	$A1, $14, $01, $12, $35, $02, $14
+			.word	     strOptn3Setup0
+			
+			.byte	$00
+			
+menuPageSetup9Keys:
+		CMP	#'0'
+		BPL	@tstupper
+		
+		JMP	@exit
+
+@tstupper:
+		CMP	#'5'
+		BMI	@begin
+		
+		JMP	@exit
+		
+@begin:
+		SEC
+		SBC	#'0'
+
+		CMP	#$00
+		BEQ	@done
+		
+		LDX	game + GAME::pCount
+		STX	game + GAME::varA
+		
+		CMP	game + GAME::varA
+		BPL 	@exit
+
+		STA	game + GAME::varA
+		SEC
+		LDA	game + GAME::pCount
+		SBC	game + GAME::varA
+		TAX
+
+		LDA	#$01
+		STA	game + GAME::varC
+		
+@loop0:		
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDY	#PLAYER::fCPU
+		LDA	#$01
+		STA	($FB), Y
+		
+		LDA	game + GAME::varC
+		CLC
+		ADC	#$B0
+		
+		INC	game + GAME::varC
+		
+		LDY	#$05
+		STA	cpuDefName, Y
+		
+		LDA	plrNameLo, X
+		STA	$FB
+		LDA	plrNameHi, X
+		STA	$FC
+		
+		LDY	#$08
+@loop1:
+		LDA	cpuDefName, Y
+		STA	($FB), Y
+		DEY
+		BPL	@loop1
+		
+@next0:
+		INX
+		CPX	game + GAME::pCount
+		BNE	@loop0
+
+@done:
+		LDA	#$00
+		STA	menuTemp0
+		JSR	menuPageSetup1EnbAll
+
+		LDA 	#<menuPageSetup1
+		LDY	#>menuPageSetup1
+		
+		JSR	menuSetPage
+
+		LDA	#$01
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
+@exit:
+		RTS
+
+
+menuPageSetup9Draw:
+		LDX	#$02
+@loop0:
+		LDA	menuWindowSetup9BN, X
+		TAY
+		LDA	#$A2
+		STA	menuWindowSetup9, Y
+		INX
+		CPX	#$06
+		BNE	@loop0
+		
+		LDX	game + GAME::pCount
+@loop1:
+		CPX	#$02
+		BEQ	@disp
+
+		DEX
+
+		LDA	menuWindowSetup9BN, X
+		TAY
+		LDA	#$A1
+		STA	menuWindowSetup9, Y
+		
+		JMP	@loop1
+
+@disp:
+		LDA	#<menuWindowSetup9
+		STA	$FD
+		LDA	#>menuWindowSetup9
+		STA	$FE
+		
+		JSR	screenPerformList
+
+		RTS
+
+
 menuWindowPlay0:	
 			.byte	$90, $01, $07
 			.word	     	strHeaderPlay0
@@ -9000,6 +9196,9 @@ menuPagePlay0DefKeys:
 @keysM:
 		CMP	#'M'
 		BNE	@keysT
+		
+		LDA	#$00
+		STA	menuManage0CheckTrade
 		
 		JSR	gameToggleManage
 		JMP	@keysDing
@@ -10534,10 +10733,35 @@ menuPageMustPay0Draw:
 		RTS
 
 
-;-------------------------------------------------------------------------------
-;menuPageManage0Keys
+menuManage0CheckTrade:
+		.byte	$00
+
+menuWindowManage0:
+			.byte	$90, $01, $07
+			.word	     strHeaderMng0
+
+			.byte	$A1, $0A, $01, $12, $46, $02, $0A
+			.word	     strOptn0Mng0
+			.byte	$A1, $0C, $01, $12, $42, $02, $0C
+			.word	     strOptn1Mng0
+			.byte	$A1, $0E, $01, $12, $4D, $02, $0E
+			.word	     strOptn2Mng0
+menuWindowManage0C:
+			.byte	$A1, $10, $01, $12, $43, $02, $10
+			.word	     strOptn3Mng0
+			.byte	$A1, $12, $01, $12, $53, $02, $12
+			.word	     strOptn4Mng0
+			.byte	$A1, $14, $01, $12, $49, $02, $14
+			.word	     strOptn5Mng0
+			.byte	$A1, $16, $01, $12, $44, $02, $16
+			.word	     strOptn6Mng0
+
+			.byte	$00
+
+
 ;-------------------------------------------------------------------------------
 menuPageManage0Keys:
+;-------------------------------------------------------------------------------
 		CMP	#'D'
 		BNE	@keysF
 		
@@ -10576,6 +10800,7 @@ menuPageManage0Keys:
 
 		JSR	prmptMustSell
 
+@buzz:
 		LDA	#<SFXBUZZ
 		LDY	#>SFXBUZZ
 		LDX	#$07
@@ -10610,6 +10835,12 @@ menuPageManage0Keys:
 		CMP	#'C'
 		BNE	@keysS
 		
+		LDX	menuManage0CheckTrade
+		BEQ	@doconstruct
+		
+		JMP	@buzz
+		
+@doconstruct:
 		LDA	game + GAME::sSelect
 		JSR	rulesNextImprv
 		
@@ -10718,7 +10949,7 @@ menuPageManage0Keys:
 ;		JMP	@exit
 	.endif
 
-
+		
 @ding:
 		LDA	#<SFXDING
 		LDY	#>SFXDING
@@ -10729,29 +10960,17 @@ menuPageManage0Keys:
 		RTS
 
 
-menuWindowManage0:
-			.byte	$90, $01, $07
-			.word	     strHeaderMng0
-
-			.byte	$A1, $0A, $01, $12, $46, $02, $0A
-			.word	     strOptn0Mng0
-			.byte	$A1, $0C, $01, $12, $42, $02, $0C
-			.word	     strOptn1Mng0
-			.byte	$A1, $0E, $01, $12, $4D, $02, $0E
-			.word	     strOptn2Mng0
-			.byte	$A1, $10, $01, $12, $43, $02, $10
-			.word	     strOptn3Mng0
-			.byte	$A1, $12, $01, $12, $53, $02, $12
-			.word	     strOptn4Mng0
-			.byte	$A1, $14, $01, $12, $49, $02, $14
-			.word	     strOptn5Mng0
-			.byte	$A1, $16, $01, $12, $44, $02, $16
-			.word	     strOptn6Mng0
-
-			.byte	$00
-
-
 menuPageManage0Draw:
+		LDA	#$A1
+		STA	menuWindowManage0C
+
+		LDA	menuManage0CheckTrade
+		BEQ	@disp
+		
+		LDA	#$A0
+		STA	menuWindowManage0C
+
+@disp:
 		JSR	prmptManage
 		
 		LDA	#<menuWindowManage0
@@ -10765,7 +10984,6 @@ menuPageManage0Draw:
 		STA	ui + UI::fWntJFB
 		
 		RTS
-		RTS
 
 
 menuWindowTradeCanConf:
@@ -10775,6 +10993,9 @@ menuTrade0RemWealth:
 		.byte	$00
 		.byte	$00
 		.byte	$00
+		
+menuTrade0RemCash:
+		.word	$0000
 
 
 menuTrade0RWealthRecalc:
@@ -10787,26 +11008,17 @@ menuTrade0RWealthRecalc:
 		LDY	#PLAYER::money
 		LDA	($FB), Y
 		STA	menuTrade0RemWealth
+		STA	menuTrade0RemCash
 		INY
 		LDA	($FB), Y
 		STA	menuTrade0RemWealth + 1
+		STA	menuTrade0RemCash + 1
 		LDA	#$00
 		STA	menuTrade0RemWealth + 2
 		
-		LDY	#PLAYER::equity
-		CLC
-		LDA	($FB), Y
-		ADC	menuTrade0RemWealth
-		STA	menuTrade0RemWealth
-		INY
-		LDA	($FB), Y
-		ADC	menuTrade0RemWealth + 1
-		STA	menuTrade0RemWealth + 1
-		LDA	#$00
-		ADC	menuTrade0RemWealth + 2
-		STA	menuTrade0RemWealth + 2
+		JSR	gameRemWlth0AddEquity
 		
-		LDY	#TRADE::money
+		LDY	#TRADE::money		;Wealth -offered money
 		SEC
 		LDA	menuTrade0RemWealth
 		SBC	trade1, Y
@@ -10818,25 +11030,65 @@ menuTrade0RWealthRecalc:
 		SBC	#$00
 		STA	menuTrade0RemWealth + 2
 		
+		LDY	#TRADE::money		;Cash -offered money
+		SEC
+		LDA	menuTrade0RemCash
+		SBC	trade1, Y
+		STA	menuTrade0RemCash
+		LDA	menuTrade0RemCash + 1
+		SBC	trade1 + 1, Y
+		STA	menuTrade0RemCash + 1
+		
+		LDY	#TRADE::money		;Wealth +wanted money
+		CLC
+		LDA	menuTrade0RemWealth
+		ADC	trade0, Y
+		STA	menuTrade0RemWealth
+		LDA	menuTrade0RemWealth + 1
+		ADC	trade0 + 1, Y
+		STA	menuTrade0RemWealth + 1
+		LDA	menuTrade0RemWealth + 2
+		ADC	#$00
+		STA	menuTrade0RemWealth + 2
+		
+		LDY	#TRADE::money		;Cash +wanted money
+		CLC
+		LDA	menuTrade0RemCash
+		ADC	trade0, Y
+		STA	menuTrade0RemCash
+		LDA	menuTrade0RemCash + 1
+		ADC	trade0 + 1, Y
+		STA	menuTrade0RemCash + 1
+		
 		LDY	#TRADE::cntDeed
-		LDA	trade1, Y
-		BNE	@dosub
+		LDA	trade0, Y
+		BNE	@dowanted
 		
-		RTS
+		JMP	@tstoffer
 		
-@dosub:
+@dowanted:
 		TAX
 		DEX
 		
 @loop:
-		LDA	trdrepay1, X
-		AND	#$80
-		BNE	@next
-
 		STX	game + GAME::varA
-
-		LDA	trddeeds1, X
+		
+		LDA	trddeeds0, X
 		JSR	gameGetCardPtrForSquare
+		
+		LDX	game + GAME::varA
+		LDA	trdrepay0, X
+		AND	#$80
+		BNE	@wantfee
+		
+		JMP	@equity
+
+@wantfee:
+		JSR	gameRemWlth0SubFee
+
+		LDA	trdrepay0, X
+		AND	#$01
+		BEQ	@next
 		
 		LDY	#DEED::mValue
 		
@@ -10847,45 +11099,118 @@ menuTrade0RWealthRecalc:
 		STA	game + GAME::varE
 		
 		SEC
-		LDA	menuTrade0RemWealth
+		LDA	menuTrade0RemCash
 		SBC	game + GAME::varD
+		STA	menuTrade0RemCash
+		LDA	menuTrade0RemCash + 1
+		SBC	game + GAME::varE
+		STA	menuTrade0RemCash + 1
+		
+		JMP	@next
+		
+@equity:
+		LDY	#DEED::mValue		;Gain equity if not mrtg
+		LDA	($FD), Y
+		STA	game + GAME::varD
+		INY	
+		LDA	($FD), Y
+		STA	game + GAME::varE
+		
+		CLC
+		LDA	menuTrade0RemWealth
+		ADC	game + GAME::varD
 		STA	menuTrade0RemWealth
 		LDA	menuTrade0RemWealth + 1
-		SBC	game + GAME::varE
+		ADC	game + GAME::varE
 		STA	menuTrade0RemWealth + 1
 		LDA	menuTrade0RemWealth + 2
-		SBC	#$00
+		ADC	#$00
 		STA	menuTrade0RemWealth + 2
 		
+@next:
 		LDX	game + GAME::varA
 		
-@next:
 		DEX
-		BPL	@loop
+		BMI	@tstoffer
 		
+		JMP	@loop
+		
+@tstoffer:
+		LDY	#TRADE::cntDeed
+		LDA	trade1, Y
+		BNE	@dooffer
+		
+		RTS
+		
+@dooffer:
+		TAX
+		DEX
+		
+@loop1:
+		STX	game + GAME::varA
+		
+		LDA	trddeeds1, X
+		JSR	gameGetCardPtrForSquare
+		
+		LDX	game + GAME::varA
+		LDA	trdrepay1, X
+		AND	#$80
+		BNE	@next1
+
+		LDY	#DEED::mValue		;Lose equity if not mrtg
+		LDA	($FD), Y
+		STA	game + GAME::varD
+		INY	
+		LDA	($FD), Y
+		STA	game + GAME::varE
+
+		JSR	gameRemWlth0SubValue
+		
+@next1:
+		LDX	game + GAME::varA
+		
+		DEX
+		BPL	@loop1
+
 		RTS
 
 
+menuTrade0Recalc:
+		.byte	$00
+
 menuWindowTrade0:
 			.byte	$90, $01, $07
-			.word	     strHeaderTrade0
+			.word	     	strHeaderTrade0
 
 			.byte	$A1, $0A, $01, $12, $50, $02, $0A
-			.word	     strOptn0Trade0
+			.word	     	strOptn0Trade0
 menuWindowTradeWB:
 			.byte	$A1, $0C, $01, $12, $57, $02, $0C
-			.word	     strOptn1Trade0
+			.word	     	strOptn1Trade0
 			.byte	$A1, $0E, $01, $12, $4F, $02, $0E
-			.word	     strOptn2Trade0
+			.word	     	strOptn2Trade0
 menuWindowTradeCB:
 			.byte	$A1, $10, $01, $12, $43, $02, $10
-			.word	     strOptn3Trade0
-			.byte	$A1, $12, $01, $12, $58, $02, $12
-			.word	     strOptn4Trade0
+			.word	     	strOptn3Trade0
+			.byte	$A1, $12, $01, $12, $4D, $02, $12
+			.word		strOptn2Play0
+			.byte	$A1, $14, $01, $12, $58, $02, $14
+			.word	     	strOptn4Trade0
 
 			.byte	$00
 			
 menuPageTrade0Keys:
+		CMP	#'M'
+		BNE	@keysP
+		
+		LDA	#$01
+		STA	menuTrade0Recalc
+		STA	menuManage0CheckTrade
+		
+		JSR	gameToggleManage
+		JMP	@keysDing
+		
+@keysP:
 		CMP	#'P'
 		BNE	@keysW
 
@@ -10967,6 +11292,9 @@ menuPageTrade0Keys:
 		
 	
 menuPageTrade0Draw:
+		LDA	menuTrade0Recalc
+		BNE	@recalc
+
 		LDX	#TRADE::player
 		LDA	menuPlyrSelSelect
 		
@@ -11002,7 +11330,11 @@ menuPageTrade0Draw:
 		LDA	game + GAME::pActive
 		STA	trade1, X
 		
+@recalc:
 		JSR	menuTrade0RWealthRecalc
+		
+		LDA	#$00
+		STA	menuTrade0Recalc
 		
 @cont:
 		LDX	#TRADE::player		;Continue drawing
@@ -11048,6 +11380,8 @@ menuTrade1RemWealth:
 		.byte	$00
 		.byte	$00
 		.byte	$00
+menuTrade1RemCash:
+		.word	$0000
 menuTrade1Warn0:
 		.byte	$00
 		
@@ -11068,9 +11402,11 @@ menuTrade1RWealthRecalc:
 		LDY	#PLAYER::money		;Wealth +player money
 		LDA	($FB), Y
 		STA	menuTrade1RemWealth
+		STA	menuTrade1RemCash
 		INY
 		LDA	($FB), Y
 		STA	menuTrade1RemWealth + 1
+		STA	menuTrade1RemCash + 1
 		LDA	#$00
 		STA	menuTrade1RemWealth + 2
 		
@@ -11099,6 +11435,15 @@ menuTrade1RWealthRecalc:
 		SBC	#$00
 		STA	menuTrade1RemWealth + 2
 		
+		LDY	#TRADE::money		;Cash -wanted money
+		SEC
+		LDA	menuTrade1RemCash
+		SBC	trade0, Y
+		STA	menuTrade1RemCash
+		LDA	menuTrade1RemCash + 1
+		SBC	trade0 + 1, Y
+		STA	menuTrade1RemCash + 1
+		
 		LDY	#TRADE::money		;Wealth +offered money
 		CLC
 		LDA	menuTrade1RemWealth
@@ -11110,7 +11455,16 @@ menuTrade1RWealthRecalc:
 		LDA	menuTrade1RemWealth + 2
 		ADC	#$00
 		STA	menuTrade1RemWealth + 2
-		
+
+		LDY	#TRADE::money		;Cash +offered money
+		CLC
+		LDA	menuTrade1RemCash
+		ADC	trade1, Y
+		STA	menuTrade1RemCash
+		LDA	menuTrade1RemCash + 1
+		ADC	trade1 + 1, Y
+		STA	menuTrade1RemCash + 1
+
 		LDY	#TRADE::cntDeed
 		LDA	trade1, Y
 		BNE	@dooffer
@@ -11129,8 +11483,11 @@ menuTrade1RWealthRecalc:
 		
 		LDA	trdrepay1, X
 		AND	#$80
-		BEQ	@equity
+		BNE	@mrtg
+		
+		JMP	@equity
 
+@mrtg:
 		LDA	#$01
 		STA	menuTrade1Warn0
 
@@ -11141,16 +11498,20 @@ menuTrade1RWealthRecalc:
 		LDA	($FD), Y
 		STA	game + GAME::varE
 		
-		SEC
-		LDA	menuTrade1RemWealth
-		SBC	game + GAME::varD
-		STA	menuTrade1RemWealth
-		LDA	menuTrade1RemWealth + 1
-		SBC	game + GAME::varE
-		STA	menuTrade1RemWealth + 1
-		LDA	menuTrade1RemWealth + 2
-		SBC	#$00
-		STA	menuTrade1RemWealth + 2
+		JSR	gameRemWlth1SubValue
+		
+		LDA	trdrepay1, X
+		AND	#$01
+		BEQ	@next
+		
+		LDY	#DEED::mValue		;And mValue for repay
+		LDA	($FD), Y
+		STA	game + GAME::varD
+		INY	
+		LDA	($FD), Y
+		STA	game + GAME::varE
+		
+		JSR	gameRemWlth1SubValue
 		
 		JMP	@next
 
@@ -11177,9 +11538,11 @@ menuTrade1RWealthRecalc:
 		LDX	game + GAME::varA
 		
 		DEX
-		BPL	@loop
+		BMI	@procwant
 		
+		JMP	@loop
 		
+				
 @procwant:
 		LDY	#TRADE::cntDeed
 		LDA	trade0, Y
@@ -11231,6 +11594,9 @@ menuTrade1RWealthRecalc:
 		RTS
 
 
+menuTrade1Recalc:
+		.byte	$00
+
 menuWindowTrade1:
 			.byte	$90, $01, $07
 			.word	     strHeaderTrade1
@@ -11243,12 +11609,25 @@ menuWindowTrade1:
 			.word	     strOptn2Trade0
 			.byte	$A1, $10, $01, $12, $43, $02, $10
 			.word	     strOptn3Trade0
-			.byte	$A1, $12, $01, $12, $58, $02, $12
+			.byte	$A1, $12, $01, $12, $4D, $02, $12
+			.word		strOptn2Play0
+			.byte	$A1, $14, $01, $12, $58, $02, $14
 			.word	     strOptn4Trade0
 
 			.byte	$00
 			
 menuPageTrade1Keys:
+		CMP	#'M'
+		BNE	@keysP
+		
+		LDA	#$01
+		STA	menuTrade1Recalc
+		STA	menuManage0CheckTrade
+		
+		JSR	gameToggleManage
+		JMP	@keysDing
+		
+@keysP:
 		CMP	#'P'
 		BNE	@keysW
 
@@ -11325,6 +11704,15 @@ menuPageTrade1Keys:
 		
 	
 menuPageTrade1Draw:
+		LDA	menuTrade1Recalc
+		BEQ	@disp
+		
+		LDA	#$00
+		STA	menuTrade1Recalc
+		
+		JSR	menuTrade1RWealthRecalc
+
+@disp:
 		LDA	#<menuWindowTrade1
 		STA	$FD
 		LDA	#>menuWindowTrade1
@@ -11383,6 +11771,8 @@ menuPageTrade6Draw:
 
 menuElimin0HaveOffer:
 		.byte	$00
+menuElimin0Recalc:
+		.byte	$00
 
 
 menuElimin0RemWlthRecalc:
@@ -11401,19 +11791,68 @@ menuElimin0RemWlthRecalc:
 		LDA	#$00
 		STA	menuTrade0RemWealth + 2
 		
-		LDY	#PLAYER::equity
-		CLC
-		LDA	($FB), Y
-		ADC	menuTrade0RemWealth
-		STA	menuTrade0RemWealth
-		INY
-		LDA	($FB), Y
-		ADC	menuTrade0RemWealth + 1
-		STA	menuTrade0RemWealth + 1
-		LDA	#$00
-		ADC	menuTrade0RemWealth + 2
-		STA	menuTrade0RemWealth + 2
+		
+		
+		JSR	gameRemWlth0AddEquity
 
+		LDY	#TRADE::cntDeed
+		LDA	trade1, Y
+		BNE	@dooffer
+		
+		JMP	@exit
+		
+@dooffer:					;Process offer (fees, equity)
+		TAX
+		DEX
+		
+@loop:
+		STX	game + GAME::varA
+		
+		LDA	trddeeds1, X
+		JSR	gameGetCardPtrForSquare
+		
+		LDA	trdrepay1, X
+		AND	#$80
+		BNE	@mrtg
+		
+		JMP	@next
+
+@mrtg:
+		LDA	#$01
+		STA	menuTrade1Warn0
+
+		JSR	gameRemWlth0SubFee
+		
+		LDA	trdrepay1, X
+		AND	#$01
+		BEQ	@next
+		
+		LDY	#DEED::mValue		;And mValue for repay
+		LDA	($FD), Y
+		STA	game + GAME::varD
+		INY	
+		LDA	($FD), Y
+		STA	game + GAME::varE
+		
+		JSR	gameRemWlth0SubValue
+		
+		SEC
+		LDA	menuTrade0RemCash
+		SBC	game + GAME::varD
+		STA	menuTrade0RemCash
+		LDA	menuTrade0RemCash + 1
+		SBC	game + GAME::varE
+		STA	menuTrade0RemCash + 1
+		
+@next:
+		LDX	game + GAME::varA
+		
+		DEX
+		BMI	@exit
+		
+		JMP	@loop
+		
+@exit:
 		RTS
 
 
@@ -11427,6 +11866,8 @@ menuWindowElimin0:
 			.word	     strOptn2Trade0
 			.byte	$A1, $10, $01, $12, $43, $02, $10
 			.word	     strOptn3Trade0
+			.byte	$A1, $12, $01, $12, $4D, $02, $12
+			.word		strOptn2Play0
 
 			.byte	$00
 		
@@ -11498,7 +11939,7 @@ menuPageElimin0SetAuctn:
 menuPageElimin0Keys:
 	.if	DEBUG_KEYS
 		CMP	#'A'
-		BNE	@keysP
+		BNE	@keysM
 
 		LDY	#TRADE::player
 		LDA	trade1, Y
@@ -11525,6 +11966,20 @@ menuPageElimin0Keys:
 
 		RTS
 	.endif
+	
+@keysM:
+		CMP	#'M'
+		BNE	@keysP
+		
+		LDA	#$01
+		STA	menuElimin0Recalc
+		
+		LDA	#$00
+		STA	menuManage0CheckTrade
+		
+		JSR	gameToggleManage
+		JMP	@keysDing
+		
 @keysP:
 		CMP	#'P'
 		BNE	@keysO
@@ -11585,8 +12040,12 @@ menuPageElimin0Keys:
 
 @tstproc:
 		LDA	menuTrade0RemWealth + 2
+		BMI	@fail0
+	
+		LDA	menuTrade0RemCash + 1
 		BPL	@proc
 		
+@fail0:
 		LDA 	#<dialogDlgTrade2
 		LDY	#>dialogDlgTrade2
 		
@@ -11634,6 +12093,15 @@ menuPageElimin0Keys:
 
 
 menuPageElimin0Draw:
+		LDA	menuElimin0Recalc
+		BEQ	@disp
+		
+		LDA	#$00
+		STA	menuElimin0Recalc
+		
+		JSR	menuElimin0RemWlthRecalc
+
+@disp:
 		LDA	#<menuWindowElimin0
 		STA	$FD
 		LDA	#>menuWindowElimin0
@@ -12132,6 +12600,90 @@ menuPageQuit2Draw:
 ;===============================================================================
 
 
+gameRemWlth0AddEquity:		
+		LDY	#PLAYER::equity
+		CLC
+		LDA	($FB), Y
+		ADC	menuTrade0RemWealth
+		STA	menuTrade0RemWealth
+		INY
+		LDA	($FB), Y
+		ADC	menuTrade0RemWealth + 1
+		STA	menuTrade0RemWealth + 1
+		LDA	#$00
+		ADC	menuTrade0RemWealth + 2
+		STA	menuTrade0RemWealth + 2
+		
+		RTS
+		
+
+gameRemWlth0SubFee:		
+		LDY	#DEED::mFee		;At least a fee for mrtg
+		LDA	($FD), Y
+		STA	game + GAME::varD
+		INY	
+		LDA	($FD), Y
+		STA	game + GAME::varE
+		
+		SEC
+		LDA	menuTrade0RemWealth
+		SBC	game + GAME::varD
+		STA	menuTrade0RemWealth
+		LDA	menuTrade0RemWealth + 1
+		SBC	game + GAME::varE
+		STA	menuTrade0RemWealth + 1
+		LDA	menuTrade0RemWealth + 2
+		SBC	#$00
+		STA	menuTrade0RemWealth + 2
+		
+		SEC
+		LDA	menuTrade0RemCash
+		SBC	game + GAME::varD
+		STA	menuTrade0RemCash
+		LDA	menuTrade0RemCash + 1
+		SBC	game + GAME::varE
+		STA	menuTrade0RemCash + 1
+		
+		RTS
+		
+		
+gameRemWlth1SubValue:
+		SEC
+		LDA	menuTrade1RemWealth
+		SBC	game + GAME::varD
+		STA	menuTrade1RemWealth
+		LDA	menuTrade1RemWealth + 1
+		SBC	game + GAME::varE
+		STA	menuTrade1RemWealth + 1
+		LDA	menuTrade1RemWealth + 2
+		SBC	#$00
+		STA	menuTrade1RemWealth + 2
+		
+		SEC
+		LDA	menuTrade1RemCash
+		SBC	game + GAME::varD
+		STA	menuTrade1RemCash
+		LDA	menuTrade1RemCash + 1
+		SBC	game + GAME::varE
+		STA	menuTrade1RemCash + 1
+		
+		RTS
+		
+		
+gameRemWlth0SubValue:
+		SEC
+		LDA	menuTrade0RemWealth
+		SBC	game + GAME::varD
+		STA	menuTrade0RemWealth
+		LDA	menuTrade0RemWealth + 1
+		SBC	game + GAME::varE
+		STA	menuTrade0RemWealth + 1
+		LDA	menuTrade0RemWealth + 2
+		SBC	#$00
+		STA	menuTrade0RemWealth + 2
+
+		RTS
+		
 
 gamePerformQuit:
 		LDX	game + GAME::pFirst
@@ -13784,8 +14336,12 @@ gameInitTrdFail0:
 gameInitTrdIntrpt:
 ;-------------------------------------------------------------------------------
 		LDA	menuTrade0RemWealth + 2
+		BMI	@fail0
+		
+		LDA	menuTrade0RemCash + 1
 		BPL	@tstWantedRW
 		
+@fail0:
 		LDA 	#<dialogDlgTrade2
 		LDY	#>dialogDlgTrade2
 		
@@ -13795,8 +14351,12 @@ gameInitTrdIntrpt:
 @tstWantedRW:
 		JSR	menuTrade1RWealthRecalc
 		LDA	menuTrade1RemWealth + 2
-		BPL	@initiate
+		BMI	@fail1
 		
+		LDA	menuTrade1RemCash + 1
+		BPL	@initiate
+
+@fail1:
 		LDA 	#<dialogDlgTrade3
 		LDY	#>dialogDlgTrade3
 		
@@ -13834,8 +14394,12 @@ gameInitTrdIntrptDirect:
 gameApproveTrade:
 ;-------------------------------------------------------------------------------
 		LDA	menuTrade1RemWealth + 2
+		BMI	@fail0
+		
+		LDA	menuTrade1RemCash + 1
 		BPL	@tstWarning
 		
+@fail0:
 		LDA 	#<dialogDlgTrade4
 		LDY	#>dialogDlgTrade4
 		
@@ -13855,21 +14419,19 @@ gameApproveTrade:
 		JSR	gameInitTrdFail0
 		RTS
 
-
 @approve:
+		LDA	#$00
+		STA	game + GAME::fTrdTyp
+		
 		LDA	game + GAME::fDoJump
 		BEQ	@stepping
 
 		LDA	#$00
-		STA	game + GAME::fTrdTyp
 		STA	ui + UI::fActInt		
 		
 		JMP	@proc
 		
 @stepping:
-		LDA	#$00
-		STA	game + GAME::fTrdTyp
-		
 		LDA	#$01
 		STA	ui + UI::fActInt		
 		
@@ -14358,8 +14920,6 @@ gamePerfTradeFull:
 		STA	game + GAME::fTrdStg
 		STA	game + GAME::iTrdStp 
 		STA	game + GAME::fTrdPhs
-;		STA	game + GAME::fTrdTyp
-;		STA	game + GAME::fTrdInt
 
 		LDA	game + GAME::fTrdTyp
 		BNE	@loop
@@ -17453,6 +18013,10 @@ dialogWindowTrdSel0:
 			.byte	$2C, $05, $0A, $06	;RWealth lbl + $
 			.byte	$2F, $05, $0B, $06	
 
+			.byte	$90, $05, $0D		;Rem money lbls
+			.word		strText7TrdSel0
+			.byte	$2C, $05, $0D, $06
+			.byte	$2F, $05, $0E, $06
 
 			.byte	$90, $1D, $05		;GO Free
 			.word		strText0TrdSel0
@@ -17530,8 +18094,9 @@ dialogWindowTrdSel4:
 			.byte	$00
 
 
-dialogAddrTrdSelCash=	$04F5
-dialogAddrTrdSelRWealth=$05BD
+dialogAddrTrdSelCash	=	$04F5
+dialogAddrTrdSelRWealth	=	$05BD
+dialogAddrTrdSelRCash	=	$0635
 
 
 dialogAddrTrdSelSqrLo:
@@ -17602,6 +18167,11 @@ dialogTrdSelBakRWlthA:
 		.byte	$00
 		.byte	$00
 		.byte	$00
+dialogTrdSelBakRCashI:
+		.word	$0000
+dialogTrdSelBakRCashA:
+		.word	$0000
+	
 
 doDialogTrdSelGetAddr:
 		LDX	game + GAME::sTrdSel
@@ -17676,6 +18246,19 @@ doDialogTrdSelMvBck:
 		
 		RTS
 
+;-------------------------------------------------------------------------------
+doDialogTrdSelGetCashHi:
+;-------------------------------------------------------------------------------
+		LDA	dialogTrdSelDoApprv
+		BEQ	@initial
+		
+		LDA	menuTrade1RemCash + 1
+		RTS
+
+@initial:
+		LDA	menuTrade0RemCash + 1
+		RTS
+
 
 ;-------------------------------------------------------------------------------
 doDialogTrdSelSubRWlthI:
@@ -17695,6 +18278,20 @@ doDialogTrdSelSubRWlthI:
 
 
 ;-------------------------------------------------------------------------------
+doDialogTrdSelSubRCashI:
+;-------------------------------------------------------------------------------
+		SEC
+		LDA	menuTrade0RemCash
+		SBC	game + GAME::varD
+		STA	menuTrade0RemCash
+		LDA	menuTrade0RemCash + 1
+		SBC	game + GAME::varE 
+		STA	menuTrade0RemCash + 1
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
 doDialogTrdSelSubRWlthA:
 ;-------------------------------------------------------------------------------
 		SEC
@@ -17707,6 +18304,20 @@ doDialogTrdSelSubRWlthA:
 		LDA	menuTrade1RemWealth + 2
 		SBC	#$00
 		STA	menuTrade1RemWealth + 2
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
+doDialogTrdSelSubRCashA:
+;-------------------------------------------------------------------------------
+		SEC
+		LDA	menuTrade1RemCash
+		SBC	game + GAME::varD
+		STA	menuTrade1RemCash
+		LDA	menuTrade1RemCash + 1
+		SBC	game + GAME::varE 
+		STA	menuTrade1RemCash + 1
 		
 		RTS
 
@@ -17731,10 +18342,12 @@ doDialogTrdSelChrgFee:
 		BEQ	@initial
 
 		JSR	doDialogTrdSelSubRWlthA
+		JSR	doDialogTrdSelSubRCashA
 		RTS
 		
 @initial:
 		JSR	doDialogTrdSelSubRWlthI
+		JSR	doDialogTrdSelSubRCashI
 		RTS
 		
 		
@@ -17752,6 +18365,21 @@ doDialogTrdSelAddRWlthI:
 		LDA	#$00
 		ADC	menuTrade0RemWealth + 2
 		STA	menuTrade0RemWealth + 2
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
+doDialogTrdSelAddRCashI:
+;-------------------------------------------------------------------------------
+		CLC
+		LDA	($FD), Y
+		ADC	menuTrade0RemCash
+		STA	menuTrade0RemCash
+		INY	
+		LDA	($FD), Y
+		ADC	menuTrade0RemCash + 1
+		STA	menuTrade0RemCash + 1
 		
 		RTS
 
@@ -17775,7 +18403,22 @@ doDialogTrdSelAddRWlthA:
 
 
 ;-------------------------------------------------------------------------------
-doDialogTrdSelTstRfndFee:
+doDialogTrdSelAddRCashA:
+;-------------------------------------------------------------------------------
+		CLC
+		LDA	($FD), Y
+		ADC	menuTrade1RemCash
+		STA	menuTrade1RemCash
+		INY	
+		LDA	($FD), Y
+		ADC	menuTrade1RemCash + 1
+		STA	menuTrade1RemCash + 1
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
+doDialogTrdSelTstRfndSel:
 ;-------------------------------------------------------------------------------
 ;		For trade index in .X...
 ;		See if square is mortgaged, if so..  if repay set refund repay
@@ -17802,7 +18445,7 @@ doDialogTrdSelTstRfndFee:
 @rfndequity:
 		TXA
 		PHA
-		JSR	doDialogTrdSelRfndMVal	;Return lost equity
+		JSR	doDialogTrdSelRfndWlthMVal	;Return lost equity
 		PLA
 		TAX
 
@@ -17815,7 +18458,7 @@ doDialogTrdSelTstRfndFee:
 		
 		TXA				;Return gained equity
 		PHA
-		JSR	doDialogTrdSelChrgMVal
+		JSR	doDialogTrdSelChrgWlthMVal
 		PLA
 		TAX
 	
@@ -17828,15 +18471,33 @@ doDialogTrdSelTstRfndFee:
 		BEQ	@initial
 		
 		JSR	doDialogTrdSelAddRWlthA
+
+		LDA	trdrepay2, X
+		AND	#$01
+		BEQ	@exit
+		
+		LDY	#DEED::mValue
+		JSR	doDialogTrdSelAddRCashA
+		
 		RTS
 		
 @initial:
 		JSR	doDialogTrdSelAddRWlthI
+		
+		LDA	trdrepay2, X
+		AND	#$01
+		BEQ	@exit
+		
+		LDY	#DEED::mValue
+		JSR	doDialogTrdSelAddRCashI
+		
+		
+@exit:
 		RTS
 		
 		
 ;-------------------------------------------------------------------------------
-doDialogTrdSelChrgMVal:
+doDialogTrdSelChrgWlthMVal:
 ;-------------------------------------------------------------------------------
 ;		Directly charge the mvalue on the remaining wealth for square in .X
 
@@ -17859,11 +18520,40 @@ doDialogTrdSelChrgMVal:
 		
 @initial:
 		JSR	doDialogTrdSelSubRWlthI
+		
 		RTS
 		
 		
 ;-------------------------------------------------------------------------------
-doDialogTrdSelRfndMVal:
+doDialogTrdSelChrgCashMVal:
+;-------------------------------------------------------------------------------
+;		Directly charge the mvalue on the remaining cash for square in .X
+
+		TXA
+		JSR	gameGetCardPtrForSquare
+		
+		LDY	#DEED::mValue
+		
+		LDA	($FD), Y
+		STA	game + GAME::varD
+		INY	
+		LDA	($FD), Y
+		STA	game + GAME::varE
+		
+		LDA	dialogTrdSelDoApprv
+		BEQ	@initial
+
+		JSR	doDialogTrdSelSubRCashA
+		RTS
+		
+@initial:
+		JSR	doDialogTrdSelSubRCashI
+		
+		RTS
+		
+		
+;-------------------------------------------------------------------------------
+doDialogTrdSelRfndWlthMVal:
 ;-------------------------------------------------------------------------------
 ;		Directly refund the mvalue on the remaining wealth for square in .X
 
@@ -17871,7 +18561,7 @@ doDialogTrdSelRfndMVal:
 
 		JSR	gameGetCardPtrForSquare
 
-doDialogTrdSelRfndMValAlt:
+doDialogTrdSelRfndWlthMValAlt:
 		LDY	#DEED::mValue
 		
 		LDA	dialogTrdSelDoApprv
@@ -17882,6 +18572,29 @@ doDialogTrdSelRfndMValAlt:
 		
 @initial:
 		JSR	doDialogTrdSelAddRWlthI
+		RTS
+		
+
+;-------------------------------------------------------------------------------
+doDialogTrdSelRfndCashMVal:
+;-------------------------------------------------------------------------------
+;		Directly refund the mvalue on the remaining cash for square in .X
+
+		TXA
+
+		JSR	gameGetCardPtrForSquare
+
+doDialogTrdSelRfndCashMValAlt:
+		LDY	#DEED::mValue
+		
+		LDA	dialogTrdSelDoApprv
+		BEQ	@initial
+
+		JSR	doDialogTrdSelAddRCashA
+		RTS
+		
+@initial:
+		JSR	doDialogTrdSelAddRCashI
 		RTS
 		
 
@@ -17918,9 +18631,9 @@ doDialogTrdSelTogRepay:
 		AND	#$01
 		BEQ	@togon			;Selecting?
 
-;		LDA	trddeeds2, X		;***Don't do this because when
-;		TAX				;repaying, effectively get mvalue
-;		JSR	doDialogTrdSelRfndMVal	;back again in equity
+		LDA	trddeeds2, X		
+		TAX				
+		JSR	doDialogTrdSelRfndCashMVal	
 
 		LDX	game + GAME::sTrdSel
 		LDA	trdrepay2, X		;No
@@ -17931,18 +18644,27 @@ doDialogTrdSelTogRepay:
 		JMP	@proc
 		
 @togon:
-;		LDA	trddeeds2, X		;***Don't do this as above
-;		TAX
-;		JSR	doDialogTrdSelChrgMVal
+		LDA	trddeeds2, X		
+		TAX
+		JSR	doDialogTrdSelChrgCashMVal
 		
 		LDX	game + GAME::sTrdSel
 		LDA	trdrepay2, X		;Yes
 		ORA	#$01	
 		STA	trdrepay2, X
 		
+		JSR	doDialogTrdSelGetCashHi
+		BPL	@okay0
+		
+		LDA	#$03
+		STA	game + GAME::varP
+		JMP	@cont0
+		
+@okay0:
 		LDA	#$01
 		STA	game + GAME::varP
 		
+@cont0:
 		LDA	#$DA
 	
 @proc:
@@ -17970,7 +18692,7 @@ doDialogTrdSelTogRepay:
 		
 @tstMrtg:
 		CMP	#$01
-		BNE	@doBuzz
+		BNE	@tstBuzz
 		
 		LDA	#<SFXRENT2
 		LDY	#>SFXRENT2
@@ -17979,9 +18701,20 @@ doDialogTrdSelTogRepay:
 
 		RTS
 		
-@doBuzz:
+@tstBuzz:
+		CMP	#$02
+		BNE	@doBell
+		
 		LDA	#<SFXBUZZ
 		LDY	#>SFXBUZZ
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
+		RTS
+		
+@doBell:
+		LDA	#<SFXBELL
+		LDY	#>SFXBELL
 		LDX	#$07
 		JSR	SNDBASE + 6
 		
@@ -18007,7 +18740,7 @@ doDialogTrdSelToggle:
 		BPL	@cont0			;No
 		
 ;		.X is already loaded		
-		JSR	doDialogTrdSelTstRfndFee
+		JSR	doDialogTrdSelTstRfndSel
 
 		LDA	dialogAddrTrdSelRepLo, X	;Yes, clear any previous 
 		STA	$A3				;repay
@@ -18040,6 +18773,11 @@ doDialogTrdSelToggle:
 		BEQ	@tstPlr			;Yes, don't worry about wealth
 
 		LDA	menuTrade0RemWealth + 2	;Is there remaining wealth?
+		BPL	@tstCash
+		JMP	@doSound		;No, bail (buzz)
+		
+@tstCash:		
+		LDA	menuTrade0RemCash + 1	;Is there remaining cash?
 		BPL	@tstPlr
 		JMP	@doSound		;No, bail (buzz)
 		
@@ -18098,7 +18836,7 @@ doDialogTrdSelToggle:
 		STA	game + GAME::varP
 		
 						;.X is already loaded
-		JSR	doDialogTrdSelRfndMVal
+		JSR	doDialogTrdSelRfndWlthMVal
 		LDX	game + GAME::sTrdSel
 		
 		JMP	@dotstwealth
@@ -18122,7 +18860,7 @@ doDialogTrdSelToggle:
 		STA	game + GAME::varP
 		
 						;.X is already loaded
-		JSR	doDialogTrdSelChrgMVal  ;Need to sub equity
+		JSR	doDialogTrdSelChrgWlthMVal  ;Need to sub equity
 		LDX	game + GAME::sTrdSel
 
 ;		JMP	@dotstwealth
@@ -18131,8 +18869,12 @@ doDialogTrdSelToggle:
 		LDA	menuTrade0RemWealth + 2
 		BPL	@dotogon
 		
+		LDA	menuTrade0RemCash + 1
+		BPL	@dotogon
+		
 		LDA	#$03			;Gone negative set sound to bell
 		STA	game + GAME::varP
+		
 		JMP	@dotogon
 		
 @tstgofree:
@@ -18241,6 +18983,51 @@ doDialogTrdSelClose:
 		RTS
 
 
+doDialogTrdSelSetRCashI:
+		LDA	#<dialogAddrTrdSelRCash
+		STA	$FD
+		LDA	#>dialogAddrTrdSelRCash
+		STA	$FE
+
+		LDA	menuTrade0RemCash + 1	
+		BMI	@dispInvl		
+		
+		LDA	menuTrade0RemCash
+		STA	Z:numConvVALUE
+		LDA	menuTrade0RemCash + 1
+		STA	Z:numConvVALUE + 1
+		
+		JSR	numConvPRTSGN
+		
+		LDA	#$24
+		LDY	#$00
+		STA	($FD), Y
+		
+		INC	$FD			;Naughty but will work...
+						;Just
+		LDY	#$04
+@loop:
+		LDA	heap0 + 1, Y
+		STA	($FD), Y
+		
+		DEY
+		BPL	@loop
+
+		RTS
+
+@dispInvl:
+		
+		LDY	#$05
+@loop0:
+		LDA	strText5TrdSel0 + 1, Y
+		STA	($FD), Y
+		
+		DEY
+		BPL	@loop0
+		
+		RTS
+
+
 doDialogTrdSelSetRWlthI:
 		LDA	#<dialogAddrTrdSelRWealth
 		STA	$FD
@@ -18300,6 +19087,51 @@ doDialogTrdSelSetRWlthI:
 		
 		DEY
 		BPL	@loop1
+		
+		RTS
+
+
+doDialogTrdSelSetRCashA:
+		LDA	#<dialogAddrTrdSelRCash
+		STA	$FD
+		LDA	#>dialogAddrTrdSelRCash
+		STA	$FE
+
+		LDA	menuTrade1RemCash + 1	
+		BMI	@dispInvl		
+		
+		LDA	menuTrade1RemCash
+		STA	Z:numConvVALUE
+		LDA	menuTrade1RemCash + 1
+		STA	Z:numConvVALUE + 1
+		
+		JSR	numConvPRTSGN
+		
+		LDA	#$24
+		LDY	#$00
+		STA	($FD), Y
+		
+		INC	$FD			;Naughty but will work...
+						;Just
+		LDY	#$04
+@loop:
+		LDA	heap0 + 1, Y
+		STA	($FD), Y
+		
+		DEY
+		BPL	@loop
+
+		RTS
+
+@dispInvl:
+		
+		LDY	#$05
+@loop0:
+		LDA	strText5TrdSel0 + 1, Y
+		STA	($FD), Y
+		
+		DEY
+		BPL	@loop0
 		
 		RTS
 
@@ -18452,10 +19284,12 @@ doDialogTrdSelSetState:
 		BEQ	@initial
 		
 		JSR	doDialogTrdSelSetRWlthA
+		JSR	doDialogTrdSelSetRCashA
 		RTS
 		
 @initial:
 		JSR	doDialogTrdSelSetRWlthI
+		JSR	doDialogTrdSelSetRCashI
 		RTS
 
 
@@ -18554,8 +19388,11 @@ doDialogTrdSelAddCash:
 		
 ;		D, E (max) < .A, .Y (new) -> CLC | SEC
 		JSR	gameAmountIsLess
-		BCC	@max
+		BCS	@cont0
+		
+		JMP	@max
 
+@cont0:
 		LDX	#TRADE::money
 		LDA	game + GAME::varM
 		STA	trade2, X
@@ -18566,8 +19403,13 @@ doDialogTrdSelAddCash:
 		LDA	dialogTrdSelDoRepay
 		BEQ	@subRWealth
 		
-		CLC
+		LDA	#$00
+		STA	game + GAME::varO
+		
 		PLA
+		STA	game + GAME::varP
+		
+		CLC
 		ADC	menuTrade0RemWealth
 		STA	menuTrade0RemWealth
 		LDA	#$00
@@ -18577,11 +19419,31 @@ doDialogTrdSelAddCash:
 		ADC	menuTrade0RemWealth + 2
 		STA	menuTrade0RemWealth + 2
 		
+		BPL	@addCash
+		
+		LDA	#$01
+		STA	game + GAME::varO
+		
+@addCash:
+		CLC
+		LDA	game + GAME::varP
+		ADC	menuTrade0RemCash
+		STA	menuTrade0RemCash
+		LDA	#$00
+		ADC	menuTrade0RemCash + 1
+		STA	menuTrade0RemCash + 1
+
 		BMI	@sfxBell
 		
-		JMP	@sfxDing
+		LDA	game + GAME::varO
+		BEQ	@sfxDing
+		
+		JMP	@sfxBell
 		
 @subRWealth:
+		LDA	#$00
+		STA	game + GAME::varO
+
 		PLA
 		STA	game + GAME::varD
 		
@@ -18596,7 +19458,26 @@ doDialogTrdSelAddCash:
 		SBC	#$00
 		STA	menuTrade0RemWealth + 2
 		
+		BPL	@subCash
+		
+		LDA	#$01
+		STA	game + GAME::varO
+		
+@subCash:
+		SEC
+		LDA	menuTrade0RemCash
+		SBC	game + GAME::varD
+		STA	menuTrade0RemCash
+		LDA	menuTrade0RemCash + 1
+		SBC	#$00
+		STA	menuTrade0RemCash + 1
+
 		BMI	@sfxBell
+		
+		LDA	game + GAME::varO
+		BEQ	@sfxDing
+		
+		JMP	@sfxBell
 		
 @sfxDing:
 		LDA	#<SFXDING
@@ -18638,8 +19519,11 @@ doDialogTrdSelSubCash:
 		SBC	#$00
 		STA	game + GAME::varE
 		
-		BMI	@min
+		BPL	@cont0
 		
+		JMP	@min
+		
+@cont0:
 		LDX	#TRADE::money
 		LDA	game + GAME::varD
 		STA	trade2, X
@@ -18649,6 +19533,9 @@ doDialogTrdSelSubCash:
 
 		LDA	dialogTrdSelDoRepay
 		BEQ	@addRWealth
+		
+		LDA	#$00
+		STA	game + GAME::varP
 		
 		SEC
 		LDA	menuTrade0RemWealth
@@ -18661,9 +19548,31 @@ doDialogTrdSelSubCash:
 		SBC	#$00
 		STA	menuTrade0RemWealth + 2
 		
-		JMP	@sfxDingBell
+		BPL	@subCash
+		
+		LDA	#$01
+		STA	game + GAME::varP
+		
+@subCash:
+		SEC
+		LDA	menuTrade0RemCash
+		SBC	game + GAME::varA
+		STA	menuTrade0RemCash
+		LDA	menuTrade0RemCash + 1
+		SBC	#$00
+		STA	menuTrade0RemCash + 1
+		
+		BMI	@sfxBell
+		
+		LDA	game + GAME::varP
+		BEQ	@sfxDing
+		
+		JMP	@sfxBell
 		
 @addRWealth:
+		LDA	#$00
+		STA	game + GAME::varP
+		
 		CLC
 		LDA	menuTrade0RemWealth
 		ADC	game + GAME::varA
@@ -18674,11 +19583,29 @@ doDialogTrdSelSubCash:
 		LDA	menuTrade0RemWealth + 2
 		ADC	#$00
 		STA	menuTrade0RemWealth + 2
+
+		BPL	@addCash
 		
-@sfxDingBell:
-		LDA	menuTrade0RemWealth + 2
+		LDA	#$01
+		STA	game + GAME::varP
+		
+@addCash:
+		CLC
+		LDA	menuTrade0RemCash
+		ADC	game + GAME::varA
+		STA	menuTrade0RemCash
+		LDA	menuTrade0RemCash + 1
+		ADC	#$00
+		STA	menuTrade0RemCash + 1
+
 		BMI	@sfxBell
 		
+		LDA	game + GAME::varP
+		BEQ	@sfxDing
+		
+		JMP	@sfxBell
+
+@sfxDing:
 		LDA	#<SFXDING
 		LDY	#>SFXDING
 		LDX	#$07
@@ -18727,6 +19654,7 @@ dialogDlgTrdSel0Keys:
 		
 		JSR	doDialogTrdSelToggle
 		JSR	doDialogTrdSelSetRWlthI
+		JSR	doDialogTrdSelSetRCashI
 		JMP	@keysExit
 		
 @keysR:
@@ -18744,11 +19672,21 @@ dialogDlgTrdSel0Keys:
 		BNE	@initR
 
 		LDA	menuTrade1RemWealth + 2
+		BPL	@tstRepA
+		JMP	@keysBuzz
+		
+@tstRepA:
+		LDA	menuTrade1RemCash + 1
 		BPL	@doRepay
 		JMP	@keysBuzz
 
 @initR:
 		LDA	menuTrade0RemWealth + 2
+		BPL	@tstRepI
+		JMP	@keysBuzz
+		
+@tstRepI:
+		LDA	menuTrade0RemCash + 1
 		BPL	@doRepay
 		JMP	@keysBuzz
 		
@@ -18770,6 +19708,11 @@ dialogDlgTrdSel0Keys:
 		LDA	dialogTrdSelBakRWlthA + 2	
 		STA	menuTrade1RemWealth + 2
 		
+		LDA	dialogTrdSelBakRCashA	;Restore r cash
+		STA	menuTrade1RemCash
+		LDA	dialogTrdSelBakRCashA + 1	
+		STA	menuTrade1RemCash + 1
+		
 		JMP	@contD
 
 @initD:
@@ -18780,6 +19723,11 @@ dialogDlgTrdSel0Keys:
 		LDA	dialogTrdSelBakRWlthI + 2	
 		STA	menuTrade0RemWealth + 2
 
+		LDA	dialogTrdSelBakRCashI	;Restore r cash
+		STA	menuTrade0RemCash
+		LDA	dialogTrdSelBakRCashI + 1	
+		STA	menuTrade0RemCash + 1
+		
 @contD:
 		JSR	doDialogTrdSelClose
 		JMP	@keysDong
@@ -18803,6 +19751,7 @@ dialogDlgTrdSel0Keys:
 		JSR	doDialogTrdSelAddCash
 		JSR	doDialogTrdSelSetCash
 		JSR	doDialogTrdSelSetRWlthI
+		JSR	doDialogTrdSelSetRCashI
 		RTS
 
 @keysI:
@@ -18813,6 +19762,7 @@ dialogDlgTrdSel0Keys:
 		JSR	doDialogTrdSelAddCash
 		JSR	doDialogTrdSelSetCash
 		JSR	doDialogTrdSelSetRWlthI
+		JSR	doDialogTrdSelSetRCashI
 		RTS
 
 @keysO:
@@ -18823,6 +19773,7 @@ dialogDlgTrdSel0Keys:
 		JSR	doDialogTrdSelAddCash
 		JSR	doDialogTrdSelSetCash
 		JSR	doDialogTrdSelSetRWlthI
+		JSR	doDialogTrdSelSetRCashI
 		RTS
 		
 @keysJ:
@@ -18833,6 +19784,7 @@ dialogDlgTrdSel0Keys:
 		JSR	doDialogTrdSelSubCash
 		JSR	doDialogTrdSelSetCash
 		JSR	doDialogTrdSelSetRWlthI
+		JSR	doDialogTrdSelSetRCashI
 		RTS
 		
 @keysK:
@@ -18843,6 +19795,7 @@ dialogDlgTrdSel0Keys:
 		JSR	doDialogTrdSelSubCash
 		JSR	doDialogTrdSelSetCash
 		JSR	doDialogTrdSelSetRWlthI
+		JSR	doDialogTrdSelSetRCashI
 		RTS
 		
 @keysL:
@@ -18853,6 +19806,7 @@ dialogDlgTrdSel0Keys:
 		JSR	doDialogTrdSelSubCash
 		JSR	doDialogTrdSelSetCash
 		JSR	doDialogTrdSelSetRWlthI
+		JSR	doDialogTrdSelSetRCashI
 		
 @keysExit:
 		RTS
@@ -18862,15 +19816,31 @@ dialogDlgTrdSel0Keys:
 		BEQ	@initial
 		
 		JSR	doDialogTrdSelSetRWlthA
+		JSR	doDialogTrdSelSetRCashA
 		LDA	menuTrade1RemWealth + 2
+		BPL	@tstCashA
+		
+		JMP	@keysBell
+		
+@tstCashA:
+		LDA	menuTrade1RemCash + 1
 		BPL	@keysExit
 		
 		JMP	@keysBell
 		
 @initial:
 		JSR	doDialogTrdSelSetRWlthI
+		JSR	doDialogTrdSelSetRCashI
 		LDA	menuTrade0RemWealth + 2
 		BPL	@keysExit
+		
+		JMP	@keysBell
+		
+@tstCashI:
+		LDA	menuTrade0RemCash + 1
+		BPL	@keysExit
+		
+		JMP	@keysBell
 		
 @keysBell:
 		LDA	#<SFXBELL
@@ -18913,7 +19883,13 @@ dialogDlgTrdSel0Draw:
 		STA	dialogTrdSelBakRWlthA + 1	
 		LDA	menuTrade1RemWealth + 2
 		STA	dialogTrdSelBakRWlthA + 2
-		
+
+		LDA	menuTrade1RemCash	;Back up the remaining cash
+		STA	dialogTrdSelBakRCashA	;in case its dismissed
+		LDA	menuTrade1RemCash + 1
+		STA	dialogTrdSelBakRCashA + 1	
+
+
 		JMP	@begin
 
 @initial:
@@ -18923,6 +19899,11 @@ dialogDlgTrdSel0Draw:
 		STA	dialogTrdSelBakRWlthI + 1	
 		LDA	menuTrade0RemWealth + 2
 		STA	dialogTrdSelBakRWlthI + 2
+
+		LDA	menuTrade0RemCash	;Back up the remaining cash
+		STA	dialogTrdSelBakRCashI	;in case its dismissed
+		LDA	menuTrade0RemCash + 1
+		STA	dialogTrdSelBakRCashI + 1	
 
 @begin:
 		LDY	#TRADE::player		
@@ -24836,9 +25817,60 @@ rulesMortgageImmed:
 @exit:
 		RTS
 
+
+;-------------------------------------------------------------------------------
+rulesMrtgCheckTrade:
+;-------------------------------------------------------------------------------
+		LDY	#TRADE::cntDeed
+		LDA	trade0, Y
+		BEQ	@offer
+		
+		TAX
+		DEX
+@loop0:
+		LDA	trddeeds0, X
+		CMP	game + GAME::sSelect
+		BEQ	@found
+		
+		DEX
+		BPL	@loop0
+		
+@offer:
+		LDA	trade1, Y
+		BEQ	@notfound
+		
+		TAX
+		DEX
+@loop1:
+		LDA	trddeeds1, X
+		CMP	game + GAME::sSelect
+		BEQ	@found
+		
+		DEX
+		BPL	@loop1
+
+@notfound:
+		LDA	#$00
+		RTS
+		
+@found:
+		LDA	#$01
+		RTS
+
+
 ;-------------------------------------------------------------------------------
 rulesToggleMrtg:
 ;-------------------------------------------------------------------------------
+		LDA	menuManage0CheckTrade
+		BEQ	@start
+		
+		JSR	rulesMrtgCheckTrade
+		BEQ	@start
+		
+		JSR	prmptInTrade
+		JMP	@buzz
+		
+@start:
 		LDA	game + GAME::sSelect
 		
 		TAY
@@ -25438,8 +26470,8 @@ rulesInitEliminToBank:
 		LDA	game + GAME::pActive
 		STA	trade0, X
 
-		LDA	game + GAME::pElimin
-		STA	game + GAME::pActive
+;		LDA	game + GAME::pElimin
+;		STA	game + GAME::pActive
 
 		LDA	#$00
 		STA	menuElimin0HaveOffer
@@ -28971,7 +30003,8 @@ RTRN:
 
 plrDefName:
 			.byte 	$08, $90, $8C, $81, $99, $85, $92, $E4, $B0
-
+cpuDefName:
+			.byte 	$08, $83, $90, $95, $E4, $B0, $A0, $A0, $A0
 
 ;-------------------------------------------------------------------------------
 initBoard:
@@ -29156,18 +30189,6 @@ initPlayers:
 		CPX	#$06
 		BNE	@loop
 	
-		
-	.if	DEBUG_CPU
-		LDX	#$01
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
-		LDY	#PLAYER::fCPU
-		LDA	#$01
-		STA	($FB), Y
-	.endif
 		RTS
 		
 		
