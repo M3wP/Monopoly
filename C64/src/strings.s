@@ -121,11 +121,11 @@ strDescSetup2:		;SET START FUNDS
 			.byte $0F, $93, $85, $94, $A0, $93, $94, $81
 			.byte $92, $94, $A0, $86, $95, $8E, $84, $93
 			
-strOptn0Setup2:		;0 - 1000 LOW
-			.byte 	$0C, $B0, $A0, $AD, $A0, $B1, $B0, $B0
+strOptn0Setup2:		;1 - 1000 LOW
+			.byte 	$0C, $B1, $A0, $AD, $A0, $B1, $B0, $B0
 			.byte 	$B0, $A0, $8C, $8F, $97
-strOptn1Setup2:		;1 - 1500 NORMAL
-			.byte 	$0F, $B1, $A0, $AD, $A0, $B1, $B5, $B0
+strOptn1Setup2:		;0 - 1500 NORMAL
+			.byte 	$0F, $B0, $A0, $AD, $A0, $B1, $B5, $B0
 			.byte 	$B0, $A0, $8E, $8F, $92, $8D, $81, $8C
 strOptn2Setup2:		;2 - 2000 HIGH
 			.byte 	$0D, $B2, $A0, $AD, $A0, $B2, $B0, $B0
@@ -298,6 +298,9 @@ strOptn7Play0:		;C - INPUT CONFIG
 strOptn8Play0:		;Q - QUIT
 			.byte $08, $91, $A0, $AD, $A0, $91, $95, $89
 			.byte $94
+strOptn9Play0:		;A - AUTOPAY
+			.byte $0B, $81, $A0, $AD, $A0, $81, $95, $94
+			.byte $8F, $90, $81, $99
 			
 strOptn0Ftr0:		;F5-QUAD3
 			.byte $08, $86, $B5, $AD, $91, $95, $81, $84
@@ -620,6 +623,11 @@ strHeaderElimin0:	;PLAYER ELIMINATED
 			.byte $11, $90, $8C, $81, $99, $85, $92, $A0
 			.byte $85, $8C, $89, $8D, $89, $8E, $81, $94
 			.byte $85, $84
+			
+strDescElimin0:		;DEFEATED BY PLAYER 1
+			.byte $14, $84, $85, $86, $85, $81, $94, $85
+			.byte $84, $A0, $82, $99, $A0, $90, $8C, $81
+			.byte $99, $85, $92, $A0, $B1
 			
 strText0Elimin0:	;PLAYER_1 ELIMINATED!
 			.byte $14, $90, $8C, $81, $99, $85, $92, $E4
@@ -1198,5 +1206,82 @@ strText2Tax1:		;$100.
 			.byte $05, $A4, $B1, $B0, $B0, $AE
 strText3Tax1	=	strDummyDummy0
 strText4Tax1	=	strDummyDummy0
+
+
+tokPrmptRolled:		;.ROLLED 
+			.byte 	$07, $51, $12, $0F, $0C, $0C, $05, $04
+tokPrmptRent:		;.RENT   
+			.byte 	$05, $51, $12, $05, $0E, $14
+tokPrmptBought:		;.BOUGHT
+			.byte	$07, $51, $02, $0F, $15, $07, $08, $14
+tokPrmptTax:		;.TAX
+			.byte 	$04, $51, $14, $01, $18
+tokPrmptGaol:		;.GONE TO GAOL
+			.byte 	$0D, $51, $07, $0F, $0E, $05, $20, $14
+			.byte 	$0F, $20, $07, $01, $0F, $0C
+tokPrmptManage:		;.HSES+00 HTLS+00
+			.byte 	$10, $51, $08, $13, $05, $13, $2B, $30
+			.byte 	$30, $20, $08, $14, $0C, $13, $2B, $30
+			.byte	$30
+tokPrmptMustSell:	;.MUST SELL IMPRV
+			.byte 	$10, $51, $0D, $15, $13, $14, $20, $13
+			.byte 	$05, $0C, $0C, $20, $09, $0D, $10, $12
+			.byte	$16
+tokPrmptSalary:		;.SALARY   
+			.byte 	$07, $51, $13, $01, $0C, $01, $12, $19
+tokPrmptFParking:	;.FPARKING$
+			.byte 	$0A, $51, $06, $10, $01, $12, $0B, $09
+			.byte	$0E, $07, $24
+tokPrmptMortgage:	;.MORTGAGE$
+			.byte 	$0A, $51, $0D, $0F, $12, $14, $07, $01
+			.byte	$07, $05, $24
+tokPrmptRepay:		;.REPAY   $
+			.byte 	$0A, $51, $12, $05, $10, $01, $19, $20
+			.byte	$20, $20, $24
+tokPrmptSold:		;.SOLD    $
+			.byte 	$0A, $51, $13, $0F, $0C, $04, $20, $20
+			.byte	$20, $20, $24
+tokPrmptShuffle:	;.SHUFFLING...
+			.byte 	$10, $51, $13, $08, $15, $06, $06, $0C 
+			.byte	$09, $0E, $07, $2E, $2E, $2E, $20, $20
+			.byte	$20
+tokPrmptChest:		;.CHEST   $
+			.byte 	$0A, $51, $03, $08, $05, $13, $14, $20
+			.byte	$20, $20, $24
+tokPrmptChance:		;.CHANCE  $
+			.byte 	$0A, $51, $03, $08, $01, $0E, $03, $05
+			.byte	$20, $20, $24
+tokPrmptForSale:	;.FOR SALE$
+			.byte 	$0A, $51, $06, $0F, $12, $20, $13, $01
+			.byte	$0C, $05, $24
+tokPrmptPostBail:	;.BAIL    $
+			.byte 	$0A, $51, $02, $01, $09, $0C, $20, $20
+			.byte	$20, $20, $24
+tokPrmptFee:		;.FEE     $
+			.byte 	$0A, $51, $06, $05, $05, $20, $20, $20
+			.byte	$20, $20, $24
+tokPrmptForfeit:	;.FORFEIT
+			.byte 	$08, $51, $06, $0F, $12, $06, $05, $09
+			.byte	$14
+tokPrmptPass:		;.PASS
+			.byte 	$05, $51, $10, $01, $13, $13
+tokPrmptBid:		;.BID
+			.byte 	$04, $51, $02, $09, $04
+tokPrmptInTrade:	;.BEING TRADED!
+			.byte 	$0E, $51, $02, $05, $09, $0E, $07, $20
+			.byte	$14, $12, $01, $04, $05, $04, $21
+tokPrmptTrading:	;.TRADING...
+			.byte 	$0B, $51, $14, $12, $01, $04, $09, $0E
+			.byte	$07, $2E, $2E, $2E
+tokPrmptTrdApprv:	;.APPROVED!
+			.byte 	$0A, $51, $01, $10, $10, $12, $0F, $16
+			.byte	$05, $04, $21
+tokPrmptTrdDecln:	;.DECLINED!
+			.byte 	$0A, $51, $04, $05, $03, $0C, $09, $0E
+			.byte	$05, $04, $21
+tokPrmptThinking:	;.THINKING...
+			.byte 	$10, $51, $14, $08, $09, $0E, $0B, $09
+			.byte	$0E, $07, $2E, $2E, $2E, $20, $20, $20
+			.byte	$20
 
 	.assert	* < $F400, error, "Strings data too large for current allocation!"

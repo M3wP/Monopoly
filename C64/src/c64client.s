@@ -1,5 +1,5 @@
 ;===============================================================================
-;MONOPOLY 
+;M O N O P O L Y 
 ;-------------------------------------------------------------------------------
 ;FOR THE COMMODORE 64
 ;BY DANIEL ENGLAND FOR ECCLESTIAL SOLUTIONS
@@ -22,13 +22,10 @@
 ;
 ;
 ;Free memory information (as of last update from 0.02.39A):
-;	* Between strings and rules data, 801 bytes (free for data)
-;	* Between rules data and action cache, 239 bytes (free for data)
-;	* Between heap and reserved, 4534 bytes (free for program)
+;	* Between strings and rules data, 483 bytes (free for data)
+;	* Between rules data and action cache, 210 bytes (free for data)
+;	* Between heap and reserved, 3969 bytes (free for program)
 ;	* Reserved areas, 768 bytes (unavailable/unused)
-;
-;By my calculation, there are 655 bytes unaccounted for somewhere...  Where did
-;they go?
 ;
 ;
 ;Memory map (as of last update from 0.02.39A):
@@ -36,13 +33,13 @@
 ;	0100 -	01FF	System stack
 ;	0200 - 	03FF	Global state
 ;	0400 - 	07FF	Screen data and sprite pointers
-;	0800 - 	08FF	Sprite data/bootstrap
-;	0900 -  BC49	Program area
-;	BC4A - 	CDFF	Discard/heap
+;	0800 - 	08FF	Bootstrap/sprite data
+;	0900 -  BE7E	Program area
+;	BE7F - 	CDFF	Discard/heap
 ;	CE00 - 	CFFF	Reserved (may be used for discard/heap)
 ;	D000 - 	DFFF	System IO
-;	E000 -	F3FF	Strings data (ends at F0DF)
-;	F400 - 	FAFF	Rules data (ends at FA11)
+;	E000 -	F3FF	Strings data (ends at F21D)
+;	F400 - 	FAFF	Rules data (ends at FA2E)
 ;	FB00 - 	FEFF	Action cache
 ;	FF00 -  FFF9	Reserved (unused on purpose)
 ;	FFFA -	FFFF	System vectors
@@ -65,6 +62,9 @@
 	.define DEBUG_IRQ 	0
 	.define DEBUG_KEYS	0
 	.define DEBUG_CPU 	0
+	
+	.define	DEBUG_HEAP	0
+	.define	DEBUG_ACTIONS	0
 
 
 ;-------------------------------------------------------------------------------
@@ -239,8 +239,8 @@ uiActnCache	=	$FB00
 		
 		cActns	.byte
 		
-		gMdAct	.byte			;Remove for game state stack
-		pActBak .byte			;Remove for game state stack
+;		gMdAct	.byte			;Remove for game state stack
+;		pActBak .byte			;Remove for game state stack
 		
 		fActTyp .byte			;type (regular, elimin)
 		fActInt .byte			;interactive
@@ -272,7 +272,10 @@ musTunePlyrElim =	$0E
 musTuneStart	=	$0F
 
 
-;***	keydefs.inc
+;-------------------------------------------------------------------------------
+;keydefs.inc
+;-------------------------------------------------------------------------------
+
 keyF1		= 	$85
 keyF3		=	$86
 keyF5		=	$87
@@ -355,23 +358,10 @@ keyZPDecodePtr	=	$F5			;word
 		_7	.byte
 	.endstruct
 	
-	.struct TOKEN
-		_0	.byte
-		_1	.byte
-		_2	.byte
-		_3	.byte
-		_4	.byte
-		_5	.byte
-		_6	.byte
-		_7	.byte
-		_8	.byte
-		_9	.byte
-		_A	.byte
-		_B	.byte
-		_C	.byte
-		_D	.byte
-		_E	.byte
-		_F	.byte
+
+	.struct GAMESTATE
+		mode	.byte
+		player	.byte
 	.endstruct
 
 	.struct GAME
@@ -410,8 +400,8 @@ keyZPDecodePtr	=	$F5			;word
 		fFPTax	.byte
 		mFPTax	.word
 
-		gMdActn .byte			;Remove for game state stack
-		pRecall	.byte			;Remove for game state stack
+;		gMdActn .byte			;Remove for game state stack
+;		pRecall	.byte			;Remove for game state stack
 		
 		pWAuctn	.byte
 		pAFirst .byte
@@ -435,7 +425,7 @@ keyZPDecodePtr	=	$F5			;word
 		sStpDst .byte
 		fStpPsG .byte
 		fPayDbl .byte
-		gMdStep .byte			;Remove for game state stack
+;		gMdStep .byte			;Remove for game state stack
 		
 		fTrdSlM .byte
 		fTrdSlL .byte
@@ -443,24 +433,24 @@ keyZPDecodePtr	=	$F5			;word
 		aTrdSlH .word
 		cTrdSlB .byte
 		
-		gMdMPyI	.byte			;Remove for game state stack
-		pMstPyI	.byte			;Remove for game state stack
+;		gMdMPyI	.byte			;Remove for game state stack
+;		pMstPyI	.byte			;Remove for game state stack
 
 		pMPyLst	.byte			;Last player to check in mpay
 		pMPyCur	.byte			;Current player checked in mpay
 		
-		gMdElim	.byte			;Remove for game state stack 
-		pElimin .byte			;Remove for game state stack
+;		gMdElim	.byte			;Remove for game state stack 
+;		pElimin .byte			;Remove for game state stack
 		
-		gMdTrdI .byte			;Remove for game state stack
-		pTrdICP	.byte			;Remove for game state stack
+;		gMdTrdI .byte			;Remove for game state stack
+;		pTrdICP	.byte			;Remove for game state stack
 	
 		fTrdStg .byte			;stage
 		iTrdStp .byte			;step
 		fTrdPhs .byte			;phase
 		fTrdTyp .byte			;type (regular, elimin)
 		
-		gMdQuit .byte			;Remove for game state stack
+;		gMdQuit .byte			;Remove for game state stack
 		pQuitCP	.byte			
 		
 		gMode	.byte			;0:  Normal (Play)
@@ -873,13 +863,39 @@ sfxRentHi:
 			
 	
 ;-------------------------------------------------------------------------------
+;game consts/tables
+;-------------------------------------------------------------------------------
+plrColours:
+			.byte	$02, $04, $05, $06, $07, $08, $09, $0A
+			.byte   $0D, $0E
+			
+plrFlags:		.byte	$01, $02, $04, $08, $10, $20
+	
+plrLo:
+			.byte	<plr0, <plr1, <plr2
+			.byte	<plr3, <plr4, <plr5
+plrHi:
+			.byte	>plr0, >plr1, >plr2
+			.byte	>plr3, >plr4, >plr5
+plrNameLo:		
+			.byte	<(plr0 + PLAYER::name)
+			.byte	<(plr1 + PLAYER::name) 
+			.byte	<(plr2 + PLAYER::name)
+			.byte	<(plr3 + PLAYER::name)
+			.byte	<(plr4 + PLAYER::name)
+			.byte	<(plr5 + PLAYER::name)
+plrNameHi:
+			.byte	>(plr0 + PLAYER::name)
+			.byte	>(plr1 + PLAYER::name) 
+			.byte	>(plr2 + PLAYER::name)
+			.byte	>(plr3 + PLAYER::name)
+			.byte	>(plr4 + PLAYER::name)
+			.byte	>(plr5 + PLAYER::name)
+
+	
+;-------------------------------------------------------------------------------
 ;Global variable data
 ;-------------------------------------------------------------------------------
-prmptTok0:	.tag	TOKEN
-prmptTok1:	.tag	TOKEN
-prmptClr0:	.tag	TOKEN
-prmptClr1:	.tag	TOKEN
-
 trade0:		.tag	TRADE
 trddeeds0:		
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
@@ -929,37 +945,6 @@ trdrepay2:
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 
 
-;-------------------------------------------------------------------------------
-;game consts/tables
-;-------------------------------------------------------------------------------
-plrColours:
-			.byte	$02, $04, $05, $06, $07, $08, $09, $0A
-			.byte   $0D, $0E
-			
-plrFlags:		.byte	$01, $02, $04, $08, $10, $20
-	
-plrLo:
-			.byte	<plr0, <plr1, <plr2
-			.byte	<plr3, <plr4, <plr5
-plrHi:
-			.byte	>plr0, >plr1, >plr2
-			.byte	>plr3, >plr4, >plr5
-plrNameLo:		
-			.byte	<(plr0 + PLAYER::name)
-			.byte	<(plr1 + PLAYER::name) 
-			.byte	<(plr2 + PLAYER::name)
-			.byte	<(plr3 + PLAYER::name)
-			.byte	<(plr4 + PLAYER::name)
-			.byte	<(plr5 + PLAYER::name)
-plrNameHi:
-			.byte	>(plr0 + PLAYER::name)
-			.byte	>(plr1 + PLAYER::name) 
-			.byte	>(plr2 + PLAYER::name)
-			.byte	>(plr3 + PLAYER::name)
-			.byte	>(plr4 + PLAYER::name)
-			.byte	>(plr5 + PLAYER::name)
-
-	
 ;-------------------------------------------------------------------------------
 ;"Main thread" game loop
 ;-------------------------------------------------------------------------------
@@ -1115,7 +1100,6 @@ mainHandleUpdates:
 		AND	#$20
 		BEQ	@updTstCont1
 
-		JSR	prmptUpdate
 		JSR	prmptDisplay
 		
 @updTstCont1:
@@ -1153,6 +1137,11 @@ mainHandleUpdates:
 		LDY	#PLAYER::fCPU
 		LDA	($FB), Y
 		BEQ	@human
+		
+		LDY	#PLAYER::colour
+		LDA	($FB), Y
+		TAX
+		JSR	prmptThinking
 		
 		LDA	menuActivePage0 + MENUPAGE::aCPU
 		STA	cpuThisPerform
@@ -5329,82 +5318,22 @@ plyrDispUpdShort:
 ;===============================================================================
 ;FOR PROMPT.S
 ;===============================================================================
+prmptDisp0:
+		.byte	$90, $13, $16
+prmptTok0:
+		.word		strDummyDummy0
+		.byte	$00
+		
+prmptDisp1:
+		.byte	$90, $13, $17
+prmptTok1:
+		.word		strDummyDummy0
+		.byte	$00
 
 prmpt0Txt0	=	$0783
 prmpt0Clr0	=	$DB83
 prmpt1Txt0	=	prmpt0Txt0 + 40
 prmpt1Clr0	=	prmpt0Clr0 + 40
-
-;***TODO:	Consider moving this constant data into high memory (after 
-;		strings?)
-
-tokPrmptRolled:		;ROLLED 
-			.byte 	$51, $12, $0F, $0C, $0C, $05, $04, $20
-			.byte	$20, $20, $20, $20, $20, $20, $20, $20
-tokPrmptRent:		;RENT   
-			.byte 	$51, $12, $05, $0E, $14, $20, $20, $20
-			.byte	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptBought:		;BOUGHT
-			.byte	$51, $02, $0F, $15, $07, $08, $14, $20
-			.byte	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptTax:		;TAX
-			.byte 	$51, $14, $01, $18, $20, $20, $20, $20
-			.byte	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptGaol:		;GONE TO GAOL
-			.byte 	$51, $07, $0F, $0E, $05, $20, $14, $0F
-			.byte 	$20, $07, $01, $0F, $0C, $20, $20, $20
-tokPrmptManage:		;HSES+00 HTLS+00
-			.byte 	$51, $08, $13, $05, $13, $2B, $30, $30
-			.byte 	$20, $08, $14, $0C, $13, $2B, $30, $30
-tokPrmptMustSell:	;MUST SELL IMPRV
-			.byte 	$51, $0D, $15, $13, $14, $20, $13, $05
-			.byte 	$0C, $0C, $20, $09, $0D, $10, $12, $16
-tokPrmptSalary:		;SALARY   
-			.byte 	$51, $13, $01, $0C, $01, $12, $19, $20
-			.byte 	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptFParking:	;FPARKING
-			.byte 	$51, $06, $10, $01, $12, $0B, $09, $0E
-			.byte 	$07, $24, $20, $20, $20, $20, $20, $20
-tokPrmptMortgage:	;MORTGAGE
-			.byte 	$51, $0D, $0F, $12, $14, $07, $01, $07
-			.byte 	$05, $24, $20, $20, $20, $20, $20, $20
-tokPrmptRepay:		;REPAY    
-			.byte 	$51, $12, $05, $10, $01, $19, $20, $20
-			.byte 	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptSold:		;SOLD     
-			.byte 	$51, $13, $0F, $0C, $04, $20, $20, $20
-			.byte 	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptShuffle:	;SHUFFLING...
-			.byte 	$51, $13, $08, $15, $06, $06, $0C, $09
-			.byte 	$0E, $07, $2E, $2E, $2E, $20, $20, $20
-tokPrmptChest:		;CHEST
-			.byte 	$51, $03, $08, $05, $13, $14, $20, $20
-			.byte 	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptChance:		;CHANCE 
-			.byte 	$51, $03, $08, $01, $0E, $03, $05, $20
-			.byte 	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptForSale:	;FOR SALE
-			.byte 	$51, $06, $0F, $12, $20, $13, $01, $0C
-			.byte 	$05, $24, $20, $20, $20, $20, $20, $20
-tokPrmptPostBail:	;BAIL
-			.byte 	$51, $02, $01, $09, $0C, $20, $20, $20
-			.byte	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptFee:		;FEE
-			.byte 	$51, $06, $05, $05, $20, $20, $20, $20
-			.byte	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptForfeit:	;FORFEIT
-			.byte 	$51, $06, $0F, $12, $06, $05, $09, $14
-			.byte	$20, $20, $20, $20, $20, $20, $20, $20
-tokPrmptPass:		;PASS
-			.byte 	$51, $10, $01, $13, $13, $20, $20, $20
-			.byte	$20, $20, $20, $20, $20, $20, $20, $20
-tokPrmptBid:		;BID
-			.byte 	$51, $02, $09, $04, $20, $20, $20, $20
-			.byte	$20, $24, $20, $20, $20, $20, $20, $20
-tokPrmptInTrade:	;BEING TRADED!
-			.byte 	$51, $02, $05, $09, $0E, $07, $20, $14
-			.byte 	$12, $01, $04, $05, $04, $21, $20, $20
-
 
 prmptTemp0:
 		.byte	$00, $00
@@ -5412,29 +5341,25 @@ prmptTemp2:
 		.byte 	$00
 prmptTemp3:
 		.byte	$00
+prmptClr0:
+		.byte	$0F
+prmptClr1:
+		.byte	$0F
 
 
 ;-------------------------------------------------------------------------------
 prmptClear:
 ;-------------------------------------------------------------------------------
-		LDA 	#$20
-		LDX	#$1F
-@loop1:
-		STA	prmptTok0, X
-		
-		DEX
-		BPL	@loop1
-
-		LDX	#$0F
-@loop2:
-		LDA	#$0C
-		STA	prmptClr0, X
+		LDA	#<strDummyDummy0
+		STA	prmptTok0
+		STA	prmptTok1
+		LDA	#>strDummyDummy0
+		STA	prmptTok0 + 1
+		STA	prmptTok1 + 1
 
 		LDA	#$0F
-		STA	prmptClr1, X
-		
-		DEX
-		BPL 	@loop2
+		STA	prmptClr0
+		STA	prmptClr1
 
 		LDA	#$00
 		STA	prmptTemp2
@@ -5450,12 +5375,13 @@ prmptClear:
 ;-------------------------------------------------------------------------------
 prmptClear2:
 ;-------------------------------------------------------------------------------
-		LDX	#$0F
-		LDA	#$20
-@loop0:
-		STA	prmptTok1, X
-		DEX
-		BPL	@loop0
+		LDA	#<strDummyDummy0
+		STA	prmptTok1
+		LDA	#>strDummyDummy0
+		STA	prmptTok1 + 1
+
+		LDA	#$0F
+		STA	prmptClr1
 		
 		LDA	prmptTemp2
 		AND	#$F0
@@ -5472,19 +5398,40 @@ prmptClear2:
 prmptDisplay:
 ;-------------------------------------------------------------------------------
 		LDX	#$0F
-@loop0:
-		LDA	prmptTok0, X
+@loop1:
+		LDA 	#$20
 		STA	prmpt0Txt0, X
-		LDA	prmptClr0, X
-		STA	prmpt0Clr0, X
-		
-		LDA	prmptTok1, X
 		STA	prmpt1Txt0, X
-		LDA	prmptClr1, X
-		STA	prmpt1Clr0, X
+		
+		LDA	#$0C
+		STA	prmpt0Clr0, X
 
+		LDA	#$0F
+		STA	prmpt1Clr0, X
+		
 		DEX
-		BPL	@loop0
+		BPL	@loop1
+		
+		LDA	prmptClr0
+		STA	prmpt0Clr0
+		LDA	prmptClr1
+		STA	prmpt1Clr0
+
+		LDA	#<prmptDisp0
+		STA	$FD
+		LDA	#>prmptDisp0
+		STA	$FE
+		
+		JSR	screenPerformList
+		
+		LDA	#<prmptDisp1
+		STA	$FD
+		LDA	#>prmptDisp1
+		STA	$FE
+		
+		JSR	screenPerformList
+
+		JSR	prmptUpdate
 
 		RTS
 	
@@ -5498,6 +5445,23 @@ prmptUpdate:
 		JMP	@exit
 		
 @begin:
+		AND	#$40
+		BEQ	@tstimprv
+		
+		LDA	prmptTemp0
+		CLC
+		ADC	#'0'
+		STA	prmpt0Txt0 + $09
+		
+		LDA	prmptTemp0 + 1
+		CLC
+		ADC	#'0'
+		STA	prmpt0Txt0 + $0B
+
+		JMP	@exit
+
+@tstimprv:
+		LDA	prmptTemp2
 		AND	#$80
 		BEQ	@test
 		
@@ -5521,18 +5485,18 @@ prmptUpdate:
 @cont0:
 		LDX	#$02
 @loop0:
-		STA	prmptClr0 + $05, X
+		STA	prmpt0Clr0 + $05, X
 		DEX
 		BPL	@loop0
 
 		JSR	numConvPRTSGN
 		
 		LDA	heap0
-		STA	prmptTok0 + $05
+		STA	prmpt0Txt0 + $05
 		LDA	heap0 + $04
-		STA	prmptTok0 + $06
+		STA	prmpt0Txt0 + $06
 		LDA	heap0 + $05
-		STA	prmptTok0 + $07
+		STA	prmpt0Txt0 + $07
 		
 		LDA	game + GAME::cntHt
 		STA	Z:numConvVALUE
@@ -5560,11 +5524,11 @@ prmptUpdate:
 		JSR	numConvPRTSGN
 		
 		LDA	heap0
-		STA	prmptTok0 + $0D
+		STA	prmpt0Txt0 + $0D
 		LDA	heap0 + $04
-		STA	prmptTok0 + $0E
+		STA	prmpt0Txt0 + $0E
 		LDA	heap0 + $05
-		STA	prmptTok0 + $0F
+		STA	prmpt0Txt0 + $0F
 		
 @test:
 		LDA	prmptTemp2
@@ -5581,23 +5545,23 @@ prmptUpdate:
 		LDX	#$05
 @loop2:
 		LDA	heap0, X
-		STA	prmptTok1 + $0A, X
+		STA	prmpt1Txt0 + $0A, X
 		
 		LDA	prmptTemp2
 		AND	#$0F
-		STA	prmptClr1 + $0A, X
+		STA	prmpt1Clr0 + $0A, X
 		
 		DEX
 		BPL	@loop2
 		
-		STA	prmptClr1 + $09
+		STA	prmpt1Clr0 + $09
 
 ;		LDA	prmptTemp2			;This would put a + in
 ;		AND	#$0F				;all add cash (green) values
 ;		CMP	#$05				;but it looks strange 
 ;		BNE	@exit				;sometimes - eg for sale 
 ;		LDA	#$2B
-;		STA	prmptTok1 + $0A
+;		STA	prmpt1Txt0 + $0A
 
 @exit:	
 		LDA	#$00
@@ -5609,38 +5573,25 @@ prmptUpdate:
 ;-------------------------------------------------------------------------------
 prmptRolled:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
+		STX	prmptClr0
 
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptRolled, X
-		STA	prmptTok0, X
+		LDA	#<tokPrmptRolled
+		STA	prmptTok0
+		LDA	#>tokPrmptRolled
+		STA	prmptTok0 + 1
 
-		LDA	#$0C
-		STA	prmptClr0, X
-
-		DEX
-		BPL	@loop1
-		
-		PLA
-		STA	prmptClr0
-		
 		LDA	game + GAME::dieA
-		CLC
-		ADC	#'0'
-		STA	prmptTok0 + $09
+		STA	prmptTemp0
 		
 		LDA	game + GAME::dieB
-		CLC
-		ADC	#'0'
-		STA	prmptTok0 + $0B
+		STA	prmptTemp0 + 1
 
 		LDA	#$01
 		STA	prmptTemp3
 		
 		LDA	prmptTemp2
 		AND	#$0F
+		ORA	#$40
 		STA	prmptTemp2
 		
 		JSR	prmptClear2
@@ -5651,22 +5602,17 @@ prmptRolled:
 ;-------------------------------------------------------------------------------
 prmptManage:
 ;-------------------------------------------------------------------------------
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptManage, X
-		STA	prmptTok0, X
-
-		LDA	#$0C
-		STA	prmptClr0, X
-
-		DEX
-		BPL	@loop1
-		
 		LDA	#$0F
 		STA	prmptClr0
 		
-		LDA	#$80
-		ORA	prmptTemp2
+		LDA	#<tokPrmptManage
+		STA	prmptTok0
+		LDA	#>tokPrmptManage
+		STA	prmptTok0 + 1
+		
+		LDA	prmptTemp2
+		AND	#$0F
+		ORA	#$80
 		STA	prmptTemp2
 		
 		LDA	#$20
@@ -5693,23 +5639,15 @@ prmptClearOrRoll:
 ;-------------------------------------------------------------------------------
 prmptMustSell:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
+		STX	prmptClr1
+
+;***FIXME:	This was supposed to display in white which it doesn't anymore
+
+		LDA	#<tokPrmptMustSell
+		STA	prmptTok1
+		LDA	#>tokPrmptMustSell
+		STA	prmptTok1 + 1
 		
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptMustSell, X
-		STA	prmptTok1, X
-
-		LDA	#$01
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
-
-		PLA
-		STA	prmptClr1
-
 		LDA	prmptTemp2		;Exclude flags for text 1 (not 
 		AND	#$F0			;needed)
 		STA	prmptTemp2
@@ -5724,23 +5662,13 @@ prmptMustSell:
 ;-------------------------------------------------------------------------------
 prmptGoneGaol:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
+		STX	prmptClr1
+
+		LDA	#<tokPrmptGaol
+		STA	prmptTok1
+		LDA	#>tokPrmptGaol
+		STA	prmptTok1 + 1
 		
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptGaol, X
-		STA	prmptTok1, X
-
-		LDA	#$0F
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
-
-		PLA
-		STA	prmptClr1
-
 		LDA	prmptTemp2
 		AND	#$F0
 		STA	prmptTemp2
@@ -5755,9 +5683,6 @@ prmptGoneGaol:
 ;-------------------------------------------------------------------------------
 prmptDoSubCash:
 ;-------------------------------------------------------------------------------
-		PLA
-		STA	prmptClr1
-		
 		SEC
 		LDA	#$00
 		SBC	game + GAME::varD
@@ -5782,9 +5707,6 @@ prmptDoSubCash:
 ;-------------------------------------------------------------------------------
 prmptDoAddCash:
 ;-------------------------------------------------------------------------------
-		PLA
-		STA	prmptClr1
-		
 		LDA	game + GAME::varD
 		STA	prmptTemp0
 		
@@ -5806,19 +5728,12 @@ prmptDoAddCash:
 ;-------------------------------------------------------------------------------
 prmptRent:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
+		STX	prmptClr1
 
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptRent, X
-		STA	prmptTok1, X
-
-		LDA	#$0F
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
+		LDA	#<tokPrmptRent
+		STA	prmptTok1
+		LDA	#>tokPrmptRent
+		STA	prmptTok1 + 1
 		
 		JMP	prmptDoSubCash
 		
@@ -5826,19 +5741,12 @@ prmptRent:
 ;-------------------------------------------------------------------------------
 prmptBought:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
+		STX	prmptClr1
 
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptBought, X
-		STA	prmptTok1, X
-
-		LDA	#$0F
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
+		LDA	#<tokPrmptBought
+		STA	prmptTok1
+		LDA	#>tokPrmptBought
+		STA	prmptTok1 + 1
 		
 		JMP	prmptDoSubCash
 		
@@ -5846,19 +5754,12 @@ prmptBought:
 ;-------------------------------------------------------------------------------
 prmptPostBail:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
+		STX	prmptClr1
 
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptPostBail, X
-		STA	prmptTok1, X
-
-		LDA	#$0F
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
+		LDA	#<tokPrmptPostBail
+		STA	prmptTok1
+		LDA	#>tokPrmptPostBail
+		STA	prmptTok1 + 1
 		
 		JMP	prmptDoSubCash
 		
@@ -5866,19 +5767,12 @@ prmptPostBail:
 ;-------------------------------------------------------------------------------
 prmptTax:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
+		STX	prmptClr1
 
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptTax, X
-		STA	prmptTok1, X
-
-		LDA	#$0F
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
+		LDA	#<tokPrmptTax
+		STA	prmptTok1
+		LDA	#>tokPrmptTax
+		STA	prmptTok1 + 1
 		
 		JMP	prmptDoSubCash
 
@@ -5886,19 +5780,12 @@ prmptTax:
 ;-------------------------------------------------------------------------------
 prmptFee:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
+		STX	prmptClr1
 
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptFee, X
-		STA	prmptTok1, X
-
-		LDA	#$0F
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
+		LDA	#<tokPrmptFee
+		STA	prmptTok1
+		LDA	#>tokPrmptFee
+		STA	prmptTok1 + 1
 		
 		JMP	prmptDoSubCash
 
@@ -5906,19 +5793,12 @@ prmptFee:
 ;-------------------------------------------------------------------------------
 prmptSalary:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
+		STX	prmptClr1
 
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptSalary, X
-		STA	prmptTok1, X
-
-		LDA	#$0F
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
+		LDA	#<tokPrmptSalary
+		STA	prmptTok1
+		LDA	#>tokPrmptSalary
+		STA	prmptTok1 + 1
 		
 		JMP	prmptDoAddCash
 
@@ -5926,19 +5806,12 @@ prmptSalary:
 ;-------------------------------------------------------------------------------
 prmptFParking:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
+		STX	prmptClr1
 
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptFParking, X
-		STA	prmptTok1, X
-
-		LDA	#$0F
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
+		LDA	#<tokPrmptFParking
+		STA	prmptTok1
+		LDA	#>tokPrmptFParking
+		STA	prmptTok1 + 1
 		
 		JMP	prmptDoAddCash
 
@@ -5946,19 +5819,12 @@ prmptFParking:
 ;-------------------------------------------------------------------------------
 prmptSold:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
+		STX	prmptClr1
 
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptSold, X
-		STA	prmptTok1, X
-
-		LDA	#$0F
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
+		LDA	#<tokPrmptSold
+		STA	prmptTok1
+		LDA	#>tokPrmptSold
+		STA	prmptTok1 + 1
 		
 		JMP	prmptDoAddCash
 		
@@ -5966,19 +5832,12 @@ prmptSold:
 ;-------------------------------------------------------------------------------
 prmptMortgage:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
+		STX	prmptClr1
 
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptMortgage, X
-		STA	prmptTok1, X
-
-		LDA	#$0F
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
+		LDA	#<tokPrmptMortgage
+		STA	prmptTok1
+		LDA	#>tokPrmptMortgage
+		STA	prmptTok1 + 1
 		
 		JMP	prmptDoAddCash
 		
@@ -5986,19 +5845,12 @@ prmptMortgage:
 ;-------------------------------------------------------------------------------
 prmptRepay:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
+		STX	prmptClr1
 
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptRepay, X
-		STA	prmptTok1, X
-
-		LDA	#$0F
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
+		LDA	#<tokPrmptRepay
+		STA	prmptTok1
+		LDA	#>tokPrmptRepay
+		STA	prmptTok1 + 1
 		
 		JMP	prmptDoSubCash
 
@@ -6006,19 +5858,12 @@ prmptRepay:
 ;-------------------------------------------------------------------------------
 prmptChestSub:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
+		STX	prmptClr1
 
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptChest, X
-		STA	prmptTok1, X
-
-		LDA	#$0F
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
+		LDA	#<tokPrmptChest
+		STA	prmptTok1
+		LDA	#>tokPrmptChest
+		STA	prmptTok1 + 1
 		
 		JMP	prmptDoSubCash
 
@@ -6026,19 +5871,12 @@ prmptChestSub:
 ;-------------------------------------------------------------------------------
 prmptChanceSub:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
+		STX	prmptClr1
 
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptChance, X
-		STA	prmptTok1, X
-
-		LDA	#$0F
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
+		LDA	#<tokPrmptChance
+		STA	prmptTok1
+		LDA	#>tokPrmptChance
+		STA	prmptTok1 + 1
 		
 		JMP	prmptDoSubCash
 
@@ -6046,19 +5884,12 @@ prmptChanceSub:
 ;-------------------------------------------------------------------------------
 prmptChestAdd:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
+		STX	prmptClr1
 
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptChest, X
-		STA	prmptTok1, X
-
-		LDA	#$0F
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
+		LDA	#<tokPrmptChest
+		STA	prmptTok1
+		LDA	#>tokPrmptChest
+		STA	prmptTok1 + 1
 		
 		JMP	prmptDoAddCash
 
@@ -6066,19 +5897,12 @@ prmptChestAdd:
 ;-------------------------------------------------------------------------------
 prmptChanceAdd:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
+		STX	prmptClr1
 
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptChance, X
-		STA	prmptTok1, X
-
-		LDA	#$0F
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
+		LDA	#<tokPrmptChance
+		STA	prmptTok1
+		LDA	#>tokPrmptChance
+		STA	prmptTok1 + 1
 		
 		JMP	prmptDoAddCash
 
@@ -6097,7 +5921,7 @@ prmptShuffle:
 
 		LDX	#$0F
 @loop1:
-		LDA	tokPrmptShuffle, X
+		LDA	tokPrmptShuffle + 1, X
 		STA	prmpt0Txt0, X
 
 		LDA	#$0C
@@ -6119,19 +5943,13 @@ prmptShuffle:
 ;-------------------------------------------------------------------------------
 prmptForSale:
 ;-------------------------------------------------------------------------------
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptForSale, X
-		STA	prmptTok1, X
-
 		LDA	#$0F
-		STA	prmptClr1, X
+		STA	prmptClr1
 
-		DEX
-		BPL	@loop1
-		
-		LDA	#$0F
-		PHA
+		LDA	#<tokPrmptForSale
+		STA	prmptTok1
+		LDA	#>tokPrmptForSale
+		STA	prmptTok1 + 1
 		
 		JMP	prmptDoAddCash
 
@@ -6141,22 +5959,12 @@ prmptForSale:
 ;-------------------------------------------------------------------------------
 prmptForfeit:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
-		
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptForfeit, X
-		STA	prmptTok1, X
+		STX	prmptClr1
 
-		LDA	#$0F
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
-		
-		PLA
-		STA	prmptClr1
+		LDA	#<tokPrmptForfeit
+		STA	prmptTok1
+		LDA	#>tokPrmptForfeit
+		STA	prmptTok1 + 1
 		
 		LDA	prmptTemp2
 		AND	#$F0
@@ -6172,22 +5980,12 @@ prmptForfeit:
 ;-------------------------------------------------------------------------------
 prmptPass:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
-		
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptPass, X
-		STA	prmptTok1, X
+		STX	prmptClr1
 
-		LDA	#$0F
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
-		
-		PLA
-		STA	prmptClr1
+		LDA	#<tokPrmptPass
+		STA	prmptTok1
+		LDA	#>tokPrmptPass
+		STA	prmptTok1 + 1
 		
 		LDA	prmptTemp2
 		AND	#$F0
@@ -6203,19 +6001,12 @@ prmptPass:
 ;-------------------------------------------------------------------------------
 prmptBid:
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
+		STX	prmptClr1
 
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptBid, X
-		STA	prmptTok1, X
-
-		LDA	#$0F
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
+		LDA	#<tokPrmptBid
+		STA	prmptTok1
+		LDA	#>tokPrmptBid
+		STA	prmptTok1 + 1
 		
 		JMP	prmptDoAddCash
 
@@ -6223,19 +6014,13 @@ prmptBid:
 ;-------------------------------------------------------------------------------
 prmptInTrade:
 ;-------------------------------------------------------------------------------
-		LDX	#$0F
-@loop1:
-		LDA	tokPrmptInTrade, X
-		STA	prmptTok1, X
-
-		LDA	#$0F
-		STA	prmptClr1, X
-
-		DEX
-		BPL	@loop1
-		
 		LDA	#$0F
 		STA	prmptClr1
+
+		LDA	#<tokPrmptInTrade
+		STA	prmptTok1
+		LDA	#>tokPrmptInTrade
+		STA	prmptTok1 + 1
 		
 		LDA	prmptTemp2
 		AND	#$F0
@@ -6247,7 +6032,97 @@ prmptInTrade:
 
 		RTS
 		
+		
+;-------------------------------------------------------------------------------
+prmptTrading:
+;-------------------------------------------------------------------------------
+		STX	prmptClr1
 
+		LDA	#<tokPrmptTrading
+		STA	prmptTok1
+		LDA	#>tokPrmptTrading
+		STA	prmptTok1 + 1
+		
+		LDA	prmptTemp2
+		AND	#$F0
+		STA	prmptTemp2
+		
+		LDA	#$20
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
+prmptTrdApprv:
+;-------------------------------------------------------------------------------
+		STX	prmptClr1
+
+		LDA	#<tokPrmptTrdApprv
+		STA	prmptTok1
+		LDA	#>tokPrmptTrdApprv
+		STA	prmptTok1 + 1
+		
+		LDA	prmptTemp2
+		AND	#$F0
+		STA	prmptTemp2
+		
+		LDA	#$20
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+		RTS
+		
+		
+;-------------------------------------------------------------------------------
+prmptTrdDecln:
+;-------------------------------------------------------------------------------
+		STX	prmptClr1
+
+		LDA	#<tokPrmptTrdDecln
+		STA	prmptTok1
+		LDA	#>tokPrmptTrdDecln
+		STA	prmptTok1 + 1
+		
+		LDA	prmptTemp2
+		AND	#$F0
+		STA	prmptTemp2
+		
+		LDA	#$20
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
+prmptThinking:
+;-------------------------------------------------------------------------------
+		TXA
+		PHA
+		
+		LDX	#$0F
+@loop1:
+		LDA	tokPrmptThinking + 1, X
+		STA	prmpt0Txt0, X
+
+		LDA	#$0C
+		STA	prmpt0Clr0, X
+
+		DEX
+		BPL	@loop1
+		
+		PLA
+		STA	prmpt0Clr0
+		
+		LDA	#$20
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+
+		RTS
+		
+		
 ;===============================================================================
 ;FOR STATUS.S
 ;===============================================================================
@@ -6658,10 +6533,12 @@ uiProcessInit:
 		LDA	#$00			
 		STA	game + GAME::fStpSig
 
-		LDA	game + GAME::gMode
-		STA	ui + UI::gMdAct
-		LDA	game + GAME::pActive
-		STA	ui + UI::pActBak
+;		LDA	game + GAME::gMode
+;		STA	ui + UI::gMdAct
+;		LDA	game + GAME::pActive
+;		STA	ui + UI::pActBak
+		
+		JSR	gamePushState
 
 		LDA	#$08
 		STA	game + GAME::gMode
@@ -6723,12 +6600,14 @@ uiProcessActions:
 ;-------------------------------------------------------------------------------
 uiProcessMPay:
 ;-------------------------------------------------------------------------------
-		LDA	game + GAME::gMode
-		STA	game + GAME::gMdMPyI	
-		
-		LDA	game + GAME::pActive
-		STA	game + GAME::pMstPyI
+;		LDA	game + GAME::gMode
+;		STA	game + GAME::gMdMPyI	
+;		LDA	game + GAME::pActive
+;		STA	game + GAME::pMstPyI
 
+		JSR	gamePushState
+
+		LDA	game + GAME::pActive
 		STA	game + GAME::pMPyLst
 		STA	game + GAME::pMPyCur
 
@@ -6783,14 +6662,16 @@ uiProcessTerminate:
 		BNE	@endelimin
 
 ;		Pop player and mode from trade 
-		LDA	ui + UI::pActBak
-		STA	game + GAME::pActive
+;		LDA	ui + UI::pActBak
+;		STA	game + GAME::pActive
+;		LDA	ui + UI::gMdAct
+;		STA	game + GAME::gMode
+
+		JSR	gamePopState
+
 		LDA	#$FF
 		STA	game + GAME::pLast
 		
-		LDA	ui + UI::gMdAct
-		STA	game + GAME::gMode
-
 		LDA	#$00
 		STA	game + GAME::fStpSig
 		STA	game + GAME::kWai
@@ -6822,14 +6703,16 @@ uiProcessTerminate:
 		RTS
 
 @endelimin:
-		LDA	ui + UI::pActBak
-		STA	game + GAME::pActive
+;		LDA	ui + UI::pActBak
+;		STA	game + GAME::pActive
+;		LDA	ui + UI::gMdAct
+;		STA	game + GAME::gMode
+
+		JSR	gamePopState
+	
 		LDA	#$FF
 		STA	game + GAME::pLast
 		
-		LDA	ui + UI::gMdAct
-		STA	game + GAME::gMode
-
 		LDA	#$00
 		STA	game + GAME::fStpSig
 		STA	game + GAME::kWai
@@ -6848,8 +6731,7 @@ uiProcessTerminate:
 		
 @alreadympay:
 		LDA	game + GAME::pActive	;Check them all again
-		STA	game + GAME::pMstPyI
-
+;		STA	game + GAME::pMstPyI
 		STA	game + GAME::pMPyLst
 
 @complete:
@@ -7401,18 +7283,8 @@ cpuPerformAuction:
 ;-------------------------------------------------------------------------------
 cpuPerformTrade:
 ;-------------------------------------------------------------------------------
-;***TODO:	Try to evaluate and accept
+		JSR	rulesAutoTradeApprove
 
-		LDA	#UI_ACT_SKEY
-		STA	$68
-	.if	DEBUG_CPU
-		LDA	#'C'
-	.else
-		LDA	#'X'
-	.endif
-		STA	$69
-		JSR	uiEnqueueAction
-	
 		RTS
 		
 
@@ -8306,18 +8178,18 @@ menuWindowSetup2:
 			.byte	$90, $01, $08
 			.word        strDescSetup2
 			.byte	$A1, $0A, $01, $12, $30, $02, $0A
-			.word	     strOptn0Setup2
-			.byte	$A1, $0C, $01, $12, $31, $02, $0C
 			.word	     strOptn1Setup2
+			.byte	$A1, $0C, $01, $12, $31, $02, $0C
+			.word	     strOptn0Setup2
 			.byte	$A1, $0E, $01, $12, $32, $02, $0E
 			.word	     strOptn2Setup2
 			
 			.byte	$00
 
-menuCashStartLow:	
-			.word	1000
 menuCashStartDef:	
 			.word	1500
+menuCashStartLow:	
+			.word	1000
 menuCashStartHigh:	
 			.word	2000
 			
@@ -8334,9 +8206,9 @@ menuPageSetup2Keys:
 		
 		ASL
 		TAX
-		LDA	menuCashStartLow, X
+		LDA	menuCashStartDef, X
 		STA	menuTemp0
-		LDA	menuCashStartLow + 1, X
+		LDA	menuCashStartDef + 1, X
 		STA	menuTemp0 + 1
 
 		LDX	#$00
@@ -8800,17 +8672,17 @@ menuWindowSetup6:
 			.word	     strHeaderSetup0
 			.byte	$90, $01, $08
 			.word        strDescSetup6
-			.byte	$A1, $0A, $01, $12, $46, $02, $0A
-			.word	     strOptn0Setup6
-			.byte	$A1, $14, $01, $12, $43, $02, $14
+			.byte	$A1, $0A, $01, $12, $43, $02, $0A
 			.word	     strOptn0MustPay0
+			.byte	$A1, $0C, $01, $12, $46, $02, $0C
+			.word	     strOptn0Setup6
 			
 			.byte	$00
 			
 menuWindowSetup6FP:
-			.byte	$90, $04, $0B
+			.byte	$90, $04, $0D
 			.word		strText0Setup6
-			.byte	$90, $04, $0C
+			.byte	$90, $04, $0E
 			.word		strText1Setup6
 			.byte	$00
 
@@ -9839,11 +9711,13 @@ menuWindowPlay2D:
 
 			.byte	$A1, $0A, $01, $12, $53, $02, $0A
 			.word	     	strOptn5Play0
-			.byte	$A1, $0C, $01, $12, $4F, $02, $0C
+			.byte	$A1, $0C, $01, $12, $41, $02, $0C
+			.word	     	strOptn9Play0
+			.byte	$A1, $0E, $01, $12, $4F, $02, $0E
 			.word	     	strOptn6Play0
-			.byte	$A1, $0E, $01, $12, $43, $02, $0E
+			.byte	$A1, $10, $01, $12, $43, $02, $10
 			.word	     	strOptn7Play0
-			.byte	$A1, $10, $01, $12, $51, $02, $10
+			.byte	$A1, $12, $01, $12, $51, $02, $12
 			.word		strOptn8Play0
 
 			.byte	$A1, $14, $01, $12, $2E, $02, $14
@@ -11804,6 +11678,16 @@ menuPageTrade1Keys:
 		CMP	#'X'
 		BNE	@keysC
 
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		LDY 	#PLAYER::colour
+		LDA	($FB), Y
+		TAX
+		JSR	prmptTrdDecln
+
 		LDA	#$00
 		STA	game + GAME::fTrdTyp
 		JSR	gamePerfTradePopMode
@@ -12498,8 +12382,10 @@ menuPageJump0Keys:
 		STA	game + GAME::fAmStep
 		STA	game + GAME::fStpSig
 		
-		LDA	game + GAME::gMdStep
-		STA	game + GAME::gMode
+;		LDA	game + GAME::gMdStep
+;		STA	game + GAME::gMode
+
+		JSR	gamePopState
 
 		LDA	#$00
 		STA	game + GAME::kWai
@@ -12612,8 +12498,10 @@ menuPageQuit1Keys:
 @tstY:
 		CMP	#'Y'
 		
-		LDA	game + GAME::gMode
-		STA	game + GAME::gMdQuit
+;		LDA	game + GAME::gMode
+;		STA	game + GAME::gMdQuit
+
+		JSR	gamePushState
 		
 		LDA	game + GAME::pActive
 		STA	game + GAME::pQuitCP
@@ -12671,11 +12559,12 @@ menuPageQuit2Keys:
 		CMP	#'N'
 		BNE	@tstY
 		
-		LDA	game + GAME::gMdQuit
-		STA	game + GAME::gMode
-		
-		LDA	game + GAME::pQuitCP
-		STA	game + GAME::pActive
+;		LDA	game + GAME::gMdQuit
+;		STA	game + GAME::gMode
+;		LDA	game + GAME::pQuitCP
+;		STA	game + GAME::pActive
+
+		JSR	gamePopState
 		
 		JMP	@update
 
@@ -12723,6 +12612,46 @@ menuPageQuit2Draw:
 ;===============================================================================
 ;FOR GAME.S
 ;===============================================================================
+
+gameStateStack:
+	.repeat	8, I
+		.byte	$00, $00
+	.endrep
+	
+gameStateIdx:
+		.byte	$00
+
+
+gamePushState:
+		LDA	gameStateIdx
+		ASL
+		TAX
+
+		LDA	game + GAME::gMode
+		STA	gameStateStack, X
+		
+		LDA	game + GAME::pActive
+		STA	gameStateStack + 1, X
+		
+		INC	gameStateIdx
+		
+		RTS
+		
+		
+gamePopState:
+		DEC	gameStateIdx
+		
+		LDA	gameStateIdx
+		ASL
+		TAX
+		
+		LDA	gameStateStack, X
+		STA	game + GAME::gMode
+		
+		LDA	gameStateStack + 1, X
+		STA	game + GAME::pActive
+		
+		RTS
 
 
 gameRemWlth0AddEquity:		
@@ -13299,8 +13228,10 @@ gamePerfStepping:
 		STA	game + GAME::fAmStep
 		STA	game + GAME::fStpSig
 		
-		LDA	game + GAME::gMdStep
-		STA	game + GAME::gMode
+;		LDA	game + GAME::gMdStep
+;		STA	game + GAME::gMode
+
+		JSR	gamePopState
 
 		LDA	#$00
 		STA	game + GAME::kWai
@@ -13434,12 +13365,14 @@ gameContinueAfterPost:
 ;-------------------------------------------------------------------------------
 gameMustPayAfterPost:
 ;-------------------------------------------------------------------------------
-		LDA	game + GAME::gMode
-		STA	game + GAME::gMdMPyI	
-		
-		LDA	game + GAME::pActive
-		STA	game + GAME::pMstPyI
+;		LDA	game + GAME::gMode
+;		STA	game + GAME::gMdMPyI	
+;		LDA	game + GAME::pActive
+;		STA	game + GAME::pMstPyI
 
+		JSR	gamePushState
+
+		LDA	game + GAME::pActive
 		STA	game + GAME::pMPyLst
 		STA	game + GAME::pMPyCur
 
@@ -13553,11 +13486,15 @@ gameUpdateForMustPay:
 ;-------------------------------------------------------------------------------
 gameRestoreFromMustPay:
 ;-------------------------------------------------------------------------------
-		LDA	game + GAME::pMstPyI
-		STA	game + GAME::pActive
+;		LDA	game + GAME::pMstPyI
+;		STA	game + GAME::pActive
+;		LDA	game + GAME::gMdMPyI	
+;		STA	game + GAME::gMode
+
+		JSR	gamePopState
 		
-		LDA	game + GAME::gMdMPyI	
-		STA	game + GAME::gMode
+		LDA	#$FF
+		STA	game + GAME::pLast
 		
 		JSR	rulesFocusOnActive
 		JSR	gamePlayersDirty
@@ -14193,10 +14130,13 @@ gameNextAuction:
 		LDA	game + GAME::sAuctn
 		JSR	gameDeselect
 
-		LDA	game + GAME::gMdActn	;go back to normal mode
-		STA	game + GAME::gMode
-		LDA	game + GAME::pRecall	;go back to initial player
-		STA	game + GAME::pActive
+;		LDA	game + GAME::gMdActn	;go back to normal mode
+;		STA	game + GAME::gMode
+;		LDA	game + GAME::pRecall	;go back to initial player
+;		STA	game + GAME::pActive
+
+		JSR	gamePopState
+
 		
 @update:
 		JSR	gameUpdateMenu
@@ -14490,15 +14430,26 @@ gameInitTrdIntrpt:
 		
 @initiate:
 gameInitTrdIntrptDirect:
-		LDA	game + GAME::pActive
-		STA	game + GAME::pTrdICP
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		LDY 	#PLAYER::colour
+		LDA	($FB), Y
+		TAX
+		JSR	prmptTrading
+
+;		LDA	game + GAME::pActive
+;		STA	game + GAME::pTrdICP
+;		LDA	game + GAME::gMode
+;		STA	game + GAME::gMdTrdI
+
+		JSR	gamePushState
 		
 		LDY	#TRADE::player
 		LDA	trade0, Y
 		STA	game + GAME::pActive
-		
-		LDA	game + GAME::gMode
-		STA	game + GAME::gMdTrdI
 		
 		LDA	#$02
 		STA	game + GAME::gMode
@@ -14518,6 +14469,17 @@ gameInitTrdIntrptDirect:
 ;-------------------------------------------------------------------------------
 gameApproveTrade:
 ;-------------------------------------------------------------------------------
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDY 	#PLAYER::fCPU
+		LDA	($FB), Y
+		
+		BNE	@approve
+
 		LDA	menuTrade1RemWealth + 2
 		BMI	@fail0
 		
@@ -14545,6 +14507,11 @@ gameApproveTrade:
 		RTS
 
 @approve:
+		LDY 	#PLAYER::colour
+		LDA	($FB), Y
+		TAX
+		JSR	prmptTrdApprv
+		
 		LDA	#$00
 		STA	game + GAME::fTrdTyp
 		
@@ -15015,26 +14982,29 @@ gamePerfTradePopMode:
 		BNE	@endelimin
 
 ;		Pop player and mode from trade 
-		LDA	game + GAME::pTrdICP
-		STA	game + GAME::pActive
+;		LDA	game + GAME::pTrdICP
+;		STA	game + GAME::pActive
+;		LDA	game + GAME::gMdTrdI
+;		STA	game + GAME::gMode
+
+		JSR	gamePopState
+
 		LDA	#$FF
 		STA	game + GAME::pLast
 		
-		LDA	game + GAME::gMdTrdI
-		STA	game + GAME::gMode
-
 		RTS
 
 @endelimin:
-		LDA	game + GAME::pElimin
-		
-		STA	game + GAME::pActive
+;		LDA	game + GAME::pElimin
+;		STA	game + GAME::pActive
+;		LDA	game + GAME::gMdElim
+;		STA	game + GAME::gMode
+
+		JSR	gamePopState
+
 		LDA	#$FF
 		STA	game + GAME::pLast
 		
-		LDA	game + GAME::gMdElim
-		STA	game + GAME::gMode
-
 		RTS
 
 
@@ -15796,16 +15766,19 @@ gameStartAuction:
 		STA	game + GAME::fAPass	;All active players in auction
 		STA	game + GAME::fAForf
 
-		LDA	game + GAME::gMode	;Back up current mode
-		STA	game + GAME::gMdActn
+;		LDA	game + GAME::gMode	;Back up current mode
+;		STA	game + GAME::gMdActn
+;		LDA	game + GAME::pActive	;Back up current player
+;		STA	game + GAME::pRecall
+		
+		JSR	gamePushState
+		
 		LDA	#$01			;Go to auction mode
 		STA	game + GAME::gMode
 		
 		LDA	#$FF			;No winner
 		STA	game + GAME::pWAuctn
 		
-		LDA	game + GAME::pActive	;Back up current player
-		STA	game + GAME::pRecall
 		
 		PLA				;Have we already got the player
 		BNE	@nonext			;who goes first?
@@ -18157,11 +18130,12 @@ dialogWindowTrdSel0:
 			.word		strOptn1TrdSel0
 
 			
-;***TODO:		Make colours configurable in order to indicate
-;			which are available
 			.byte	$81, $1C, $05		;GO Free
 			.byte	$81, $1C, $06
+
+dialogWindowTrdSel0G0:
 			.byte	$2F, $1D, $05, $06	
+dialogWindowTrdSel0G1:
 			.byte	$2F, $1D, $06, $06
 			
 			
@@ -20056,13 +20030,33 @@ dialogDlgTrdSel0Draw:
 		STA	dialogTrdSelMaxCash + 1
 		
 @disp:
+		LDX	#$2B
+		STX	dialogWindowTrdSel0G0
+		STX	dialogWindowTrdSel0G1
+		
+		LDY	#TRADE::player		
+		LDA	trade2, Y
+		CMP	game + GAME::pGF0Crd
+		BNE	@cont0
+		
+		LDX	#$2F
+		STX	dialogWindowTrdSel0G0
+		
+@cont0:
+		CMP	game + GAME::pGF1Crd
+		BNE	@cont1
+
+		LDX	#$2F
+		STX	dialogWindowTrdSel0G1
+		
+@cont1:
 		LDA	#<dialogWindowTrdSel0
 		STA	$FD
 		LDA	#>dialogWindowTrdSel0
 		STA	$FE
 
 		JSR	screenPerformList
-		
+
 		LDA	#<dialogWindowOvervw1
 		STA	$FD
 		LDA	#>dialogWindowOvervw1
@@ -23065,8 +23059,10 @@ rulesInitStepping:
 		STA	game + GAME::fAmStep
 		STA	game + GAME::fStpSig
 		
-		LDA	game + GAME::gMode
-		STA	game + GAME::gMdStep
+;		LDA	game + GAME::gMode
+;		STA	game + GAME::gMdStep
+		
+		JSR	gamePushState
 
 		LDA	#$06
 		STA	game + GAME::gMode
@@ -24397,12 +24393,14 @@ rulesCCCrdProcRep:				;street/gen repairs
 
 
 rulesCCCrdProcColMPay:
-		LDA	game + GAME::gMode
-		STA	game + GAME::gMdMPyI	
-		
-		LDA	game + GAME::pActive
-		STA	game + GAME::pMstPyI
+;		LDA	game + GAME::gMode
+;		STA	game + GAME::gMdMPyI	
+;		LDA	game + GAME::pActive
+;		STA	game + GAME::pMstPyI
 
+		JSR	gamePushState
+
+		LDA	game + GAME::pActive
 		STA	game + GAME::pMPyLst
 		STA	game + GAME::pMPyCur
 
@@ -26468,11 +26466,18 @@ rulesInitTradeData:
 ;-------------------------------------------------------------------------------
 rulesInitEliminToPlyr:
 ;-------------------------------------------------------------------------------
-		LDX	game + GAME::pActive
-		STX	game + GAME::pElimin
-		LDX	game + GAME::gMode
-		STX	game + GAME::gMdElim
+		PHA
+;		LDX	game + GAME::pActive
+;		STX	game + GAME::pElimin
+;		LDX	game + GAME::gMode
+;		STX	game + GAME::gMdElim
 		
+		JSR	gamePushState
+		
+		LDA	game + GAME::pActive
+		STA	game + GAME::varX
+		
+		PLA
 		STA	game + GAME::pActive
 		
 		JSR	menuElimin0RemWlthRecalc
@@ -26485,7 +26490,7 @@ rulesInitEliminToPlyr:
 		LDX	#$00
 @loop:
 		LDA	sqr00, X
-		CMP	game + GAME::pElimin
+		CMP	game + GAME::varX
 		
 		BNE	@next
 		
@@ -26499,7 +26504,7 @@ rulesInitEliminToPlyr:
 		BNE	@loop
 
 		LDX	#TRADE::player
-		LDA	game + GAME::pElimin
+		LDA	game + GAME::varX
 		STA	trade1, X
 		LDA	game + GAME::pActive
 		STA	trade0, X
@@ -26513,7 +26518,7 @@ rulesInitEliminToPlyr:
 rulesInitEliminToBank:
 ;-------------------------------------------------------------------------------
 		LDX	game + GAME::pActive
-		STX	game + GAME::pElimin
+;		STX	game + GAME::pElimin
 		STX	game + GAME::varA
 
 		JSR	menuElimin0RemWlthRecalc
@@ -26568,8 +26573,6 @@ rulesInitEliminToBank:
 		LDA	#$01
 		STA	game + GAME::fTrdTyp
 		
-;***FIXME:	Do I need to change game + GAME::pActive?
-
 		LDA	#$01
 		STA	ui + UI::fActInt		
 		
@@ -29011,7 +29014,7 @@ rulesSuggestDeedValue:
 		TAX
 		JSR	gameGetCardPtrForSquareImmed
 		
-		LDY	#DEED::mMrtg
+		LDY	#DEED::mPurch
 		LDA	($FD), Y
 		STA	game + GAME::varS
 		STA	game + GAME::varM
@@ -29133,6 +29136,20 @@ rulesSuggestDeedValue:
 		JSR	rulesDoTapValue		
 
 @done:
+;	Adjust for mortgaged deeds
+
+		LDX	game + GAME::varL
+		LDA	sqr00 + 1, X
+		AND	#$80
+		BEQ	@exit
+		
+;	Mortgaged deeds half value
+		LDA	game + GAME::varE
+		ASL
+		ROR	game + GAME::varE
+		ROR	game + GAME::varD		
+		
+@exit:
 		RTS
 
 rulesAutoAuction:
@@ -29281,8 +29298,626 @@ rulesAutoTradeInitiate:
 		RTS
 
 
-rulesAutoTradeApprove:
+rulesTestLoseGroup:
+		LDX	game + GAME::varK
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+
+;	For each deed in trade wanted (0)
+		LDY	#TRADE::cntDeed
+		LDA	trade0, Y
+		BEQ	@notlosing
+		
+		TAX
+		DEX
+@loop:
+;		STX	game + GAME::varC
+
+;	Get deed from trddeeds0 for index
+		LDA	trddeeds0, X
+
+;	Get group for deed
+		TAY
+		LDA	rulesSqr0, Y
+
+;	If group $00 or greater than $0A then next
+		BEQ	@next
+		
+		CMP	#$0B
+		BPL	@next
+
+;	Get group pointer
+		STA	game + GAME::varB
+
+		TAY
+		LDA	rulesGrpLo, Y
+		STA	$FD
+		LDA	rulesGrpHi, Y
+		STA	$FE
+
+;	Get group::count
+		LDY	#GROUP::count
+		LDA	($FD), Y
+		
+		STA	game + GAME::varH
+
+;	Get offset to player own for group
+		LDY	game + GAME::varB
+		DEY
+		TYA
+		CLC
+		ADC	#PLAYER::oGrp01
+		
+		TAY
+
+;	If own group::count, yes
+		LDA	($FB), Y
+		CMP	game + GAME::varH
+		BEQ	@arelosing
+
+@next:
+;		LDX	game + GAME::varC
+		
+		DEX
+		BPL	@loop
+
+@notlosing:
 		LDA	#$00
+		RTS
+
+@arelosing:
+		LDA	#$01
+		RTS
+
+
+rulesInitAccounted:
+		LDX	#$27
+		LDA	#$FF
+@loop:
+		STA	trddeeds2, X
+		DEX
+		BPL	@loop
+		
+		RTS
+		
+		
+rulesCalcTradePts:
+		LDX	game + GAME::varK
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+
+		LDA	#$00
+;	Total remaining (untested) deeds in varH
+		STA	game + GAME::varH
+;	Total points in varQ
+		STA	game + GAME::varQ
+
+;	For each deed in trade offer
+		LDY	#TRADE::cntDeed
+		
+		LDA	game + GAME::varX
+		BEQ	@offertot
+		
+		LDA	trade1, Y
+		JMP	@begin
+		
+@offertot:
+		LDA	trade0, Y
+		
+@begin:
+		BNE	@cont0
+		
+		JMP	@done
+		
+@cont0:
+		TAX
+		DEX
+@loop:
+;		STX	game + GAME::varC
+
+;	Get deed from trddeeds for index
+		LDA	game + GAME::varX
+		BEQ	@offerdeed
+		
+		LDA	trddeeds1, X
+		JMP	@proc
+		
+@offerdeed:
+		LDA	trddeeds0, X
+
+@proc:
+;	Get group for deed
+		STA	game + GAME::varL
+
+		TAY
+		LDA	rulesSqr0, Y
+
+;	If group $00 or greater than $0A then next
+		BNE	@tstupper
+		
+		JMP	@next
+		
+@tstupper:
+		CMP	#$0B
+		BMI	@cont1
+
+		JMP	@next
+
+@cont1:
+;	Get group pointer
+		STA	game + GAME::varB
+
+		TAY
+		LDA	rulesGrpLo, Y
+		STA	$FD
+		LDA	rulesGrpHi, Y
+		STA	$FE
+
+;	Get group::count
+		LDY	#GROUP::count
+		LDA	($FD), Y
+		
+		STA	game + GAME::varH
+
+;	Get offset to player own for group
+		LDY	game + GAME::varB
+		DEY
+		TYA
+		CLC
+		ADC	#PLAYER::oGrp01
+		
+		TAY
+
+;	If own group::count - 1, would gain group
+		LDA	($FB), Y
+		TAY
+		INY
+		
+		CPY	game + GAME::varH
+		BEQ	@gaingroup
+		
+;	If own group::count - 2, would gain potential group
+		INY	
+		CPY	game + GAME::varH
+		BEQ	@gainpotential
+		
+;	If testing offer, check potential losses
+		LDA	game + GAME::varX
+		BEQ	@unaccounted
+
+;	If losing potential group, -1 points
+		LDY	game + GAME::varB
+		DEY
+		TYA
+		CLC
+		ADC	#PLAYER::oGrp01
+		
+		TAY
+		
+;	If own group::count - 1, would lose potential
+		LDA	($FB), Y
+		TAY
+		INY
+		
+		CPY	game + GAME::varH
+		BNE	@unaccounted
+		
+		SEC
+		LDA	game + GAME::varQ
+		SBC	#$01
+		STA	game + GAME::varQ
+			
+		JMP	@next
+	
+		
+@unaccounted:
+		LDA	game + GAME::varK
+		LDY	game + GAME::varL
+		
+		INC	game + GAME::varH
+		
+		STA	trddeeds2, Y
+		JMP	@next
+		
+@gaingroup:
+		LDY	game + GAME::varB
+		LDA	rulesGrpPointsFull, Y
+		CLC
+		ADC	game + GAME::varQ
+		STA	game + GAME::varQ
+		
+		JMP	@next
+		
+@gainpotential:
+		LDY	game + GAME::varB
+		LDA	rulesGrpPointsPart, Y
+		CLC
+		ADC	game + GAME::varQ
+		STA	game + GAME::varQ
+
+@next:
+;		LDX	game + GAME::varC
+		
+		DEX
+		BMI	@done
+		
+		JMP	@loop
+		
+@done:
+		RTS
+		
+
+rulesTallySuggested:
+		LDA	#$00
+		STA	game + GAME::varO
+		STA	game + GAME::varP
+
+;	For each deed in trddeeds2
+		LDX	#$27
+@loop:
+;	If is unaccounted to player in varK
+		LDA	trddeeds2, X
+		CMP	game + GAME::varK
+		BNE	@next
+
+;	Get suggested value
+		JSR	rulesSuggestDeedValue
+
+;	Add to tally
+		CLC
+		LDA	game + GAME::varO
+		ADC	game + GAME::varD
+		STA	game + GAME::varO
+		LDA	game + GAME::varP
+		ADC	game + GAME::varE
+		STA	game + GAME::varP
+
+@next:
+		DEX
+		BMI	@done
+		
+		JMP	@loop
+		
+@done:
+		RTS
+		
+
+rulesTrdApprvTstRepay:
+;	Get repay cost for deed in varL
+		LDX	game + GAME::varL
+		JSR	gameGetCardPtrForSquareImmed
+		
+		LDY	#DEED::mMrtg
+		LDA	($FD), Y
+		STA	game + GAME::varD
+		INY
+		LDA	($FD), Y
+		STA	game + GAME::varE
+
+		LDY	#DEED::mFee
+		CLC
+		LDA	($FD), Y
+		ADC	game + GAME::varD
+		STA	game + GAME::varD
+		INY
+		LDA	($FD), Y
+		ADC	game + GAME::varE
+		STA	game + GAME::varE
+
+		LDA	#$01
+		STA	game + GAME::varX
+
+;	Can afford to repay?  
+		JSR	gameAmountIsLessDirect
+		BCC	@repay
+
+;	No, get just the fee and return 0
+		LDY	#DEED::mFee
+		CLC
+		LDA	($FD), Y
+		STA	game + GAME::varD
+		INY
+		LDA	($FD), Y
+		STA	game + GAME::varE
+
+		LDA	#$00
+		STA	game + GAME::varX
+
+@repay:
+;	Yes, decrement cost from total
+		SEC
+		LDA	game + GAME::varO
+		SBC	game + GAME::varD
+		STA	game + GAME::varO
+		LDA	game + GAME::varP
+		SBC	game + GAME::varE
+		STA	game + GAME::varP
+
+;	Return
+		LDA	game + GAME::varX
+		RTS
+
+
+rulesTradeApprvRepay:
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+;	Find base rent value needed
+		JSR	rulesSuggestBaseReserve
+		
+;	Subtract value from money store as value
+		LDY	#PLAYER::money
+		SEC
+		LDA	($FB), Y
+		SBC	game + GAME::varD
+		STA	game + GAME::varO
+		INY
+		LDA	($FB), Y
+		SBC	game + GAME::varE
+		STA	game + GAME::varP
+		
+;	Have positive value, try to repay
+		BMI	@done
+
+;	For each deed in offer
+		LDY	#TRADE::cntDeed
+		LDA	trade1, Y
+		
+		TAX
+		BEQ	@done
+		
+		DEX
+@loop:
+		STX	game + GAME::varL
+
+;	If mortgaged, test have amount to repay
+		LDA	trdrepay1, X
+		AND	#$80
+		BEQ	@next
+		
+		JSR	rulesTrdApprvTstRepay
+		BEQ	@next
+
+		LDX	game + GAME::varL
+		LDA	#$81
+		STA	trdrepay1, X
+		
+@next:
+		LDX	game + GAME::varL
+		
+		DEX
+		BPL	@loop
+
+@done:
+		RTS
+
+
+rulesCalcTrdWantCash:
+		LDY	#TRADE::money
+		LDA	trade0, Y
+		STA	game + GAME::varD
+		INY
+		LDA	trade0, Y
+		STA	game + GAME::varE
+		
+		LDY	#TRADE::gofree
+		LDA	trade0, Y
+
+rulesCalcTrdGoFree:
+		AND	#$03
+		BEQ	@done
+		
+		CMP	#$03
+		BNE	@single
+		
+		LDA	#80
+		STA	game + GAME::varX
+		JMP	@calc
+		
+@single:
+		LDA	#40
+		STA	game + GAME::varX
+		
+@calc:
+		CLC
+		LDA	game + GAME::varD
+		ADC	game + GAME::varX
+		STA	game + GAME::varD
+		LDA	game + GAME::varE
+		ADC	#$00
+		STA	game + GAME::varE
+		
+@done:
+		RTS
+
+
+rulesCalcTrdOffrCash:
+		LDY	#TRADE::money
+		LDA	trade1, Y
+		STA	game + GAME::varD
+		INY
+		LDA	trade1, Y
+		STA	game + GAME::varE
+		
+		LDY	#TRADE::gofree
+		LDA	trade1, Y
+		
+		JMP	rulesCalcTrdGoFree
+
+
+rulesAutoTradeApprove:
+;	If losing a full group then no
+		LDA	game + GAME::pActive
+		STA	game + GAME::varK
+
+		JSR	rulesTestLoseGroup
+		BEQ	@tsttrade
+		
+		JMP	@reject
+
+@tsttrade:
+		JSR	rulesInitAccounted
+
+;	For each full group we get, calc points
+;	For each potential group we get, add points (-1 from full)
+;	For each potential group we lose, -1 pts
+		LDA	#$01
+		STA	game + GAME::varX
+		
+		JSR	rulesCalcTradePts
+
+;	Total remaining (untested) deeds in varH
+		LDA	game + GAME::varH
+		STA	game + GAME::varI
+		
+;	Total points in varQ
+		LDA	game + GAME::varQ
+		STA	game + GAME::varR
+
+;	For each full group they get, calc points
+;	For each potential group they get, add points (-1 from full)
+		LDY	#TRADE::player
+		LDA	trade1, Y
+		STA	game + GAME::varK
+		
+		LDA	#$00
+		STA	game + GAME::varX
+		
+		JSR	rulesCalcTradePts
+
+;	Total remaining (untested) deeds in varH
+;	Total points in varQ
+
+;	If points difference negative, no
+		SEC
+		LDA	game + GAME::varR
+		SBC	game + GAME::varQ
+		
+		BPL	@tstaccounted
+		
+		JMP	@reject
+
+@tstaccounted:
+;	If all accounted for, yes
+		LDA	game + GAME::varH
+		BNE	@tstvalue
+			
+		LDA	game + GAME::varI
+		BNE	@tstvalue
+		
+		JSR	rulesCalcTrdWantCash
+		LDA	game + GAME::varD
+		STA	game + GAME::varO
+		LDA	game + GAME::varE
+		STA	game + GAME::varP
+		
+		JSR	rulesCalcTrdOffrCash
+		
+		JSR	gameAmountIsLessDirect
+		BCS	@tstvalue
+
+		JMP	@approve
+
+@tstvalue:
+;	Calculate total suggested value for others we get
+		LDA	game + GAME::pActive
+		STA	game + GAME::varK
+		
+		JSR	rulesTallySuggested
+;	Total in varO,P
+
+		JSR	rulesCalcTrdOffrCash
+
+		CLC
+		LDA	game + GAME::varO
+		ADC	game + GAME::varD
+		STA	game + GAME::varD
+		LDA	game + GAME::varP
+		ADC	game + GAME::varE
+		STA	game + GAME::varE
+
+;		LDA	game + GAME::varO
+;		STA	game + GAME::varD
+;		LDA	game + GAME::varP
+;		STA	game + GAME::varE
+
+;	??Nudge our value by some amount??
+;***TODO:	Nudge value somehow
+
+;	Store in varU,V
+		LDA	game + GAME::varD
+		STA	game + GAME::varU
+		LDA	game + GAME::varE
+		STA	game + GAME::varV
+
+;	Calculate total suggested value for others they get
+		LDY	#TRADE::player
+		LDA	trade1, Y
+		STA	game + GAME::varK
+		
+		JSR	rulesTallySuggested
+;	Total in varO,P
+		
+		JSR	rulesCalcTrdWantCash
+
+		CLC
+		LDA	game + GAME::varO
+		ADC	game + GAME::varD
+		STA	game + GAME::varO
+		LDA	game + GAME::varP
+		ADC	game + GAME::varE
+		STA	game + GAME::varP
+
+;	If value difference negative, no
+		SEC
+		LDA	game + GAME::varU
+		SBC	game + GAME::varO
+		STA	game + GAME::varD
+		LDA	game + GAME::varV
+		SBC	game + GAME::varP
+		STA	game + GAME::varE
+		
+		BMI	@reject
+
+;	Otherwise, yes
+@approve:
+;	Test for which we can repay right away
+		JSR	rulesTradeApprvRepay
+
+		LDA	#UI_ACT_SKEY
+		STA	$68
+		LDA	#'C'
+		STA	$69
+		
+		JSR	uiEnqueueAction
+
+		JMP	@finish
+
+@reject:
+		LDA	#UI_ACT_SKEY
+		STA	$68
+		LDA	#'X'
+		STA	$69
+		
+		JSR	uiEnqueueAction
+	
+@finish:	
+		LDA	#UI_ACT_DELY
+		STA	$68
+		LDA	#$00
+		STA	$69
+		STA	$6A
+		STA	$6B
+		
+		JSR	uiEnqueueAction
+	
 		RTS
 
 

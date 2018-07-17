@@ -151,7 +151,7 @@ The following optional house rules are available (or considered):
 	
 * Starting money can be set low ($1000) or high ($2000).  I have
   done this because I feel that with only two players, the normal
-  starting money is too low.  There just isn't enough capital in play
+  starting money ($1500) is too low.  There just isn't enough capital in play
   in my opinion.  $2000 for three players is questionably high but 
   still works alright enough.  For four or more you probably want the 
   normal amount.  I may expand the selection range.  I have been 
@@ -426,25 +426,22 @@ RUN
 
 ## TODO
 
-* Statistics/Overview from trade approval, must pay.  They should work now.
-* Put AutoPay on play2 menu.
-* Colour gofree items on trdsel0 dialog to indicate availability.
-* Make dialog elimin0 more informative about the elimination (to player/bank?)
 * Shouldn't $FF in current hot button prevent changes?  Joystick up/down is 
   causing hot button changes on setup7 at game start.
 
 * Should be able to do beta state after above.
 
-* CPU player still needs:  AutoTradeApprove, AutoTradeInitiate
-* "Thinking" menu/prompt when cpu engaged?  Its so fast anyway... 
+* CPU player still needs:  AutoTradeInitiate
 * rulesSuggestDeedValue should tap values based on group significance.
 * AutoAuction should commit equity like AutoBuy does and perhaps not bail so 
   early (push value upwards if its less than what they and other players currently 
-  have).
+  have -- calc minimum as well as max?).
+* AutoTradeApprove could tally "half points" for prime targets and require that they
+  be accounted for in other deeds or money (convert extra points too?).
   
+* Statistics/Overview from trade approval, must pay.  They should work now.
+* Make dialog elimin0 more informative about the elimination (to player/bank?)
 * Change trade6 menu naming to action jump menu.
-* Consolidate all the backup/retrievals of game mode + player into a single main
-  state stack.
 * Once have main state stack, can check in roll that the player is the one 
   with the dice (is the player for the normal mode).  Just to be safe?
 * Could also do other mode chain integrity checks.
@@ -458,7 +455,7 @@ RUN
 * Do not overflow heap??  Shouldn't ever happen.  Should gather statistics 
   in order to check actual maximum requirements.
 
-* Player sprites on overview dialog.  Would look pretty.  IRQ is a mess.
+* Player sprites on overview dialog?  Would look pretty.  IRQ is a mess.
 * Get exomiser working.
 * Allow construct from manage menu in trade if not doing so for group in trade?
 
@@ -469,7 +466,8 @@ RUN
 * Is rent3 SFX still a little lame?  Does it matter?  Are the sounds okay on 
   Android (where the emulation is terrible)?
 * Properly divide game and rule routines.  Hmm...
-* CPU player personalities?
+* CPU player personalities?  Not enough memory unless I do something radical in
+  optimisation.
 * Fix ZPage variable use, in particular active player pointer and IRQ.
 * Fix IRQ handler -- its gotten hacked to death.
 * Game save/load?  Difficult now that the Kernal program and data space is used.
@@ -480,10 +478,10 @@ RUN
 
 ## Optimisation Targets:
 
-* The trdsel0 dialog currently uses some 3KB of memory.  This is massive.  It 
-  should be optimised somehow.
 * The screen constant data could be loaded into high memory (346 bytes).
-* The prompt constant data could be loaded into high memory (352 bytes).
+* The trdsel0 dialog currently uses some 3KB of memory on top of the overview 
+  dialog's nearly 1.5KB.  This is massive.  It should be optimised somehow.
+* Zero page utilisation (get rid of all those reloads for current player!)
 
 
 ## For Testing (Needs Confirmation):
@@ -493,15 +491,31 @@ RUN
   shuffle (and while owned by a player).
 * Ensure all options/pages are displayed for all menus.
 * GOFree cards properly traded in trades.
-* Trade/elimination xfer working correctly (double check).
-* Trade/elimination xfer correctly calculate remaining cash and enforce positive.
+* Trade + elimination xfer working correctly (double check).
+* Trade + elimination xfer correctly calculate remaining cash and enforce positive.
 * Elimination returns to correct player.
 * Must pay works after trade/elimination xfer?
 * Multiple eliminations in one turn works?
 * Does elimination to bank work at all?
 
+
 ## Change History (Since Version 0.01.99A)
+* 17JUL2018
+	* Optimise prompts code and move data to strings, saving almost 0.5KB.
+	* Thinking prompt when cpu engaged.
+	* Change order of buttons on setup6 house rules menu.
+	* Change order of buttons on set funds setup menu (normal, low, high).
+	* Prompt for trade initiated.
+	* Prompts for actions taken on trade approve menu (approved/declined).
+	* Implement AutoTradeApprove and utilise by CPU.
+	* rulesSuggestDeedValue takes into account mortgaged state and properly
+	  gets market value.
 * 16JUL2018
+	* Consolidate all the backup/retrievals of game mode + player into a 
+	  single main state stack.
+	* Put AutoPay button on play2 menu (already has key input handling).
+	* Add strOptn9Play0 and strDescElimin0 strings.
+	* Colour gofree items on trdsel0 dialog to indicate availability.
 	* Fix user input handling issues (at start and when DEBUG_CPU not enabled).
 	* Move keys globals out of globals area.
 	* Move IRQ globals into globals area ($0200-$03FF).
