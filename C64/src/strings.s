@@ -1210,12 +1210,15 @@ strText4Tax1	=	strDummyDummy0
 
 tokPrmptRolled:		;.ROLLED 
 			.byte 	$07, $51, $12, $0F, $0C, $0C, $05, $04
-tokPrmptRent:		;.RENT   
-			.byte 	$05, $51, $12, $05, $0E, $14
-tokPrmptBought:		;.BOUGHT
-			.byte	$07, $51, $02, $0F, $15, $07, $08, $14
-tokPrmptTax:		;.TAX
-			.byte 	$04, $51, $14, $01, $18
+tokPrmptRent:		;.RENT    $
+			.byte 	$0A, $51, $12, $05, $0E, $14, $20, $20
+			.byte	$20, $20, $24
+tokPrmptBought:		;.BOUGHT  $
+			.byte	$0A, $51, $02, $0F, $15, $07, $08, $14
+			.byte	$20, $20, $24
+tokPrmptTax:		;.TAX     $
+			.byte 	$0A, $51, $14, $01, $18, $20, $20, $20
+			.byte	$20, $20, $24
 tokPrmptGaol:		;.GONE TO GAOL
 			.byte 	$0D, $51, $07, $0F, $0E, $05, $20, $14
 			.byte 	$0F, $20, $07, $01, $0F, $0C
@@ -1227,8 +1230,9 @@ tokPrmptMustSell:	;.MUST SELL IMPRV
 			.byte 	$10, $51, $0D, $15, $13, $14, $20, $13
 			.byte 	$05, $0C, $0C, $20, $09, $0D, $10, $12
 			.byte	$16
-tokPrmptSalary:		;.SALARY   
-			.byte 	$07, $51, $13, $01, $0C, $01, $12, $19
+tokPrmptSalary:		;.SALARY  $
+			.byte 	$0A, $51, $13, $01, $0C, $01, $12, $19
+			.byte	$20, $20, $24
 tokPrmptFParking:	;.FPARKING$
 			.byte 	$0A, $51, $06, $10, $01, $12, $0B, $09
 			.byte	$0E, $07, $24

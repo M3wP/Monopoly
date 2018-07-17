@@ -427,7 +427,7 @@ RUN
 ## TODO
 
 * Shouldn't $FF in current hot button prevent changes?  Joystick up/down is 
-  causing hot button changes on setup7 at game start.
+  causing hot button changes on setup7 at game start.  Fix - causes input failures.
 
 * Should be able to do beta state after above.
 
@@ -489,7 +489,6 @@ RUN
 * Don't allow leave management when -ve hses, htls at all.
 * Used GO Free cards prevented from appearing in deck until after 
   shuffle (and while owned by a player).
-* Ensure all options/pages are displayed for all menus.
 * GOFree cards properly traded in trades.
 * Trade + elimination xfer working correctly (double check).
 * Trade + elimination xfer correctly calculate remaining cash and enforce positive.
@@ -501,6 +500,8 @@ RUN
 
 ## Change History (Since Version 0.01.99A)
 * 17JUL2018
+	* Fix bought, tax et al prompt strings (missing $).
+	* Fix rolled prompt data regression.
 	* Optimise prompts code and move data to strings, saving almost 0.5KB.
 	* Thinking prompt when cpu engaged.
 	* Change order of buttons on setup6 house rules menu.

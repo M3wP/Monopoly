@@ -638,7 +638,7 @@ keyZPDecodePtr	=	$F5			;word
 ;-------------------------------------------------------------------------------
 
 ui		=	$0200
-game		=	ui + .sizeof(UI)		
+game		=	ui + .sizeof(UI)	;$0214		
 plr0		=	game + .sizeof(GAME)
 plr1		=	plr0 + .sizeof(PLAYER)
 plr2		=	plr1 + .sizeof(PLAYER)
@@ -5448,17 +5448,17 @@ prmptUpdate:
 		AND	#$40
 		BEQ	@tstimprv
 		
-		LDA	prmptTemp0
 		CLC
+		LDA	game + GAME::dieA
 		ADC	#'0'
 		STA	prmpt0Txt0 + $09
 		
-		LDA	prmptTemp0 + 1
 		CLC
+		LDA	game + GAME::dieB
 		ADC	#'0'
 		STA	prmpt0Txt0 + $0B
 
-		JMP	@exit
+		JMP	@test
 
 @tstimprv:
 		LDA	prmptTemp2
@@ -5564,9 +5564,6 @@ prmptUpdate:
 ;		STA	prmpt1Txt0 + $0A
 
 @exit:	
-		LDA	#$00
-		STA	prmptTemp2
-		
 		RTS
 	
 		
@@ -5579,12 +5576,6 @@ prmptRolled:
 		STA	prmptTok0
 		LDA	#>tokPrmptRolled
 		STA	prmptTok0 + 1
-
-		LDA	game + GAME::dieA
-		STA	prmptTemp0
-		
-		LDA	game + GAME::dieB
-		STA	prmptTemp0 + 1
 
 		LDA	#$01
 		STA	prmptTemp3
