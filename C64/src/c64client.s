@@ -24,21 +24,21 @@
 ;Contents:
 ;	 16 modules (6 display segment; 10 core)
 ;	 10 game modes (6 primary; 4 front end; stackable w/ limits)
-;	 14 core actions (2 system; 1 generic key action; 11 specific)
-;	 14 CPU behaviours (2 system; 12 game play)
 ;	 30 menus
 ;	 17 dialogs
+;	 14 CPU behaviours (2 system; 12 game play)
+;	 14 core actions (2 system; 1 generic key action; 11 specific)
 ;	 16 tunes (2 voice)
 ;	 16 sfx
 ;	350 strings
-;	  3 thread equivalent (raster IRQ and signal managed; system, main, game)
+;	  3 threads equivalent (raster IRQ, signal managed; system, main, game)
 ;	  3 configurable input sources (keyboard, joystick, mouse)
 ;	  2 sprite zones (by raster split)
 ;
 ;	 40 game board squares
-;	  4 qudrants
+;	  4 quadrants
 ;	 10 player colours
-;	 28 title deeds
+;	 28 title deed cards (plus title cards for all other squares)
 ;	 16 chance cards
 ;	 16 community chest cards
 ;	 32 houses
@@ -50,14 +50,16 @@
 ;	 8+ years
 ;
 ;	  3 house rules (one always enabled:  reshuffle)
+;	    strictly turn-based (with interrupts and flexible management)
 ;
-;	 an estimated 16.5KB of data, 38KB of code
+;	 an estimated 16.5KB of data, 38KB of code, 1.5KB of heap
+;	 more than 650 double-sided, A4 pages of source code with small font
 ;
 ;
 ;Free memory information (as of last update from 0.02.39A):
-;	* Between rules data and action cache, 307 bytes (free for data)
-;	* Between heap and reserved, 4235 bytes (free for program)
-;	* Reserved areas, 768 bytes (unavailable/unused)
+;	* Between rules data and action cache 307 bytes (free for const data)
+;	* Between heap and reserved 4235 bytes (free for program)
+;	* Reserved areas 768 bytes (unavailable/unused)
 ;	* Free in discard, 6 bytes
 ;
 ;
@@ -67,8 +69,12 @@
 ;	0200 - 	03FF	Global state
 ;	0400 - 	07FF	Screen data and sprite pointers
 ;	0800 - 	08FF	Bootstrap/sprite data
-;	0900 -  BD74	Program area
-;	BD75 - 	CDFF	Discard/heap
+;	0900 -  7FFF	Program area
+;	8000 -	9FFF	Program area
+;	A000 -	BD74	Program area
+;	BD75 - 	BF6E	Discard/heap
+;	BF6F -	BFFF	Free/heap
+;	C000 -	CDFF	Free
 ;	CE00 - 	CFFF	Reserved (may be used for discard/heap)
 ;	D000 - 	DFFF	System IO
 ;	E000 -	F240	Strings data (4673 bytes)
