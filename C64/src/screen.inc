@@ -1,0 +1,16 @@
+SCREEN_BEGIN = STRINGS_END;
+
+screenRowsLo = SCREEN_BEGIN
+screenRowsHi = SCREEN_BEGIN + $0019
+colourRowsLo = SCREEN_BEGIN + $0032
+colourRowsHi = SCREEN_BEGIN + $004B
+lineCodes = SCREEN_BEGIN + $0064
+pointCodes = SCREEN_BEGIN + $0071
+screenClear0 = SCREEN_BEGIN + $007F
+screenQErase0 = SCREEN_BEGIN + $0085
+brushesLo = SCREEN_BEGIN + $00EC
+brushesHi = SCREEN_BEGIN + $00F9
+bQuadPosLo = SCREEN_BEGIN + $0156
+bQuadPosHi = SCREEN_BEGIN + $015A
+
+SCREEN_END = SCREEN_BEGIN + $015E

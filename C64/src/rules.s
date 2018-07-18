@@ -3,10 +3,15 @@
 ;===============================================================================
 
 	.include	"strings.inc"
+	.include 	"screen.inc"
 
 	.code
-	.org	$F400
+	.org	SCREEN_END - 2
+	
+	.word	SCREEN_END
 
+
+RULES_BEGIN	=	*
 
 rulesGrpPriority:
 		.byte	$01, $02, $03, $0A, $04, $05, $06, $07, $09, $08
@@ -516,7 +521,7 @@ rulesSqr0:
 			.byte	$01		;Brown 2
 			.byte	$01
 
-			.byte	$0D		;INC TAX 
+			.byte	$0D		;Income TAX 
 			.byte	$00
 			
 			.byte	$09		;Station 1
@@ -618,7 +623,7 @@ rulesSqr0:
 			.byte	$08		;Blue 1
 			.byte	$00	
 			
-			.byte	$0D		;Income TAX 
+			.byte	$0D		;Luxury TAX 
 			.byte	$01
 			
 			.byte	$08		;Blue 2
@@ -1113,5 +1118,16 @@ rulesChanceE:					;Advance Kings cross
 rulesChanceF:					;Advance Mayfair
 			.byte	$02	
 			.byte	$27
+			
 
-	.assert	* < $FF00, error, "Rules data too large for current allocation!"
+rulesGrpPointsFull:
+		.byte	$00, $02, $02, $03, $03, $04, $04, $06
+		.byte	$06, $04, $02, $00, $00, $00
+		
+rulesGrpPointsPart:
+		.byte	$00, $01, $01, $02, $02, $03, $03, $05
+		.byte	$05, $03, $01, $00, $00, $00
+		
+	
+
+	.assert	* < $FB00, error, "Rules data too large for current allocation!"

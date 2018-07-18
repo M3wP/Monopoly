@@ -205,13 +205,12 @@ strDescSetup7:		;SELECT DEVICES
 strOptn0Setup7:		;K - KEYS ONLY
 			.byte $0D, $8B, $A0, $AD, $A0, $8B, $85, $99
 			.byte $93, $A0, $8F, $8E, $8C, $99
-strOptn1Setup7:		;J - AND JOYSTICK
-			.byte $10, $8A, $A0, $AD, $A0, $81, $8E, $84
-			.byte $A0, $8A, $8F, $99, $93, $94, $89, $83
-			.byte $8B
-strOptn2Setup7:		;M - OR MOUSE
-			.byte $0C, $8D, $A0, $AD, $A0, $8F, $92, $A0
-			.byte $8D, $8F, $95, $93, $85
+strOptn1Setup7:		;J - JOYSTICK
+			.byte $0C, $8A, $A0, $AD, $A0, $8A, $8F, $99
+			.byte $93, $94, $89, $83, $8B
+strOptn2Setup7:		;M - MOUSE
+			.byte $09, $8D, $A0, $AD, $A0, $8D, $8F, $95
+			.byte $93, $85
 	
 strDescSetup8:		;INPUT SENSE
 			.byte $0B, $89, $8E, $90, $95, $94, $A0, $93
@@ -1269,8 +1268,9 @@ tokPrmptForfeit:	;.FORFEIT
 			.byte	$14
 tokPrmptPass:		;.PASS
 			.byte 	$05, $51, $10, $01, $13, $13
-tokPrmptBid:		;.BID
-			.byte 	$04, $51, $02, $09, $04
+tokPrmptBid:		;.BID     $
+			.byte 	$0A, $51, $02, $09, $04, $20, $20, $20
+			.byte	$20, $20, $24
 tokPrmptInTrade:	;.BEING TRADED!
 			.byte 	$0E, $51, $02, $05, $09, $0E, $07, $20
 			.byte	$14, $12, $01, $04, $05, $04, $21
@@ -1287,5 +1287,12 @@ tokPrmptThinking:	;.THINKING...
 			.byte 	$10, $51, $14, $08, $09, $0E, $0B, $09
 			.byte	$0E, $07, $2E, $2E, $2E, $20, $20, $20
 			.byte	$20
-
+tokPrmptConstruct:	;.CONSTRCT$
+			.byte 	$0A, $51, $03, $0F, $0E, $13, $14, $12
+			.byte 	$03, $14, $24
+tokPrmptAuction:	;.AUCTION
+			.byte 	$08, $51, $01, $15, $03, $14, $09, $0F
+			.byte	$0E
+			
+STRINGS_END	=	*
 	.assert	* < $F400, error, "Strings data too large for current allocation!"

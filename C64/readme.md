@@ -426,8 +426,7 @@ RUN
 
 ## TODO
 
-* Shouldn't $FF in current hot button prevent changes?  Joystick up/down is 
-  causing hot button changes on setup7 at game start.  Fix - causes input failures.
+* Auction prompt 0 for when in auction mode (revert with clearorroll at exit).
 
 * Should be able to do beta state after above.
 
@@ -439,6 +438,10 @@ RUN
 * AutoTradeApprove could tally "half points" for prime targets and require that they
   be accounted for in other deeds or money (convert extra points too?).
   
+* Swap positions of players and improvements on overview.  No longer colour imprvs.
+  Rework draw routines to match overvw?  Also requires swap of selection/repay on 
+  trdesel?
+
 * Statistics/Overview from trade approval, must pay.  They should work now.
 * Make dialog elimin0 more informative about the elimination (to player/bank?)
 * Change trade6 menu naming to action jump menu.
@@ -478,7 +481,6 @@ RUN
 
 ## Optimisation Targets:
 
-* The screen constant data could be loaded into high memory (346 bytes).
 * The trdsel0 dialog currently uses some 3KB of memory on top of the overview 
   dialog's nearly 1.5KB.  This is massive.  It should be optimised somehow.
 * Zero page utilisation (get rid of all those reloads for current player!)
@@ -495,11 +497,26 @@ RUN
 * Elimination returns to correct player.
 * Must pay works after trade/elimination xfer?
 * Multiple eliminations in one turn works?
-* Does elimination to bank work at all?
+* Does elimination to bank still work at all?
 
 
 ## Change History (Since Version 0.01.99A)
+* 18JUL2018
+	* Rework prompts clearing and how roll is redisplayed.
+	* Eeii! Another missing '$' on bid.  Should have drawn.
+	* Fix rulesAutoAuction for now.
+	* Correct rulesSuggestBaseReserve.
+	* Focus on player when perform next in auction.
+	* Don't redraw whole menu for bid amount changes on auctn0 menu.
+	* Further issues with prompts, no longer kill zero page common.
+	* Modify early init to load screen data.
+	* Modify early init to not rely on screen module.
+	* Modify strings/screen/rules files to allow for collecting free memory.
+	* Move screen data to end of strings data.
 * 17JUL2018
+	* Kill unrequired sprPointer data from discard.
+	* Fix setup7 input issues.
+	* Different prompt for construct.
 	* Fix bought, tax et al prompt strings (missing $).
 	* Fix rolled prompt data regression.
 	* Optimise prompts code and move data to strings, saving almost 0.5KB.

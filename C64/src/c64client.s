@@ -22,10 +22,10 @@
 ;
 ;
 ;Free memory information (as of last update from 0.02.39A):
-;	* Between strings and rules data, 483 bytes (free for data)
-;	* Between rules data and action cache, 210 bytes (free for data)
-;	* Between heap and reserved, 3969 bytes (free for program)
+;	* Between rules data and action cache, 307 bytes (free for data)
+;	* Between heap and reserved, 4294 bytes (free for program)
 ;	* Reserved areas, 768 bytes (unavailable/unused)
+;	* Free in discard, 6 bytes
 ;
 ;
 ;Memory map (as of last update from 0.02.39A):
@@ -34,14 +34,16 @@
 ;	0200 - 	03FF	Global state
 ;	0400 - 	07FF	Screen data and sprite pointers
 ;	0800 - 	08FF	Bootstrap/sprite data
-;	0900 -  BE7E	Program area
-;	BE7F - 	CDFF	Discard/heap
+;	0900 -  BD39	Program area
+;	BD3A - 	CDFF	Discard/heap
 ;	CE00 - 	CFFF	Reserved (may be used for discard/heap)
 ;	D000 - 	DFFF	System IO
-;	E000 -	F3FF	Strings data (ends at F21D)
-;	F400 - 	FAFF	Rules data (ends at FA2E)
+;	E000 -	F240	Strings data (ends at F240)
+;	F241 - 	F39E	Screen data
+;	F39F - 	F9CC	Rules data (ends at F9BD)
+;	F9CD - 	FAFF	Free data area (307 bytes)
 ;	FB00 - 	FEFF	Action cache
-;	FF00 -  FFF9	Reserved (unused on purpose)
+;	FF00 -  FFF9	Reserved (unused on purpose, 249 bytes)
 ;	FFFA -	FFFF	System vectors
 ;
 ;
@@ -592,20 +594,24 @@ keyZPDecodePtr	=	$F5			;word
 ;		0D	- 	Tax
 
 
-	.struct CARD
+	.struct TITLE
 		sTitle0	.word
 		sTitle1 .word
 	.endstruct
 
+;	.struct CARD
+;		tCard	.tag	TITLE
+;	.endstruct
+
 	.struct	DEED
-		tCard	.tag	CARD
+		tCard	.tag	TITLE
 		mPurch	.word
 		mMrtg	.word			;could be byte
 		mFee	.word			;could be byte
 	.endstruct
 
 	.struct	STREET
-		tCard	.tag	CARD
+		tCard	.tag	TITLE
 		mPurch	.word
 		mMrtg	.word			;could be byte
 		mFee	.word			;could be byte
@@ -618,7 +624,7 @@ keyZPDecodePtr	=	$F5			;word
 	.endstruct
 	
 	.struct	STATION
-		tCard	.tag	CARD
+		tCard	.tag	TITLE
 		mPurch	.word
 		mMrtg	.word			;could be byte
 		mFee	.word			;could be byte
@@ -626,7 +632,7 @@ keyZPDecodePtr	=	$F5			;word
 	.endstruct
 	
 	.struct	UTILITY
-		tCard	.tag	CARD
+		tCard	.tag	TITLE
 		mPurch	.word
 		mMrtg	.word			;could be byte
 		mFee	.word			;could be byte
@@ -712,6 +718,7 @@ bootstrap:
 ;-------------------------------------------------------------------------------
 
 ;	We need this space in order to use it for the mouse pointer (from $0800)
+			.byte 	%00000000, %00010000, %00000000
 	.repeat	($0840 - *), I
 		.byte	$00
 	.endrep
@@ -1722,210 +1729,7 @@ keyTableShifted:
 ;FOR SCREEN.S
 ;==============================================================================
 
-;-------------------------------------------------------------------------------
-;screen constant data
-;-------------------------------------------------------------------------------
-;***TODO:	Consider moving this data into high memory (after strings?)
-
-screenRowsLo:
-			.byte	<$0400, <$0428, <$0450, <$0478, <$04A0
-			.byte	<$04C8, <$04F0, <$0518, <$0540, <$0568
-			.byte 	<$0590, <$05B8, <$05E0, <$0608, <$0630
-			.byte	<$0658, <$0680, <$06A8, <$06D0, <$06F8
-			.byte	<$0720, <$0748, <$0770, <$0798, <$07C0
-
-screenRowsHi:
-			.byte	>$0400, >$0428, >$0450, >$0478, >$04A0
-			.byte	>$04C8, >$04F0, >$0518, >$0540, >$0568
-			.byte 	>$0590, >$05B8, >$05E0, >$0608, >$0630
-			.byte	>$0658, >$0680, >$06A8, >$06D0, >$06F8
-			.byte	>$0720, >$0748, >$0770, >$0798, >$07C0
-
-colourRowsLo:
-			.byte	<$D800, <$D828, <$D850, <$D878, <$D8A0
-			.byte	<$D8C8, <$D8F0, <$D918, <$D940, <$D968
-			.byte 	<$D990, <$D9B8, <$D9E0, <$DA08, <$DA30
-			.byte	<$DA58, <$DA80, <$DAA8, <$DAD0, <$DAF8
-			.byte	<$DB20, <$DB48, <$DB70, <$DB98, <$DBC0
-
-colourRowsHi:
-			.byte	>$D800, >$D828, >$D850, >$D878, >$D8A0
-			.byte	>$D8C8, >$D8F0, >$D918, >$D940, >$D968
-			.byte 	>$D990, >$D9B8, >$D9E0, >$DA08, >$DA30
-			.byte	>$DA58, >$DA80, >$DAA8, >$DAD0, >$DAF8
-			.byte	>$DB20, >$DB48, >$DB70, >$DB98, >$DBC0
-			
-lineCodes:
-			.byte	$EA, $EF, $F4, $F7
-			.byte	$FF, $A0, $6C, $7E
-			.byte	$20, $6A, $77, $E7
-			.byte	$D0
-			
-pointCodes:
-			.byte	$CF, $D0, $CC, $FA
-			.byte 	$A0, $B1, $B2, $B3
-			.byte	$B4, $88, $20, $F7
-			.byte	$E7, $D7
-			
-screenClear0:
-			.byte	$11, $00, $00, $28, $19
-			.byte	$00
-
-screenQErase0:
-			.byte	$58, $12, $00, $07
-			.byte	$11, $13, $15, $15, $04
-			.byte	$00
-			
-brushRailroad0:		
-			.byte 	$02, $02
-			.byte	$E2, $7E
-			.byte	$D7, $D7
-brushChanceH1:
-			.byte	$03, $01 
-			.byte	$BF, $BF, $BF
-			
-brushTaxH2:
-			.byte	$03, $01 
-			.byte	$94, $81, $98
-
-brushTaxV3:
-			.byte	$01, $03
-			.byte	$94
-			.byte	$81
-			.byte	$98
-			
-brushChestV4:	
-			.byte	$01, $03
-			.byte	$5C
-			.byte	$66
-			.byte	$FE
-
-brushGo5:
-			.byte	$03, $02
-			.byte	$A0, $87, $8F
-			.byte	$9F, $C3, $C3
-			
-brushElectric6:		
-			.byte	$03, $01
-			.byte	$CE, $CD, $CE
-			
-brushChanceV7:
-			.byte	$01, $03
-			.byte	$BF
-			.byte	$BF
-			.byte	$BF
-			
-brushChestH8:	
-			.byte	$03, $01
-			.byte	$EC, $66, $68
-
-brushParking9:
-			.byte	$03, $03
-			.byte	$D5, $C3, $C9
-			.byte	$D7, $68, $D7
-			.byte	$6C, $62, $7B
-			
-brushWaterA:
-			.byte	$02, $03
-			.byte	$A0, $EF
-			.byte	$D5, $DB
-			.byte	$A0, $DD
-			
-brushInGaolB:
-			.byte	$03, $03
-			.byte	$DD, $DD, $DD
-			.byte	$DD, $DD, $DD
-			.byte	$ED, $F1, $F1
-
-brushGoGaolC:
-			.byte   $04, $03
-			.byte	$F0, $F2, $C0, $C9
-			.byte	$FC, $7C, $7F, $C2
-			.byte	$A0, $FC, $C0, $CB
-			
-brushesLo:
-			.byte	<brushRailroad0, <brushChanceH1, <brushTaxH2
-			.byte	<brushTaxV3, <brushChestV4, <brushGo5
-			.byte	<brushElectric6, <brushChanceV7, <brushChestH8
-			.byte	<brushParking9, <brushWaterA, <brushInGaolB
-			.byte	<brushGoGaolC
-brushesHi:
-			.byte	>brushRailroad0, >brushChanceH1, >brushTaxH2
-			.byte	>brushTaxV3, >brushChestV4, >brushGo5
-			.byte	>brushElectric6, >brushChanceV7, >brushChestH8
-			.byte	>brushParking9, >brushWaterA, >brushInGaolB
-			.byte	>brushGoGaolC
-
-
-;	These are BQUADP structs
-bQuadPos0:
-			.byte	$B6
-			.word	$0134
-			.word	$0114
-			.word	$00FC
-			.word	$00E4
-			.word	$00CC
-			.word	$00B4
-			.word	$0134
-			.byte	$36
-			.byte	$4E
-			.byte	$66
-			.byte	$7E
-			.byte	$96
-
-bQuadPos1:
-			.byte	$B6
-			.word	$0144
-			.word	$012C
-			.word	$0114
-			.word	$00FC
-			.word 	$00E4
-			.word	$00BC
-			.word	$00BC
-			.byte	$96
-			.byte	$7E
-			.byte	$66
-			.byte	$4E
-			.byte	$36
-			
-bQuadPos2:
-			.byte	$3E
-			.word	$00BC
-			.word	$00E4
-			.word	$00FC
-			.word	$0114
-			.word	$012C
-			.word	$0144
-			.word	$00BC
-			.byte	$C6
-			.byte	$AE
-			.byte	$96
-			.byte	$7E
-			.byte	$66
-			
-bQuadPos3:
-			.byte	$3E
-			.word	$00B4
-			.word	$00CC
-			.word	$00E4
-			.word	$00FC
-			.word	$011C
-			.word	$0134
-			.word	$0134
-			.byte	$66
-			.byte	$7E
-			.byte	$96
-			.byte	$AE
-			.byte	$C6
-			
-bQuadPosLo:
-			.byte 	<bQuadPos0, <bQuadPos1
-			.byte 	<bQuadPos2, <bQuadPos3
-			
-bQuadPosHi:
-			.byte 	>bQuadPos0, >bQuadPos1
-			.byte 	>bQuadPos2, >bQuadPos3
-
+	.include 	"screen.inc"
 
 ;-------------------------------------------------------------------------------
 ;screen variable data
@@ -5318,17 +5122,8 @@ plyrDispUpdShort:
 ;===============================================================================
 ;FOR PROMPT.S
 ;===============================================================================
-prmptDisp0:
-		.byte	$90, $13, $16
-prmptTok0:
-		.word		strDummyDummy0
-		.byte	$00
-		
-prmptDisp1:
-		.byte	$90, $13, $17
-prmptTok1:
-		.word		strDummyDummy0
-		.byte	$00
+prmptTok0 	=	$70
+prmptTok1	=	$72
 
 prmpt0Txt0	=	$0783
 prmpt0Clr0	=	$DB83
@@ -5373,6 +5168,27 @@ prmptClear:
 
 
 ;-------------------------------------------------------------------------------
+prmptClear1:
+;-------------------------------------------------------------------------------
+		LDA	#<strDummyDummy0
+		STA	prmptTok0
+		LDA	#>strDummyDummy0
+		STA	prmptTok0 + 1
+
+		LDA	#$0F
+		STA	prmptClr0
+		
+		LDA	prmptTemp2
+		AND	#$0F
+		STA	prmptTemp2
+		
+		LDA	#$20
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+		RTS
+		
+;-------------------------------------------------------------------------------
 prmptClear2:
 ;-------------------------------------------------------------------------------
 		LDA	#<strDummyDummy0
@@ -5398,7 +5214,7 @@ prmptClear2:
 prmptDisplay:
 ;-------------------------------------------------------------------------------
 		LDX	#$0F
-@loop1:
+@loop0:
 		LDA 	#$20
 		STA	prmpt0Txt0, X
 		STA	prmpt1Txt0, X
@@ -5410,27 +5226,35 @@ prmptDisplay:
 		STA	prmpt1Clr0, X
 		
 		DEX
-		BPL	@loop1
+		BPL	@loop0
 		
 		LDA	prmptClr0
 		STA	prmpt0Clr0
 		LDA	prmptClr1
 		STA	prmpt1Clr0
 
-		LDA	#<prmptDisp0
-		STA	$FD
-		LDA	#>prmptDisp0
-		STA	$FE
-		
-		JSR	screenPerformList
-		
-		LDA	#<prmptDisp1
-		STA	$FD
-		LDA	#>prmptDisp1
-		STA	$FE
-		
-		JSR	screenPerformList
+		LDY	 #$00
+		LDA	(prmptTok0), Y
+		BEQ	@second
+		TAY
+@loop1:
+		LDA	(prmptTok0), Y
+		STA	prmpt0Txt0 - 1, Y
+		DEY
+		BNE	@loop1
 
+@second:
+		LDY	 #$00
+		LDA	(prmptTok1), Y
+		BEQ	@update
+		TAY
+@loop2:
+		LDA	(prmptTok1), Y
+		STA	prmpt1Txt0 - 1, Y
+		DEY
+		BNE	@loop2
+
+@update:
 		JSR	prmptUpdate
 
 		RTS
@@ -5585,7 +5409,9 @@ prmptRolled:
 		ORA	#$40
 		STA	prmptTemp2
 		
-		JSR	prmptClear2
+		LDA	#$20
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
 
 		RTS
 
@@ -5614,12 +5440,35 @@ prmptManage:
 	
 	
 ;-------------------------------------------------------------------------------
+prmptAuction:
+;-------------------------------------------------------------------------------
+		LDA	#$0F
+		STA	prmptClr0
+		
+		LDA	#<tokPrmptAuction
+		STA	prmptTok0
+		LDA	#>tokPrmptAuction
+		STA	prmptTok0 + 1
+		
+		LDA	prmptTemp2
+		AND	#$0F
+;		ORA	#$80
+		STA	prmptTemp2
+		
+		LDA	#$20
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+		RTS
+	
+	
+;-------------------------------------------------------------------------------
 prmptClearOrRoll:
 ;-------------------------------------------------------------------------------
 		LDA	prmptTemp3
 		BNE	@roll
 		
-		JSR	prmptClear
+		JSR	prmptClear1
 		RTS
 		
 @roll:
@@ -5737,6 +5586,19 @@ prmptBought:
 		LDA	#<tokPrmptBought
 		STA	prmptTok1
 		LDA	#>tokPrmptBought
+		STA	prmptTok1 + 1
+		
+		JMP	prmptDoSubCash
+		
+		
+;-------------------------------------------------------------------------------
+prmptConstruct:
+;-------------------------------------------------------------------------------
+		STX	prmptClr1
+
+		LDA	#<tokPrmptConstruct
+		STA	prmptTok1
+		LDA	#>tokPrmptConstruct
 		STA	prmptTok1 + 1
 		
 		JMP	prmptDoSubCash
@@ -8771,44 +8633,55 @@ menuWindowSetup7:
 			.byte	$90, $01, $08
 			.word        strDescSetup7
 			
-			.byte	$AF, $00, $00, $01, $20, $00, $00
-			.word		strDummyDummy0
-			
-			.byte	$A1, $0A, $01, $12, $59, $02, $0A
-			.word	     strOptn0Setup7
-			.byte	$A1, $0C, $01, $12, $4E, $02, $0C
+			.byte	$A1, $0A, $01, $12, $4A, $02, $0A
 			.word	     strOptn1Setup7
-			.byte	$A1, $0E, $01, $12, $4E, $02, $0E
+			.byte	$A1, $0C, $01, $12, $4D, $02, $0C
 			.word	     strOptn2Setup7
+			.byte	$A1, $0E, $01, $12, $4B, $02, $0E
+			.word	     strOptn0Setup7
 			
 			.byte	$00
 
 
 menuPageSetup7Keys:
-		CMP	#' '
-		BNE	@tstK
-		
-		LDA	JoyUsed
-		BNE	@doJsk
-		
-		LDA	MouseUsed
-		BNE	@doMse
-		
-		RTS
-
 @tstK:
 		CMP	#'K'
 		BNE	@tstM
 
+		LDA	JoyUsed
+		BNE	@buzz
+		
+		LDA	MouseUsed
+		BNE	@buzz
+		
+		LDA	#$00
+		STA	ui + UI::fMseEnb
+		STA	ui + UI::fJskEnb
+		
 		LDA	#$FF
 		STA	ui + UI::iSelBtn
 		
 		JMP	@nojoy	
+
+@buzz:
+		LDA	#$00
+		STA	JoyUsed
+		LDA	MouseUsed
+		
+		LDA	#<SFXBUZZ
+		LDY	#>SFXBUZZ
+		LDX	#$07
+		JSR	SNDBASE + 6
+	
+		RTS
 		
 @tstM:
 		CMP	#'M'
 		BNE	@tstJ
 	
+		LDA	JoyUsed
+		BNE	@buzz
+		
 @doMse:	
 		JSR	initMouse
 		
@@ -8817,6 +8690,9 @@ menuPageSetup7Keys:
 @tstJ:
 		CMP	#'J'
 		BNE	@exit
+
+		LDA	MouseUsed
+		BNE	@buzz
 
 @doJsk:
 		LDA	#$01
@@ -9778,7 +9654,8 @@ menuPagePlay2Draw:
 
 menuPageAuctnAmt0:
 			.byte	$06, $00, $00, $00, $00, $00, $00, $00
-
+menuPageAuctnPage0:
+		.byte	$00
 
 menuWindowAuctn0:
 			.byte	$90, $01, $07
@@ -9788,8 +9665,6 @@ menuWindowAuctn0:
 			
 			.byte	$90, $02, $0A
 			.word	     	strOptn1Auctn0
-			.byte	$90, $0B, $0A
-			.word		menuPageAuctnAmt0
 
 			.byte	$2F, $01, $0B, $11
 			.byte	$2F, $01, $0C, $11
@@ -9825,7 +9700,13 @@ menuWindowAuctn0Bid:
 			
 			.byte	$00
 		
-		
+
+menuWindowAuctn0Amt:
+			.byte	$90, $0B, $0A
+			.word		menuPageAuctnAmt0
+			.byte	$00
+
+
 menuPageAuctn0Inc:
 		CLC
 		ADC	game + GAME::mACurr
@@ -10083,10 +9964,14 @@ menuPageAuctnDefKeys:
 		JSR	SNDBASE + 6
 		
 @keysRealUpd:
-		LDA	#$08
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty
+;		LDA	#$08
+;		ORA	game + GAME::dirty
+;		STA	game + GAME::dirty
+		LDA	menuPageAuctnPage0
+		BNE	@keysExit
 		
+		JSR	menuPageAuctn0SetAmt
+
 @keysExit:
 		RTS
 		
@@ -10140,24 +10025,7 @@ menuPageAuctn0Keys:
 		RTS
 
 
-menuPageAuctn0Draw:
-		LDA	game + GAME::mACurr
-		LDY	game + GAME::mACurr + 1
-		
-;		So, if money less than A, Y - clear carry else set
-		JSR	gamePlayerHasFunds
-		BCS	@havefunds
-		
-		LDA	#$A0
-		STA	menuWindowAuctn0Bid
-		
-		JMP	@beginbid
-		
-@havefunds:
-		LDA	#$A1
-		STA	menuWindowAuctn0Bid
-
-@beginbid:
+menuPageAuctn0SetAmt:
 		LDA	game + GAME::mACurr
 		STA	Z:numConvVALUE
 		LDA	game + GAME::mACurr + 1
@@ -10172,13 +10040,46 @@ menuPageAuctn0Draw:
 		STA	menuPageAuctnAmt0 + 1, X
 		DEX
 		BPL	@loop
+
+		LDA	#<menuWindowAuctn0Amt
+		STA	$FD
+		LDA	#>menuWindowAuctn0Amt
+		STA	$FE
 		
+		JSR	screenPerformList
+		
+		RTS
+
+
+menuPageAuctn0Draw:
+		LDA	#$00
+		STA	menuPageAuctnPage0
+		
+		LDA	game + GAME::mACurr
+		LDY	game + GAME::mACurr + 1
+		
+;		So, if money less than A, Y - clear carry else set
+		JSR	gamePlayerHasFunds
+		BCS	@havefunds
+		
+		LDA	#$A0
+		STA	menuWindowAuctn0Bid
+		
+		JMP	@begin
+		
+@havefunds:
+		LDA	#$A1
+		STA	menuWindowAuctn0Bid
+
+@begin:
 		LDA	#<menuWindowAuctn0
 		STA	$FD
 		LDA	#>menuWindowAuctn0
 		STA	$FE
 		
 		JSR	screenPerformList
+		
+		JSR	menuPageAuctn0SetAmt
 		
 		RTS
 		
@@ -10228,6 +10129,9 @@ menuPageAuctn1Keys:
 		
 		
 menuPageAuctn1Draw:
+		LDA	#$01
+		STA	menuPageAuctnPage0
+		
 		LDX	game + GAME::pActive
 		LDA	plrLo, X
 		STA	$FB
@@ -10780,6 +10684,8 @@ menuPageManage0Keys:
 		LDA	($FB), Y
 		TAX
 		JSR	prmptClearOrRoll
+		JSR	prmptClear2
+		
 		
 		JMP	@ding
 		
@@ -14128,8 +14034,25 @@ gameNextAuction:
 
 		JSR	gamePopState
 
+		LDA	#$FF
+		STA	game + GAME::pLast
+		
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDY	#PLAYER::colour
+		LDA	($FB), Y
+		TAX
+		JSR	prmptClearOrRoll
+
 		
 @update:
+		JSR	rulesFocusOnActive
+		JSR	gamePlayersDirty
+		
 		JSR	gameUpdateMenu
 
 		LDA	#$01
@@ -15559,6 +15482,7 @@ gameRollDice:
 		LDA	($FB), Y
 		TAX
 		JSR	prmptRolled
+		JSR	prmptClear2
 
 		LDA 	sidV2EnvOu
 		LSR
@@ -15717,6 +15641,9 @@ gameStartAuction:
 ;-------------------------------------------------------------------------------
 		TXA
 		PHA
+
+		JSR	prmptAuction
+		JSR	prmptClear2
 
 		LDA	game + GAME::sAuctn
 		JSR	gameSelect
@@ -20791,7 +20718,7 @@ dialogDlgSqrInfo0Draw:
 		PLA
 		STA	$FD
 		
-		LDY	#CARD::sTitle0
+		LDY	#TITLE::sTitle0
 		LDA	($FD), Y
 		STA	dialogWindowSqrInfoT0
 		INY
@@ -24220,6 +24147,7 @@ rulesCCCrdProcAdv:				;adv to
 		LDA	($FB), Y
 		TAX
 		JSR	prmptClearOrRoll
+		JSR	prmptClear2
 		
 		LDY	#PLAYER::square
 		LDA	($FB), Y
@@ -24619,6 +24547,7 @@ rulesCCCrdProcGGF:				;get out free
 		LDA	($FB), Y
 		TAX
 		JSR	prmptClearOrRoll
+		JSR	prmptClear2
 		
 		LDA	#<SFXSLAM
 		LDY	#>SFXSLAM
@@ -24643,6 +24572,7 @@ rulesCCCrdProcAST:				;adv to station pay dbl
 		LDA	($FB), Y
 		TAX
 		JSR	prmptClearOrRoll
+		JSR	prmptClear2
 		
 		LDY	#>SFXSPLAT
 		LDA	#<SFXSPLAT
@@ -24710,6 +24640,7 @@ rulesCCCrdProcGBk:				;go back spaces
 		LDA	($FB), Y
 		TAX
 		JSR	prmptClearOrRoll
+		JSR	prmptClear2
 		
 		LDY	#>SFXSPLAT
 		LDA	#<SFXSPLAT
@@ -24858,6 +24789,7 @@ rulesCCCrdProcAUT:				;adv to util pay 10x
 		LDA	($FB), Y
 		TAX
 		JSR	prmptClearOrRoll
+		JSR	prmptClear2
 		
 		LDY	#>SFXSPLAT
 		LDA	#<SFXSPLAT
@@ -25526,7 +25458,7 @@ rulesNextImprv:
 		LDY	#PLAYER::colour
 		LDA	($FB), Y
 		TAX
-		JSR	prmptBought
+		JSR	prmptConstruct
 		
 		LSR	game + GAME::varD
 		
@@ -28055,11 +27987,11 @@ rulesSuggestBaseReserve:
 		LDY	#PLAYER::status
 		LDA	($A3), Y
 		AND	#$01
-		BEQ	@exit
+		BEQ	@purchases
 		
 		LDA	sqr00 + 1, X
 		AND	#$40
-		BEQ	@exit
+		BEQ	@purchases
 		
 ;		Add 75
 		CLC
@@ -28080,9 +28012,9 @@ rulesSuggestBaseReserve:
 		BNE	@tst16
 		
 ;		Increase value by 150
-		LDA	#<150
+		LDA	#<100
 		STA	game + GAME::varM
-		LDA	#>150
+		LDA	#>100
 		STA	game + GAME::varN
 		
 		JMP	@bump
@@ -28093,9 +28025,9 @@ rulesSuggestBaseReserve:
 		BMI	@tst11
 
 ;		Increase value by 200
-		LDA	#<200
+		LDA	#<150
 		STA	game + GAME::varM
-		LDA	#>200
+		LDA	#>150
 		STA	game + GAME::varN
 
 		JMP	@bump
@@ -28106,9 +28038,9 @@ rulesSuggestBaseReserve:
 		BMI	@default
 		
 ;		Increase value by 300
-		LDA	#<300
+		LDA	#<250
 		STA	game + GAME::varM
-		LDA	#>300
+		LDA	#>250
 		STA	game + GAME::varN
 
 		JMP	@bump
@@ -28116,9 +28048,9 @@ rulesSuggestBaseReserve:
 @default:
 ;	Or
 ;		Increase value by 400
-		LDA	#<400
+		LDA	#<350
 		STA	game + GAME::varM
-		LDA	#>400
+		LDA	#>350
 		STA	game + GAME::varN
 
 @bump:
@@ -29176,7 +29108,7 @@ rulesAutoAuction:
 		JMP	@forfeit
 
 @begin:
-;	Copy our absolute maximum to compare
+;	Copy our value to absolute maximum for compare
 		LDA	game + GAME::varD
 		STA	game + GAME::varO
 		LDA	game + GAME::varE
@@ -29186,38 +29118,40 @@ rulesAutoAuction:
 		LDA	game + GAME::sAuctn
 		JSR	rulesSuggestDeedValue
 		
-;	Test our suggested value, if suggested is < maximum then keep
+;	Test our suggested value, if suggested is >= maximum then keep max
 ;		D, E < (O, P) -> CLC | SEC
 		JSR	gameAmountIsLessDirect
-		BCC	@cont0
+		BCS	@cont0
 		
-;	Copy our absolute maximum to suggested value
-		LDA	game + GAME::varO
-		STA	game + GAME::varD
-		LDA	game + GAME::varP
-		STA	game + GAME::varE
+;	Copy our suggested value to maximum
+		LDA	game + GAME::varD
+		STA	game + GAME::varO
+		LDA	game + GAME::varE
+		STA	game + GAME::varP
 		
 @cont0:
+
+;***TODO	
+;	If have sufficient money (still within max after sub value from money?)
+;	Get more interested in buying it?
+
 		LDA	game + GAME::mACurr
-		STA	game + GAME::varO
+		STA	game + GAME::varD
 		LDA	game + GAME::mACurr + 1
-		STA	game + GAME::varP
+		STA	game + GAME::varE
 		
 ;	Test our suggested value, if current is >= then forfeit
 ;		D, E < (O, P) -> CLC | SEC
 		JSR	gameAmountIsLessDirect
 		BCS	@forfeit
-		
-;	Swap our values around (for comparisons)
-		LDA	game + GAME::varD
-		STA	game + GAME::varO
-		LDA	game + GAME::varE
-		STA	game + GAME::varP
-		LDA	game + GAME::mACurr
-		STA	game + GAME::varD
-		LDA	game + GAME::mACurr + 1
-		STA	game + GAME::varE
-		
+
+;***TODO	
+;	Calc min?  Boot bid?
+;	Test have 75% of money
+;	Test have 50% of money?
+;	Recover equity 
+
+
 ;	Do we nudge or tap towards our value?
 		LDA	sidV2EnvOu
 		CMP	#$C0
@@ -30987,30 +30921,32 @@ heap0:
 ;DISCARD.S
 ;===============================================================================
 
-screenLoad0:
-			.byte	$11, $00, $00, $28, $19
-			.byte	$90, $00, $01
-			.word	strText0Load0
-			.byte	$00
-screenLoad1:
-			.byte	$90, $00, $02
-			.word	strText0Load1
-			.byte	$00
-			
+;screenLoad0:
+;			.byte	$11, $00, $00, $28, $19
+;			.byte	$90, $00, $01
+;			.word	strText0Load0
+;			.byte	$00
+;screenLoad1:
+;			.byte	$90, $00, $02
+;			.word	strText0Load1
+;			.byte	$00
+;			
 strText0Load0:		;LOADING RESOURCES...
-			.byte $14, $0C, $0F, $01, $04, $09, $0E, $07
+			.byte $0C, $0F, $01, $04, $09, $0E, $07
 			.byte $20, $12, $05, $13, $0F, $15, $12, $03
 			.byte $05, $13, $2E, $2E, $2E
 strText0Load1:		;LOADING RULES...
-			.byte $10, $0C, $0F, $01, $04, $09, $0E, $07
+			.byte $0C, $0F, $01, $04, $09, $0E, $07
 			.byte $20, $12, $15, $0C, $05, $13, $2E, $2E
 			.byte $2E
-			
+
 FILENAME:
 		.byte	"STRINGS"
 FILENAME_2:
 		.byte	"RULES"
 FILENAME_3:
+		.byte	"SCREEN"
+FILENAME_4:
 
 
 ;-------------------------------------------------------------------------------
@@ -31031,7 +30967,19 @@ initVICII:
 		STA	vicMemCtrl
 		
 		RTS
-	
+
+
+;-------------------------------------------------------------------------------
+initOutString:
+;-------------------------------------------------------------------------------
+@loop:
+		LDA	($FD), Y
+		STA	($FB), Y
+		DEY
+		BPL	@loop
+		
+		RTS
+
 
 ;-------------------------------------------------------------------------------
 initDataLoad:
@@ -31040,13 +30988,21 @@ initDataLoad:
 		JSR	krnlOutChr
 		LDA	#$08			;disable change character case
 		JSR	krnlOutChr
+		LDA	#$93			;clear screen
+		JSR	krnlOutChr
 		
-		LDA	#<screenLoad0
+		LDA	#<(1024 + 40)
+		STA	$FB
+		LDA	#>(1024 + 40)
+		STA	$FC
+		
+		LDA	#<strText0Load0
 		STA	$FD
-		LDA	#>screenLoad0
+		LDA	#>strText0Load0
 		STA	$FE
 		
-		JSR	screenPerformList
+		LDY	#$13
+		JSR	initOutString
 
 		LDA	#$01
 		LDX	#$08
@@ -31061,19 +31017,41 @@ initDataLoad:
 		JSR	krnlSetNam
 		
 		LDA	#$00
-		LDX	#<$E000
-		LDY	#>$E000
 		
 		JSR	krnlLoad
 		
 		JSR	knrlClAll
 
-		LDA	#<screenLoad1
+		LDA	#$01
+		LDX	#$08
+		LDY	#$01
+		
+		JSR	krnlSetLFS
+		
+		LDA	#FILENAME_4 - FILENAME_3
+		LDX	#<FILENAME_3
+		LDY	#>FILENAME_3
+
+		JSR	krnlSetNam
+		
+		LDA	#$00
+		
+		JSR	krnlLoad
+		
+		JSR	knrlClAll
+
+		LDA	#<(1024 + 80)
+		STA	$FB
+		LDA	#>(1024 + 80)
+		STA	$FC
+		
+		LDA	#<strText0Load1
 		STA	$FD
-		LDA	#>screenLoad1
+		LDA	#>strText0Load1
 		STA	$FE
 		
-		JSR	screenPerformList
+		LDY	#$0F
+		JSR	initOutString
 
 		LDA	#$01
 		LDX	#$08
@@ -31088,9 +31066,7 @@ initDataLoad:
 		JSR	krnlSetNam
 		
 		LDA	#$00
-		LDX	#<$F400
-		LDY	#>$F400
-		
+	
 		JSR	krnlLoad
 		
 		JSR	knrlClAll
@@ -31159,14 +31135,13 @@ initMem:
 		LDA	#>spriteMem20
 		STA	$FE
 		
-		LDY	#$00
+		LDY	#$26
 @loop5:						;Copy mouse pointer data
 		LDA	($FB), Y
 		STA	($FD), Y
 		
-		INY
-		CPY	#$40
-		BNE	@loop5
+		DEY
+		BPL	@loop5
 
 		RTS
 
@@ -31300,14 +31275,14 @@ sprPointer:
 			.byte 	%01010001, %01100100, %00000000
 			.byte 	%01010000, %01010100, %00000000
 			.byte 	%01000000, %00010000, %00000000
-			.byte 	%00000000, %00010000, %00000000
-			.byte 	%00000000, %00000000, %00000000
-			.byte 	%00000000, %00000000, %00000000
-			.byte 	%00000000, %00000000, %00000000
-			.byte 	%00000000, %00000000, %00000000
-			.byte 	%00000000, %00000000, %00000000
-			.byte 	%00000000, %00000000, %00000000
-			.byte 	%00000000, %00000000, %00000000
-			.byte	$00
+;			.byte 	%00000000, %00010000, %00000000
+;			.byte 	%00000000, %00000000, %00000000
+;			.byte 	%00000000, %00000000, %00000000
+;			.byte 	%00000000, %00000000, %00000000
+;			.byte 	%00000000, %00000000, %00000000
+;			.byte 	%00000000, %00000000, %00000000
+;			.byte 	%00000000, %00000000, %00000000
+;			.byte 	%00000000, %00000000, %00000000
+;			.byte	$00
 
 	.assert         * < $D000, error, "Program too large!"
