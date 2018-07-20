@@ -24,10 +24,10 @@ strDesc3Titles0:	;ECCLESTIAL
 strDesc4Titles0:	;SOLUTIONS
 			.byte $09, $93, $8F, $8C, $95, $94, $89, $8F
 			.byte $8E, $93	
-strDesc8Titles0:	;VERSION 0.02.39A
+strDesc8Titles0:	;VERSION 0.02.56B
 			.byte $10, $96, $85, $92, $93, $89, $8F, $8E
-			.byte $A0, $B0, $AE, $B0, $B2, $AE, $B3, $B9
-			.byte $81			
+			.byte $A0, $B0, $AE, $B0, $B2, $AE, $B5, $B6
+			.byte $82			
 strDesc5Titles0:	;(C) 1935, 2016
 			.byte $0E, $A8, $83, $A9, $A0, $B1, $B9, $B3
 			.byte $B5, $AC, $A0, $B2, $B0, $B1, $B6			

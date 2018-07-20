@@ -1,12 +1,16 @@
 ;===============================================================================
 ;M O N O P O L Y 
 ;-------------------------------------------------------------------------------
+;
+;VERSION 0.02.56 BETA
+;
+;
 ;FOR THE COMMODORE 64
 ;BY DANIEL ENGLAND FOR ECCLESTIAL SOLUTIONS
 ;
-;
 ;(C) 2018 DANIEL ENGLAND
 ;ALL RIGHTS RESERVED
+;
 ;
 ;MONOPOLY IS THE PROPERTY OF HASBRO INC.
 ;(C) 1935, 2016 HASBRO
@@ -15,28 +19,29 @@
 ;You probably need to own a copy of the official board game to even have this.
 ;*ugh*
 ;
-;I feel this is how the game should be played...
+;I feel this is how the game should be played in this format...
 ;
 ;
-;Please see readme.md for further information.
+;Please see readme.md and changelog.md for further information.
 ;
 ;
 ;Contents:
-;	 16 modules (6 display segment; 10 core)
-;	 10 game modes (6 primary; 4 front end; stackable w/ limits)
+;	 20 modules (8 system; 7 display segment; 5 core -- 1 multi)
+;	 11 game modes (6 core; 5 user -- 1 psuedo; stackable w/ limits)
 ;	 30 menus
 ;	 17 dialogs
 ;	 14 CPU behaviours (2 system; 12 game play)
-;	 14 core actions (2 system; 1 generic key action; 11 specific)
+;	  1 multi-context, stallable action cache (messaging)
+;	 15 core actions (3 system; 1 generic input driver; 11 specific)
 ;	 16 tunes (2 voice)
-;	 16 sfx
-;	350 strings
+;	 16 sfx (1 voice)
+;	350 constant strings (more than 4.5KB and 23 pages of source)
 ;	  3 threads equivalent (raster IRQ, signal managed; system, main, game)
 ;	  3 configurable input sources (keyboard, joystick, mouse)
 ;	  2 sprite zones (by raster split)
 ;
 ;	 40 game board squares
-;	  4 quadrants
+;	  4 board quadrants
 ;	 10 player colours
 ;	 28 title deed cards (plus title cards for all other squares)
 ;	 16 chance cards
@@ -49,40 +54,42 @@
 ;	2-6 players
 ;	 8+ years
 ;
-;	  3 house rules (one always enabled:  reshuffle)
+;	  3 house rules (one always enabled:  reshuffle CCCCards)
 ;	    strictly turn-based (with interrupts and flexible management)
 ;
-;	 an estimated 16.5KB of data, 38KB of code, 1.5KB of heap
-;	 more than 650 double-sided, A4 pages of source code with small font
+;	 an estimated 18KB of data, 35.5KB of code, 1.5KB of heap, 5KB system
+;	 more than 650 portrait A4 pages of source code with small font
+;	 to print in the old landscape style with normal font, 1100 A4 pages
 ;
 ;
-;Free memory information (as of last update from 0.02.39A):
-;	* Between rules data and action cache 307 bytes (free for const data)
-;	* Between heap and reserved 4235 bytes (free for program)
-;	* Reserved areas 768 bytes (unavailable/unused)
+;Free memory information (as of last update):
+;	* Between end of program and reserved, 4093 bytes (free for program)
 ;	* Free in discard, 6 bytes
+;	* Reserved areas, 512 bytes (unused)
+;	* Between rules data and action cache, 307 bytes (free for const data)
+;	* Free in trade data, 41 bytes
 ;
 ;
-;Memory map (as of last update from 0.02.39A):
+;Memory map (as of last update):
 ;	0000 -	00FF	Zero page
 ;	0100 -	01FF	System stack
 ;	0200 - 	03FF	Global state
 ;	0400 - 	07FF	Screen data and sprite pointers
 ;	0800 - 	08FF	Bootstrap/sprite data
-;	0900 -  7FFF	Program area
-;	8000 -	9FFF	Program area
-;	A000 -	BD74	Program area
-;	BD75 - 	BF6E	Discard/heap
-;	BF6F -	BFFF	Free/heap
+;	0900 -  7FFF	Program area (~30KB)
+;	8000 -	9FFF	Program area (4KB)
+;	A000 -	BE02	Program area (~7.5KB)
+;	BE03 - 	BFFC	Discard/screen heap
+;	BFFD - 	BFFF	Screen heap
 ;	C000 -	CDFF	Free
-;	CE00 - 	CFFF	Reserved (may be used for discard/heap)
+;	CE00 - 	CFFF	Reserved (may be used for discard/screen heap)
 ;	D000 - 	DFFF	System IO
 ;	E000 -	F240	Strings data (4673 bytes)
 ;	F241 - 	F39E	Screen data (350 bytes)
 ;	F39F - 	F9CC	Rules data (1582 bytes)
-;	F9CD - 	FAFF	Free data area (307 bytes)
-;	FB00 - 	FEFF	Action cache
-;	FF00 -  FFF9	Reserved (unused on purpose, 249 bytes)
+;	F9CD - 	FAFF	Free (307 bytes)
+;	FB00 - 	FEFF	Action cache heap
+;	FF00 -  FFF9	Trade data 
 ;	FFFA -	FFFF	System vectors
 ;
 ;
@@ -255,6 +262,8 @@ UI_ACT_POST	=	10
 UI_ACT_ROLL	=	11
 UI_ACT_SKEY	=	12
 UI_ACT_DELY	= 	13
+UI_ACT_ENDP	=	14
+
 
 uiActnCache	=	$FB00
 
@@ -279,6 +288,7 @@ uiActnCache	=	$FB00
 		fBtSta1 .byte
 		
 		cActns	.byte
+		cLstAct	.byte
 		
 ;		gMdAct	.byte			;Remove for game state stack
 ;		pActBak .byte			;Remove for game state stack
@@ -942,53 +952,73 @@ plrNameHi:
 ;-------------------------------------------------------------------------------
 ;Global variable data
 ;-------------------------------------------------------------------------------
-trade0:		.tag	TRADE
-trddeeds0:		
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00
-;		.byte			    $00, $00, $00, $00
-;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-trdrepay0:		
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00
-;		.byte			    $00, $00, $00, $00
-;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		
-trade1:		.tag	TRADE
-trddeeds1:		
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00
-;		.byte			    $00, $00, $00, $00
-;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-trdrepay1:		
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00
-;		.byte			    $00, $00, $00, $00
-;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 
-trade2:		.tag	TRADE
-trddeeds2:		
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00		;Need an extra two bytes to 
-						;"unpack" the gofree cards.
-trdrepay2:		
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
-		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+
+;***	209 bytes of 250
+
+TRADE_BEGIN	=	$FF00
+
+trade0		=	TRADE_BEGIN
+trddeeds0	=	trade0 + .sizeof(TRADE)
+trdrepay0	=	trddeeds0 + 28
+trade1		=	trdrepay0 + 28
+trddeeds1	=	trade1 + .sizeof(TRADE)
+trdrepay1	=	trddeeds1 + 28
+trade2		=	trdrepay1 + 28
+trddeeds2	=	trade2 + .sizeof(TRADE)
+trdrepay2	=	trddeeds2 + 42
+
+TRADE_END	=	trdrepay2 + 40
+
+	.assert 	TRADE_END < $FFFA, error, "Trade data too large!"
+
+;trade0:	.tag	TRADE
+;trddeeds0:		
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00
+;;		.byte			    $00, $00, $00, $00
+;;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;trdrepay0:		
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00
+;;		.byte			    $00, $00, $00, $00
+;;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		
+;trade1:	.tag	TRADE
+;trddeeds1:		
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00
+;;		.byte			    $00, $00, $00, $00
+;;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;trdrepay1:		
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00
+;;		.byte			    $00, $00, $00, $00
+;;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+
+;trade2:	.tag	TRADE
+;trddeeds2:		
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00		;Need an extra two bytes to 
+;						;"unpack" the gofree cards.
+;trdrepay2:		
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 
 
 ;-------------------------------------------------------------------------------
@@ -1043,8 +1073,8 @@ mainHandleUpdates:
 		CMP	#$06
 		BNE	@tsttrdsel
 		
-		LDA	game + GAME::dlgVis	;***FIXME: I'm not sure this is
-		BNE	@tsttrdsel		;really required but makes sense
+		LDA	game + GAME::dlgVis	
+		BNE	@tsttrdsel		
 		
 		JSR	gamePerfStepping
 		
@@ -3037,6 +3067,10 @@ screenFillRowVExit:
 	
 ;==============================================================================
 ;FOR PLAYER.S
+;
+;***TODO
+;This should be broken down into 4 modules - IRQ, sprite, joystick and mouse
+;
 ;==============================================================================
 
 ;irqglob:	.tag	IRQGLOBS
@@ -3737,7 +3771,8 @@ MoveCheck:
 ;-------------------------------------------------------------------------------
 ;***FIXME:	Are you supposed to mask out certain bits (lowest?) in order to
 ;		correct for jitter?  A real mouse isn't synced to the C64 like 
-;		it should be or tries to be...
+;		it should be or tries to be...  I could allow sensativity setting
+;		as per joystick but instead mask off lowest 0, 1 or 2 bits.
 
 		STY     OldValue
 		STA     NewValue
@@ -5328,7 +5363,7 @@ prmptUpdate:
 		AND	#$80
 		BEQ	@test
 		
-						;-HSES+00 HTLS+00
+						;.HSES+00 HTLS+00
 		LDA	game + GAME::cntHs
 		STA	Z:numConvVALUE
 		BPL	@poshs
@@ -5361,6 +5396,8 @@ prmptUpdate:
 		LDA	heap0 + $05
 		STA	prmpt0Txt0 + $07
 		
+		
+;	hotels
 		LDA	game + GAME::cntHt
 		STA	Z:numConvVALUE
 		BPL	@posht
@@ -5380,7 +5417,7 @@ prmptUpdate:
 @cont1:
 		LDX	#$02
 @loop1:
-		STA	prmptClr0 + $0D, X
+		STA	prmpt0Clr0 + $0D, X
 		DEX
 		BPL	@loop1
 		
@@ -5805,7 +5842,7 @@ prmptShuffle:
 		LDX	#$0F
 @loop0:
 		LDA	#$20
-		STA	prmpt0Txt0, X
+;		STA	prmpt0Txt0, X
 		STA	prmpt1Txt0, X
 
 		DEX
@@ -6273,6 +6310,7 @@ uiActionCallsLo:
 		.byte	<(uiActionImprv - 1), <(uiActionGOFree - 1)
 		.byte	<(uiActionPost - 1), <(uiActionRoll - 1)
 		.byte	<(uiActionSendKey - 1), <(uiActionDelay - 1)
+		.byte	<(uiActionEndProc - 1)
 uiActionCallsHi:
 		.byte	>(uiActionFault - 1), >(uiActionTrade - 1)
 		.byte	>(uiActionRepay - 1), >(uiActionFee - 1)
@@ -6281,7 +6319,21 @@ uiActionCallsHi:
 		.byte	>(uiActionImprv - 1), >(uiActionGOFree - 1)
 		.byte	>(uiActionPost - 1), >(uiActionRoll - 1)
 		.byte	>(uiActionSendKey - 1), >(uiActionDelay - 1)
+		.byte	>(uiActionEndProc - 1)
 		
+
+uiProcessContext0:
+	.repeat	5,I
+		.word	$0000
+		.byte	$00, $00
+	.endrep
+uiProcessCtxCurrPtr:
+		.word	$0000
+uiProcessCtxNextPtr:
+		.word	uiProcessContext0
+uiProcessEnqueuePtr:
+		.word	uiActnCache
+
 
 ;-------------------------------------------------------------------------------
 uiInitQueue:
@@ -6293,35 +6345,15 @@ uiInitQueue:
 
 		LDA	#$00
 		STA	ui + UI::cActns
+		STA	ui + UI::cLstAct
 
-;		LDA	#$FF
-;		STA	($6D), Y
-		
-;		CLC
-;		LDA	$6D
-;		ADC	#$04
-;		STA	$6D
-;		LDA	$6E
-;		ADC	#$00
-;		STA	$6E
-		
 		RTS
 
 
 ;-------------------------------------------------------------------------------
-uiDequeueAction:
+uiPeekAction:
 ;-------------------------------------------------------------------------------
 		LDY	#$00
-		
-;		SEC
-;		LDA	ui + UI::cActns
-;		SBC	#$01
-;		STA	ui + UI::cActns
-;		LDA	ui + UI::cActns + 1
-;		SBC	#$00
-;		STA	ui + UI::cActns + 1
-		
-		DEC	ui + UI::cActns
 		
 		LDA	($6D), Y
 		STA	$68
@@ -6335,6 +6367,16 @@ uiDequeueAction:
 		LDA	($6D), Y
 		STA	$6B
 
+		RTS
+		
+
+;-------------------------------------------------------------------------------
+uiDequeueAction:
+;-------------------------------------------------------------------------------
+		DEC	ui + UI::cActns
+		
+		JSR	uiPeekAction
+
 		CLC
 		LDA	$6D
 		ADC	#$04
@@ -6342,7 +6384,18 @@ uiDequeueAction:
 		LDA	$6E
 		ADC	#$00
 		STA	$6E
+
+		LDA	uiProcessCtxCurrPtr
+		STA	$A3
+		LDA	uiProcessCtxCurrPtr + 1
+		STA	$A4
 		
+		LDY	#$00
+		LDA	$6D
+		STA	($A3), Y
+		INY
+		LDA	$6E
+		STA	($A3), Y
 
 		RTS
 		
@@ -6350,41 +6403,41 @@ uiDequeueAction:
 ;-------------------------------------------------------------------------------
 uiEnqueueAction:
 ;-------------------------------------------------------------------------------
+		LDA	uiProcessEnqueuePtr
+		STA	$A3
+		LDA	uiProcessEnqueuePtr + 1
+		STA	$A4
+
 		LDY	#$00
 		
 		LDA	$68
-		STA	($6D), Y
+		STA	($A3), Y
 		INY
 		LDA	$69
-		STA	($6D), Y
+		STA	($A3), Y
 		INY
 		LDA	$6A
-		STA	($6D), Y
+		STA	($A3), Y
 		INY
 		LDA	$6B
-		STA	($6D), Y
+		STA	($A3), Y
 		
-;		CLC
-;		LDA	ui + UI::cActns
-;		ADC	#$01
-;		STA	ui + UI::cActns
-;		LDA	ui + UI::cActns + 1
-;		ADC	#$00
-;		STA	ui + UI::cActns + 1
-
 		INC	ui + UI::cActns
+		INC	ui + UI::cLstAct
 
 		CLC
-		LDA	$6D
+		LDA	$A3
 		ADC	#$04
-		STA	$6D
-		LDA	$6E
+		STA	$A3
+		STA	uiProcessEnqueuePtr
+		LDA	$A4
 		ADC	#$00
-		STA	$6E
+		STA	$A4
+		STA	uiProcessEnqueuePtr + 1
 		
 		LDY	#$00
 		LDA	#$FF
-		STA	($6D), Y
+		STA	($A3), Y
 
 		RTS
 
@@ -6410,13 +6463,117 @@ uiPerformAction:
 
 
 ;-------------------------------------------------------------------------------
-uiProcessInit:
+uiProcessMarkStart:
 ;-------------------------------------------------------------------------------
-		LDA	#<uiActnCache
-		STA	$6D
-		LDA	#>uiActnCache
-		STA	$6E
+		LDA	uiProcessCtxNextPtr
+		STA	$A3
+		STA	uiProcessCtxCurrPtr
+		LDA	uiProcessCtxNextPtr + 1
+		STA	$A4
+		STA	uiProcessCtxCurrPtr + 1
+
+		LDY	#$00
+		LDA	uiProcessEnqueuePtr
+		STA	($A3), Y
+		INY
+		LDA	uiProcessEnqueuePtr + 1
+		STA	($A3), Y
+		INY
+		LDA	ui + UI::fActTyp
+		STA	($A3), Y
+		INY
+		LDA	ui + UI::fActInt
+		STA	($A3), Y
 		
+		CLC
+		LDA	$A3
+		ADC	#$04
+		STA	uiProcessCtxNextPtr
+		LDA	$A4
+		ADC	#$00
+		STA	uiProcessCtxNextPtr + 1
+		
+		LDA	#$00
+		STA	ui + UI::cLstAct
+		
+		RTS
+		
+		
+;-------------------------------------------------------------------------------
+uiProcessCancel:
+;-------------------------------------------------------------------------------
+		LDA	uiProcessCtxCurrPtr
+		STA	uiProcessCtxNextPtr
+		LDA	uiProcessCtxCurrPtr + 1
+		STA	uiProcessCtxNextPtr + 1
+		
+		SEC
+		LDA	uiProcessCtxCurrPtr
+		SBC	#$04
+		STA	uiProcessCtxCurrPtr
+		LDA	uiProcessCtxCurrPtr + 1
+		SBC	#$00
+		STA	uiProcessCtxCurrPtr + 1
+
+		RTS
+		
+		
+;-------------------------------------------------------------------------------
+uiProcessEnd:
+;-------------------------------------------------------------------------------
+		JSR	uiProcessCancel
+		
+		LDA	uiProcessCtxCurrPtr
+		STA	$A3
+		LDA	uiProcessCtxCurrPtr + 1
+		STA	$A4
+
+		LDY	#$00
+		LDA	($A3), Y
+		STA	$6D
+		INY
+		LDA	($A3), Y
+		STA	$6E
+		INY
+		LDA	($A3), Y
+		STA	ui + UI::fActTyp
+		INY
+		LDA	($A3), Y
+		STA	ui + UI::fActInt
+		
+		JSR	gamePopState
+		
+		LDA	game + GAME::gMode
+		CMP	#$08
+		BNE	@leave
+		
+		RTS
+		
+@leave:
+		LDA	#$FF
+		STA	game + GAME::pLast
+		
+		LDA	#$00
+		STA	game + GAME::fStpSig
+		STA	game + GAME::kWai
+		
+		JSR	rulesFocusOnActive
+		JSR	gamePlayersDirty
+
+		JSR	gameUpdateMenu
+
+		LDA	#$01
+		STA	ui + UI::fInjKey
+		
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+
+		RTS
+		
+		
+;-------------------------------------------------------------------------------
+uiProcessSet:
+;-------------------------------------------------------------------------------
 		LDA	#$00
 		STA	ui + UI::fInjKey
 		
@@ -6424,19 +6581,7 @@ uiProcessInit:
 		STA	game + GAME::iStpCnt
 		LDA	#$00			
 		STA	game + GAME::fStpSig
-
-;		LDA	game + GAME::gMode
-;		STA	ui + UI::gMdAct
-;		LDA	game + GAME::pActive
-;		STA	ui + UI::pActBak
 		
-		JSR	gamePushState
-
-		LDA	#$08
-		STA	game + GAME::gMode
-		
-		JSR	gameUpdateMenu
-
 		LDA	#<$DA18
 		STA	game + GAME::aWai
 		LDA	#>$DA18
@@ -6444,7 +6589,39 @@ uiProcessInit:
 
 		LDA	#$01
 		STA	game + GAME::kWai
-	
+
+		RTS
+		
+
+;-------------------------------------------------------------------------------
+uiProcessInit:
+;-------------------------------------------------------------------------------
+;		LDA	#<uiActnCache
+;		STA	$6D
+;		LDA	#>uiActnCache
+;		STA	$6E
+
+		LDA	uiProcessCtxCurrPtr
+		STA	$A3
+		LDA	uiProcessCtxCurrPtr + 1
+		STA	$A4
+
+		LDY	#$00
+		LDA	($A3), Y
+		STA	$6D
+		INY
+		LDA	($A3), Y
+		STA	$6E
+
+		JSR	gamePushState
+
+		LDA	#$08
+		STA	game + GAME::gMode
+		
+		JSR	uiProcessSet
+
+		JSR	gameUpdateMenu
+		
 		RTS
 		
 
@@ -6468,18 +6645,28 @@ uiProcessActions:
 		JSR	uiDequeueAction
 		JSR	uiPerformAction
 		
-;		DEC	ui + UI::cActns
-;		LDA	ui + UI::cActns
-;		BNE	@exit
-		JMP	@exit
+		LDA	game + GAME::gMode
+		CMP	#$08
+		BNE	@exit
+		
+		LDA	ui + UI::cActns
+		BEQ	@terminate
+		
+		LDA	ui + UI::cActns
+		CMP	#$01
+		BNE	@exit
+		
+		JSR	uiPeekAction
+		LDA	$68
+		CMP	#UI_ACT_ENDP
+		BNE	@exit
+		
+		JSR	uiDequeueAction
+;		JMP	@exit
 		
 @terminate:
-		JSR	uiInitQueue
+;		JSR	uiInitQueue
 		
-		LDY	#$00
-		LDA	#$FF
-		STA	($6D), Y
-
 		JSR	uiProcessTerminate
 		
 @exit:
@@ -6548,6 +6735,26 @@ uiProcessChkAllMPay:
 ;-------------------------------------------------------------------------------
 uiProcessTerminate:
 ;-------------------------------------------------------------------------------
+		LDA	#$00
+		STA	uiProcessCtxCurrPtr
+		STA	uiProcessCtxCurrPtr + 1
+		
+		LDA	#<uiProcessContext0
+		STA	uiProcessCtxNextPtr
+		LDA	#>uiProcessContext0
+		STA	uiProcessCtxNextPtr + 1
+		
+		LDA	#<uiActnCache
+		STA	uiProcessEnqueuePtr
+		STA	$6D
+		LDA	#>uiActnCache
+		STA	uiProcessEnqueuePtr + 1
+		STA	$6E
+		
+		LDY	#$00
+		LDA	#$FF
+		STA	($6D), Y
+		
 		JSR	uiActionDeselect
 		
 		LDA	ui + UI::fActTyp
@@ -6630,6 +6837,8 @@ uiProcessTerminate:
 		JSR	gameUpdateMenu
 		
 		LDA	#$01
+		STA	ui + UI::fInjKey
+		
 		ORA	game + GAME::dirty
 		STA	game + GAME::dirty
 		
@@ -6956,17 +7165,31 @@ uiActionDelay:
 		RTS
 
 
+;-------------------------------------------------------------------------------
+uiActionEndProc:
+;-------------------------------------------------------------------------------
+		LDA	ui + UI::cActns
+		BNE	@begin
+		
+		RTS
+				
+@begin:
+		JSR	uiProcessEnd
+
+		RTS
+
+
 ;===============================================================================
 ;FOR CPU.S
 ;===============================================================================
-cpuLastActCnt:
-		.byte	$00
+;cpuLastActCnt:
+;		.byte	$00
 cpuHaveMenuUpdate:
 		.byte	$00
 		
-cpuLastPerform:	
+cpuLastPerform:					;***FIXME:	deprecated
 		.word	$0000
-cpuThisPerform:
+cpuThisPerform:					;***FIXME:	deprecated
 		.word	cpuPerformIdle
 
 cpuIsIdle:
@@ -6985,10 +7208,23 @@ cpuFlagFault:
 cpuEngageBehaviour:
 ;-------------------------------------------------------------------------------
 		LDA	cpuHaveFault
-		BNE	@havefault
+		BEQ	@tstupd
 		
+		JMP	@havefault
+		
+@tstupd:
 		LDA	cpuHaveMenuUpdate
 		BEQ	@update
+	
+;		LDA	ui + UI::cActns
+;		STA	cpuLastActCnt
+		
+		LDA	#$01
+		STA	ui + UI::fActInt
+		LDA	#$00
+		STA	ui + UI::fActTyp
+		
+		JSR	uiProcessMarkStart
 		
 		LDA	#>(@farreturn - 1)
 		PHA
@@ -6997,23 +7233,33 @@ cpuEngageBehaviour:
 		
 		JMP	(cpuThisPerform)
 @farreturn:
+		LDA	ui + UI::cLstAct
+		BNE	@proc
+		
+		JSR	uiProcessCancel
+
 		LDA	cpuIsIdle
 		BNE	@update
-
-		LDA	ui + UI::cActns
-		STA	cpuLastActCnt
-		BEQ	@tstfault
 		
-		LDA	#$01
-		STA	ui + UI::fActInt
+		JMP	@fault
+
+@proc:
+		LDA	#UI_ACT_ENDP
+		STA	$68
 		LDA	#$00
-		STA	ui + UI::fActTyp
+		STA	$69
+		STA	$6A
+		STA	$6B
+		
+		JSR	uiEnqueueAction
 		
 		JSR	uiProcessInit
 		
+		JMP	@update
+		
 @tstfault:		
-		LDA	cpuLastActCnt
-		BNE	@update
+;		LDA	cpuLastActCnt
+;		BNE	@update
 		
 		LDA	cpuLastPerform
 		CMP	cpuThisPerform 
@@ -7027,6 +7273,9 @@ cpuEngageBehaviour:
 		LDA	#$01
 		STA	cpuHaveFault
 		STA	cpuFlagFault
+		
+		LDA	game + GAME::pActive
+		STA	cpuFaultPlayer
 		
 		LDA	#<@fault
 		STA	cpuFaultAddr
@@ -7238,7 +7487,16 @@ cpuPerformGaolMustPost:
 cpuPerformMustPay:
 ;-------------------------------------------------------------------------------
 		JSR	rulesAutoPay
-
+		BNE	@exit
+		
+		LDA	#UI_ACT_SKEY
+		STA	$68
+		LDA	#'C'
+		STA	$69
+		
+		JSR	uiEnqueueAction
+		
+@exit:
 		RTS
 
 
@@ -7258,6 +7516,9 @@ cpuPerformQuit:
 ;-------------------------------------------------------------------------------
 cpuPerformSelectColour:
 ;-------------------------------------------------------------------------------
+		LDA	#$01
+		STA	cpuIsIdle
+
 		LDA	sidV2EnvOu
 		LSR
 		LSR
@@ -7305,6 +7566,9 @@ cpuPerformSelectColour:
 ;-------------------------------------------------------------------------------
 cpuPerformStartRoll:
 ;-------------------------------------------------------------------------------
+		LDA	#$01
+		STA	cpuIsIdle
+		
 		LDA	#'R'
 		JSR	keyEnqueueKey
 		
@@ -9201,18 +9465,31 @@ menuPagePlay0StdKeys:
 		CMP	#'A'
 		BNE	@keysQ
 		
-		JSR	rulesAutoPay
-		
-		LDA	ui + UI::cActns
-		BNE	@autopay
-		
-		JMP	@keysDing
-		
-@autopay:
 		LDA	#$01
 		STA	ui + UI::fActInt
 		LDA	#$00
 		STA	ui + UI::fActTyp
+		
+		JSR	uiProcessMarkStart
+		
+		JSR	rulesAutoPay
+		
+		LDA	ui + UI::cLstAct
+		BNE	@autopay
+		
+		JSR	uiProcessCancel
+		
+		JMP	@keysBuzz
+		
+@autopay:
+		LDA	#UI_ACT_ENDP
+		STA	$68
+		LDA	#$00
+		STA	$69
+		STA	$6A
+		STA	$6B
+		
+		JSR	uiEnqueueAction
 		
 		JSR	uiProcessInit
 		
@@ -9252,8 +9529,11 @@ menuPagePlay0StdKeys:
 		
 		LDX	menuWindowPlay0RollB
 		CPX	#$A1
-		BNE	@keysBuzz
+		BEQ	@doroll
 		
+		JMP	@keysBuzz
+		
+@doroll:
 		JSR	gameRollDice
 		JMP	@keysExit
 		
@@ -9315,15 +9595,31 @@ menuPagePlay0StdKeys:
 		CMP	#'I'
 		BNE	@keysOther
 		
-		JSR	rulesAutoImprove
-		
-		LDA	ui + UI::cActns
-		BEQ	@keysDing
-		
 		LDA	#$01
 		STA	ui + UI::fActInt
 		LDA	#$00
 		STA	ui + UI::fActTyp
+		
+		JSR	uiProcessMarkStart
+		
+		JSR	rulesAutoImprove
+		
+		LDA	ui + UI::cLstAct
+		BNE	@autoimprv
+		
+		JSR	uiProcessCancel
+		
+		JMP	@keysDing
+		
+@autoimprv:
+		LDA	#UI_ACT_ENDP
+		STA	$68
+		LDA	#$00
+		STA	$69
+		STA	$6A
+		STA	$6B
+		
+		JSR	uiEnqueueAction
 		
 		JSR	uiProcessInit
 		
@@ -10725,6 +11021,9 @@ menuPageManage0Keys:
 		JSR	prmptClearOrRoll
 		JSR	prmptClear2
 		
+	.if	DEBUG_KEYS
+		JSR	gameUpdateMenu
+	.endif
 		
 		JMP	@ding
 		
@@ -11134,7 +11433,10 @@ menuWindowTradeCB:
 
 			.byte	$00
 			
+
+;-------------------------------------------------------------------------------
 menuPageTrade0Keys:
+;-------------------------------------------------------------------------------
 		CMP	#'M'
 		BNE	@keysP
 		
@@ -11225,14 +11527,15 @@ menuPageTrade0Keys:
 @keysExit:
 		RTS
 		
-	
+
+;-------------------------------------------------------------------------------
 menuPageTrade0Draw:
+;-------------------------------------------------------------------------------
 		LDA	menuTrade0Recalc
 		BNE	@recalc
 
 		LDX	#TRADE::player
 		LDA	menuPlyrSelSelect
-		
 		CMP	trade0, X			;If the player is changed
 		BEQ	@cont				;we need to clear the 
 							;wanted data
@@ -11242,7 +11545,7 @@ menuPageTrade0Draw:
 							;but we need more flags to
 							;do it properly.
 		
-		LDX	#.sizeof(TRADE) - 1	;Clear the wanted data
+		LDX	#.sizeof(TRADE) - 1		;Clear the wanted data
 		LDA	#$00
 @loop0:
 		STA 	trade0, X
@@ -11257,13 +11560,10 @@ menuPageTrade0Draw:
 
 		DEX
 		BPL	@loop1
-
+		
 		LDX	#TRADE::player
 		LDA	menuPlyrSelSelect
 		STA	trade0, X
-		
-		LDA	game + GAME::pActive
-		STA	trade1, X
 		
 @recalc:
 		JSR	menuTrade0RWealthRecalc
@@ -11272,7 +11572,11 @@ menuPageTrade0Draw:
 		STA	menuTrade0Recalc
 		
 @cont:
-		LDX	#TRADE::player		;Continue drawing
+		LDX	#TRADE::player
+		LDA	game + GAME::pActive
+		STA	trade1, X
+		
+;		LDX	#TRADE::player		;Continue drawing
 		LDA	trade0, X
 		
 		CMP	#$FF
@@ -11626,7 +11930,10 @@ menuPageTrade1Keys:
 
 		LDA	#$00
 		STA	game + GAME::fTrdTyp
-		JSR	gamePerfTradePopMode
+		
+		JSR	gamePopState
+		LDA	#$FF
+		STA	game + GAME::pLast
 		
 		JSR	gameUpdateMenu
 
@@ -11730,13 +12037,13 @@ menuElimin0RemWlthRecalc:
 		LDY	#PLAYER::money
 		LDA	($FB), Y
 		STA	menuTrade0RemWealth
+		STA	menuTrade0RemCash
 		INY
 		LDA	($FB), Y
 		STA	menuTrade0RemWealth + 1
+		STA	menuTrade0RemCash + 1
 		LDA	#$00
 		STA	menuTrade0RemWealth + 2
-		
-		
 		
 		JSR	gameRemWlth0AddEquity
 
@@ -11886,13 +12193,22 @@ menuPageElimin0Keys:
 		CMP	#'A'
 		BNE	@keysM
 
+		LDA	#$01
+		STA	ui + UI::fActInt
+		LDA	#$00
+		STA	ui + UI::fActTyp
+		
+		JSR	uiProcessMarkStart
+
 		LDY	#TRADE::player
 		LDA	trade1, Y
 		TAX
 		JSR	rulesAutoEliminate
 
-		LDA	ui + UI::cActns
+		LDA	ui + UI::cLstAct
 		BNE	@autoelimin
+		
+		JSR	uiProcessCancel
 		
 		JMP	@keysBuzz
 		
@@ -11900,10 +12216,14 @@ menuPageElimin0Keys:
 		LDA	#$01
 		STA	menuElimin0HaveOffer
 		
-		LDA	#$01
-		STA	ui + UI::fActInt
+		LDA	#UI_ACT_ENDP
+		STA	$68
 		LDA	#$00
-		STA	ui + UI::fActTyp
+		STA	$69
+		STA	$6A
+		STA	$6B
+		
+		JSR	uiEnqueueAction
 		
 		JSR	uiProcessInit
 		
@@ -12550,7 +12870,7 @@ menuPageQuit2Draw:
 ;===============================================================================
 
 gameStateStack:
-	.repeat	8, I
+	.repeat	10, I
 		.byte	$00, $00
 	.endrep
 	
@@ -12586,7 +12906,14 @@ gamePopState:
 		
 		LDA	gameStateStack + 1, X
 		STA	game + GAME::pActive
+
+		LDA	game + GAME::gMode
+		CMP	#$08
+		BNE	@exit
 		
+		JSR	uiProcessSet
+		
+@exit:
 		RTS
 
 
@@ -13675,10 +14002,9 @@ gameUpdateMenu:
 		
 		RTS
 
-;------------------------------------------------------------------------------
-;gameMoveSelectFwd
-;------------------------------------------------------------------------------
+;-------------------------------------------------------------------------------
 gameMoveSelectFwd:
+;-------------------------------------------------------------------------------
 		LDX	game + GAME::sSelect
 		INX
 		TXA
@@ -13711,10 +14037,9 @@ gameMoveSelectFwd:
 		RTS
 
 
-;------------------------------------------------------------------------------
-;gameMoveSelectBck
-;------------------------------------------------------------------------------
+;-------------------------------------------------------------------------------
 gameMoveSelectBck:
+;-------------------------------------------------------------------------------
 		LDX	game + GAME::sSelect
 		DEX
 		TXA
@@ -13745,11 +14070,11 @@ gameMoveSelectBck:
 @exit:
 		RTS
 		
-
-;------------------------------------------------------------------------------
-;gameMovePlyrFwd
-;------------------------------------------------------------------------------
+		
+	.if	DEBUG_KEYS
+;-------------------------------------------------------------------------------
 gameMovePlyrFwd:
+;-------------------------------------------------------------------------------
 		LDX	game + GAME::pActive
 		LDA	plrLo, X
 		STA	$FB
@@ -13775,10 +14100,9 @@ gameMovePlyrFwd:
 		
 		RTS
 		
-;------------------------------------------------------------------------------
-;gameMovePlyrBck
-;------------------------------------------------------------------------------
+;-------------------------------------------------------------------------------
 gameMovePlyrBck:
+;-------------------------------------------------------------------------------
 		LDX	game + GAME::pActive
 		LDA	plrLo, X
 		STA	$FB
@@ -13802,11 +14126,12 @@ gameMovePlyrBck:
 		STA	($FB), Y
 		
 		RTS
+	.endif
 
-;------------------------------------------------------------------------------
-;gameToggleGaol
-;------------------------------------------------------------------------------
+
+;-------------------------------------------------------------------------------
 gameToggleGaol:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 
@@ -13911,9 +14236,8 @@ gameToggleGaol:
 
 
 ;-------------------------------------------------------------------------------
-;gameCheckGaolFree
-;-------------------------------------------------------------------------------
 gameCheckGaolFree:
+;-------------------------------------------------------------------------------
 		LDX	#$00
 
 		LDA	game + GAME::pGF0Crd
@@ -13980,11 +14304,11 @@ gameCheckGaolFree:
 ;-------------------------------------------------------------------------------
 gameNextAuction:
 ;-------------------------------------------------------------------------------
-		LDA	game + GAME::fAForf	;Have all players already forfeited?
+		LDA	game + GAME::fAForf	;Have all players forfeited?
 		CMP	#$3F
 		BEQ	@auctionover
 
-		LDA	game + GAME::fAPass	;Have all players already passed?
+		LDA	game + GAME::fAPass	;Have all players passed?
 		CMP	#$3F
 		BEQ	@auctionover
 
@@ -14023,12 +14347,12 @@ gameNextAuction:
 @cont:
 		STX	game + GAME::pActive
 
-		LDA	game + GAME::pWAuctn	;If no one bids, everyone has to pass
-		CMP	#$FF			;or forfeit, explicitly
+		LDA	game + GAME::pWAuctn	;If no one bids, everyone has to 
+		CMP	#$FF			;pass or forfeit, explicitly
 		BEQ	@update
 
-		LDA	game + GAME::pAFirst	;Have we come back to the last bidder?
-		CMP	game + GAME::pActive
+		LDA	game + GAME::pAFirst	;Have we come back to the last 
+		CMP	game + GAME::pActive	;bidder?
 		BEQ	@auctionover		;Yes, auction over
 		
 		JMP	@update
@@ -14046,8 +14370,8 @@ gameNextAuction:
 		STA	$FC
 		
 		LDY	#$01			;in order to buy deed but
-		LDX	game + GAME::sAuctn	;don't sub cash also set a specific square
-		JSR	rulesBuyTitleDeed	
+		LDX	game + GAME::sAuctn	;don't sub cash also set a specific 
+		JSR	rulesBuyTitleDeed	;square
 		
 		LDA	game + GAME::mAuctn
 		STA	game + GAME::varD
@@ -14087,10 +14411,10 @@ gameNextAuction:
 		TAX
 		JSR	prmptClearOrRoll
 
-		
-@update:
 		JSR	rulesFocusOnActive
 		JSR	gamePlayersDirty
+		
+@update:
 		
 		JSR	gameUpdateMenu
 
@@ -14489,16 +14813,14 @@ gameApproveTrade:
 ;-------------------------------------------------------------------------------
 gamePerfTradeStep:
 ;-------------------------------------------------------------------------------
-;		JSR	gamePerfTradeDeselect
-
-;		Check if doing stage 0 - offered xfer
+;	Check if doing stage 0 - offered xfer
 		LDA	game + GAME::fTrdStg
 		BEQ	@stage0
 		
 		JMP	@tststage1
 		
 @stage0:
-;		- for each deed
+;	- for each deed
 		LDY	#TRADE::cntDeed
 		LDA	trade1, Y
 		CMP	game + GAME::iTrdStp 
@@ -14512,37 +14834,22 @@ gamePerfTradeStep:
 
 		LDY	#TRADE::player
 		LDA	trade0, Y
-		
 		STA	$69
 		
-;		STA	game + GAME::pLast
-;		STA	game + GAME::pActive
-		
-;			- phase 0 - transfer deed
+;	- phase 0 - transfer deed
 		LDX	game + GAME::iTrdStp 
 		LDA	trddeeds1, X
-
 		STA	$6A
 		
 		JSR	uiEnqueueAction
 
-;		JSR	gamePerfTradeFocus
-;		
-;		LDA	trddeeds1, X
-;		TAX
-;		JSR	rulesTradeTitleDeed
-;		
-;		JSR	gamePerfTradeDeselect
-
-;***
-
-;				- if mrtg, go to phase 1
+;	- if mrtg, go to phase 1
 		LDX	game + GAME::iTrdStp 
 		LDA	trdrepay1, X
 		AND	#$80
 		BNE	@stage0tophase1
 		
-;				- else, next deed
+;	- else, next deed
 		JMP	@stage0nextdeed
 
 @stage0tophase1:
@@ -14553,34 +14860,22 @@ gamePerfTradeStep:
 @stage0phase1:
 		LDY	#TRADE::player
 		LDA	trade0, Y
-;		STA	game + GAME::pLast
-;		STA	game + GAME::pActive
-		
 		STA	$69
 		
-;			- phase 1 - fee/repay deed
 		LDX	game + GAME::iTrdStp 
+		LDA	trddeeds1, X
+		STA	$6A
+		
+;	- phase 1 - fee/repay deed
+;		LDX	game + GAME::iTrdStp 
 		LDA	trdrepay1, X
 		AND	#$01
 		BNE	@stage0ph1repay
 
 		LDA	#UI_ACT_PFEE
 		STA	$68
-
-		LDX	game + GAME::iTrdStp 
-
-		LDA	trddeeds1, X
-		
-		STA	$6A
 		
 		JSR	uiEnqueueAction
-		
-;		JSR	gamePerfTradeFocus
-;
-;		LDA	trddeeds1, X
-;		JSR	rulesMortgageFeeImmed
-;
-;		JSR	gamePerfTradeDeselect
 		
 		JMP	@stage0nextdeed
 		
@@ -14589,30 +14884,21 @@ gamePerfTradeStep:
 		LDA	#UI_ACT_REPY
 		STA	$68
 
-		LDX	game + GAME::iTrdStp 
-		LDA	trddeeds1, X
-
-		STA	$6A
+;		LDX	game + GAME::iTrdStp 
+;		LDA	trddeeds1, X
+;		STA	$6A
 		
 		JSR	uiEnqueueAction
 		
-;		JSR	gamePerfTradeFocus
-;
-;		LDA	trddeeds1, X
-;		JSR	rulesUnmortgageImmed
-;		
-;		JSR	gamePerfTradeDeselect
-
-
 @stage0nextdeed:
-;			- next deed
+;	- next deed
 		INC 	game + GAME::iTrdStp 
 		LDA	#$00
 		STA	game + GAME::fTrdPhs
 		RTS
 
 @stage0next:
-;		- if doing actual trade (not elimin) continue to stage 1
+;	- if doing actual trade (not elimin) continue to stage 1
 		LDA	#$00
 		STA	game + GAME::iTrdStp
 		STA	game + GAME::fTrdPhs
@@ -14636,9 +14922,6 @@ gamePerfTradeStep:
 		LDA	#$00
 		STA	game + GAME::iTrdStp
 		STA	game + GAME::fTrdPhs
-;		STA	game + GAME::kWai
-		
-;		JSR	gamePerfTradeDeselect
 		
 		RTS
 		
@@ -14648,7 +14931,7 @@ gamePerfTradeStep:
 		
 		RTS
 
-;		check if doing stage 1 - wanted xfer
+;	check if doing stage 1 - wanted xfer
 @tststage1:
 		CMP	#$01
 		BEQ	@stage1
@@ -14656,7 +14939,7 @@ gamePerfTradeStep:
 		JMP	@tststage2
 
 @stage1:
-;		- for each deed
+;	- for each deed
 		LDY	#TRADE::cntDeed
 		LDA	trade0, Y
 		CMP	game + GAME::iTrdStp 
@@ -14670,38 +14953,22 @@ gamePerfTradeStep:
 
 		LDY	#TRADE::player
 		LDA	trade1, Y
-		
 		STA	$69
 		
-;		STA	game + GAME::pLast
-;		STA	game + GAME::pActive
-		
-;			- phase 0 - transfer deed
+;	- phase 0 - transfer deed
 		LDX	game + GAME::iTrdStp 
 		LDA	trddeeds0, X
-		
 		STA	$6A
 		
 		JSR	uiEnqueueAction
-		
-		
-;		JSR	gamePerfTradeFocus
-;
-;		LDA	trddeeds0, X
-;		TAX
-;		JSR	rulesTradeTitleDeed
-;		
-;		JSR	gamePerfTradeDeselect
 
-
-
-;				- if mrtg, go to phase 1
+;	- if mrtg, go to phase 1
 		LDX	game + GAME::iTrdStp 
 		LDA	trdrepay0, X
 		AND	#$80
 		BNE	@stage1tophase1
 		
-;				- else, next deed
+;	- else, next deed
 		JMP	@stage1nextdeed
 
 @stage1tophase1:
@@ -14712,34 +14979,22 @@ gamePerfTradeStep:
 @stage1phase1:
 		LDY	#TRADE::player
 		LDA	trade1, Y
-		
 		STA	$69
 		
-;		STA	game + GAME::pLast
-;		STA	game + GAME::pActive
-		
-;			- phase 1 - fee/repay deed
 		LDX	game + GAME::iTrdStp 
+		LDA	trddeeds0, X
+		STA	$6A
+		
+;	- phase 1 - fee/repay deed
+;		LDX	game + GAME::iTrdStp 
 		LDA	trdrepay0, X
 		AND	#$01
 		BNE	@stage1ph1repay
 
 		LDA	#UI_ACT_PFEE
 		STA	$68
-
-		LDX	game + GAME::iTrdStp 
-		LDA	trddeeds0, X
-
-		STA	$69
 		
 		JSR	uiEnqueueAction
-
-;		JSR	gamePerfTradeFocus
-;
-;		LDA	trddeeds0, X
-;		JSR	rulesMortgageFeeImmed
-;		
-;		JSR	gamePerfTradeDeselect
 
 		JMP	@stage1nextdeed
 		
@@ -14747,31 +15002,21 @@ gamePerfTradeStep:
 		LDA	#UI_ACT_REPY
 		STA	$68
 
-		LDX	game + GAME::iTrdStp 
-		LDA	trddeeds0, X
-		
-		STA	$69
+;		LDX	game + GAME::iTrdStp 
+;		LDA	trddeeds0, X
+;		STA	$6A
 		
 		JSR	uiEnqueueAction
-
-;		JSR	gamePerfTradeFocus
-;
-;		LDA	trddeeds0, X
-;		JSR	rulesUnmortgageImmed
-;		
-;		JSR	gamePerfTradeDeselect
-		
-;***
 		
 @stage1nextdeed:
-;			- next deed
+;	- next deed
 		INC 	game + GAME::iTrdStp 
 		LDA	#$00
 		STA	game + GAME::fTrdPhs
 		RTS
 
 @stage1next:
-;		- stage $FF
+;	- stage $FF
 		LDA	#$FF
 		STA	game + GAME::fTrdStg
 		
@@ -14782,7 +15027,7 @@ gamePerfTradeStep:
 		RTS
 
 
-;		check if doing stage 2 - auction 
+;	check if doing stage 2 - auction 
 @tststage2:
 
 		LDY	#TRADE::cntDeed
@@ -14795,28 +15040,15 @@ gamePerfTradeStep:
 
 		LDY	game + GAME::iTrdStp
 		LDA	trddeeds0, Y
-;		STA	game + GAME::sAuctn
 		STA	$6A
 
 		INC	game + GAME::iTrdStp
 
 		LDY	#TRADE::player
 		LDA	trade0, Y
-		
 		STA	$69
 		
 		JSR	uiEnqueueAction
-		
-;		STA	game + GAME::pActive
-;		LDA	#$FF
-;		STA	game + GAME::pLast
-;
-;		JSR	rulesDoNextPlyr
-;
-;		LDX	#$01
-;		JSR	gameStartAuction
-;		
-
 		
 		RTS
 
@@ -14827,13 +15059,12 @@ gamePerfTradeStep:
 		RTS
 
 
-
 ;-------------------------------------------------------------------------------
 gamePerfTradeCCCCards:
 ;-------------------------------------------------------------------------------
 		LDY	#TRADE::gofree
 		LDA	trade0, Y
-		AND	$01
+		AND	#$01
 		BEQ	@wchance
 
 		LDY	#TRADE::player
@@ -14844,29 +15075,29 @@ gamePerfTradeCCCCards:
 @wchance:
 		LDY	#TRADE::gofree
 		LDA	trade0, Y
-		AND	$02
+		AND	#$02
 		BEQ	@ochest
 		
 		LDY	#TRADE::player
 		LDA	trade1, Y
 		
-		STA 	game + GAME::pGF0Crd
+		STA 	game + GAME::pGF1Crd
 
 @ochest:
 		LDY	#TRADE::gofree
 		LDA	trade1, Y
-		AND	$01
+		AND	#$01
 		BEQ	@ochance
 
 		LDY	#TRADE::player
 		LDA	trade0, Y
 		
-		STA 	game + GAME::pGF1Crd
+		STA 	game + GAME::pGF0Crd
 
 @ochance:
 		LDY	#TRADE::gofree
 		LDA	trade1, Y
-		AND	$02
+		AND	#$02
 		BEQ	@exit
 		
 		LDY	#TRADE::player
@@ -14930,35 +15161,22 @@ gamePerfTradeMoney:
 		RTS
 
 
-gamePerfTradePopMode:
-		LDA	game + GAME::fTrdTyp
-		BNE	@endelimin
-
+;gamePerfTradePopMode:
+;		LDA	game + GAME::fTrdTyp
+;		BNE	@endelimin
+;
 ;		Pop player and mode from trade 
 ;		LDA	game + GAME::pTrdICP
 ;		STA	game + GAME::pActive
 ;		LDA	game + GAME::gMdTrdI
 ;		STA	game + GAME::gMode
-
-		JSR	gamePopState
-
-		LDA	#$FF
-		STA	game + GAME::pLast
-		
-		RTS
-
-@endelimin:
+;		RTS
+;@endelimin:
 ;		LDA	game + GAME::pElimin
 ;		STA	game + GAME::pActive
 ;		LDA	game + GAME::gMdElim
 ;		STA	game + GAME::gMode
-
-		JSR	gamePopState
-
-		LDA	#$FF
-		STA	game + GAME::pLast
-		
-		RTS
+;		RTS
 
 
 ;-------------------------------------------------------------------------------
@@ -14969,12 +15187,19 @@ gamePerfTradeFull:
 		STA	game + GAME::iTrdStp 
 		STA	game + GAME::fTrdPhs
 
+		LDA	#$01
+		STA	ui + UI::fActInt
+		LDA	game + GAME::fTrdTyp
+		STA	ui + UI::fActTyp
+		
+		JSR	uiProcessMarkStart
+		
 		LDA	game + GAME::fTrdTyp
 		BNE	@loop
 
 		JSR	gamePerfTradeMoney
 		JSR	gamePerfTradeCCCCards
-		
+
 @loop:
 		JSR	gamePerfTradeStep
 
@@ -14983,9 +15208,11 @@ gamePerfTradeFull:
 		CMP	#$FF
 		BNE	@loop
 	
-		JSR	gamePerfTradePopMode
+		JSR	gamePopState
+		LDA	#$FF
+		STA	game + GAME::pLast
 	
-		LDA	ui + UI::cActns
+		LDA	ui + UI::cLstAct
 		BEQ	@cleanup
 	
 		LDA	#UI_ACT_DELY
@@ -14997,14 +15224,25 @@ gamePerfTradeFull:
 		
 		JSR	uiEnqueueAction
 	
-		LDA	game + GAME::fTrdTyp
-		STA	ui + UI::fActTyp
+		LDA	#UI_ACT_ENDP
+		STA	$68
+		LDA	#$00
+		STA	$69
+		STA	$6A
+		STA	$6B
+		
+		JSR	uiEnqueueAction
+	
+;		LDA	game + GAME::fTrdTyp
+;		STA	ui + UI::fActTyp
 		
 		JSR	uiProcessInit
 
 		RTS
 		
 @cleanup:
+		JSR	uiProcessCancel
+
 		JSR	gameUpdateMenu
 
 		LDA	#$01
@@ -15124,13 +15362,6 @@ gameSelect:
 ;-------------------------------------------------------------------------------
 		PHA
 	
-		ASL
-		TAX
-		
-		LDA	sqr00 + 1, X
-		ORA	#$20
-		STA	sqr00 + 1, X
-		
 		LDA	game + GAME::sSelect
 		CMP	#$FF
 		BEQ	@select
@@ -15140,6 +15371,13 @@ gameSelect:
 @select:
 		PLA
 		STA	game + GAME::sSelect
+		
+		ASL
+		TAX
+		
+		LDA	sqr00 + 1, X
+		ORA	#$20
+		STA	sqr00 + 1, X
 		
 		RTS
 
@@ -15220,6 +15458,7 @@ gamePlayerHasFunds:
 		RTS
 		
 
+	.if	0
 ;-------------------------------------------------------------------------------
 gamePlayerHasWealth:
 ;		ASSUMES INPUT VALUE IS POSITIVE 16BIT
@@ -15284,7 +15523,8 @@ gamePlayerHasWealth:
 		JSR	gameAmountIsLess
 
 		RTS
-		
+	.endif
+	
 
 	.if	DEBUG_KEYS
 ;-------------------------------------------------------------------------------
@@ -15475,6 +15715,8 @@ gameToggleDialog:
 ;-------------------------------------------------------------------------------
 gameRollDice:
 ;-------------------------------------------------------------------------------
+;***TODO:	Check game mode is 0 else buzz
+
 		LDA	game + GAME::dieRld
 		CMP	#$01
 		BNE	@test0
@@ -15841,7 +16083,8 @@ gameCheckChanceShuffle:
 ;===============================================================================
 ;FOR DIALOG.S
 ;===============================================================================
-	
+
+;***	60 bytes
 dialogDefWindow0:		
 			.byte	$13, $08, $05, $18, $0C
 			.byte	$46, $07, $04, $19
@@ -16065,6 +16308,7 @@ dialogDefKeys:
 		RTS
 
 
+;***	106 bytes
 dialogWindowTitles0:
 			.byte	$13, $0B, $01, $12, $17
 			
@@ -16538,6 +16782,7 @@ dialogDlgWaitFor0Draw:
 		RTS
 
 
+;***	11 bytes
 dialogWindowStart0:
 			.byte	$90, $09, $06
 			.word		strHeaderStart0
@@ -16795,6 +17040,7 @@ dialogDlgElimin0Draw:
 		RTS
 
 
+;***	21 bytes
 dialogWindowElimin1:
 			.byte	$90, $09, $06
 			.word		strHeaderElimin1
@@ -16820,6 +17066,7 @@ dialogDlgElimin1Draw:
 		RTS
 
 
+;***	11 bytes
 dialogWindowGameOver0:		
 			.byte	$90, $09, $06
 			.word		strHeaderGameOver0
@@ -17039,6 +17286,21 @@ doDialogOvervwColOwnFilt:
 		RTS
 		
 		
+dialogOvervwUpdHeap:
+		CLC
+		LDA	$A3
+		ADC	game + GAME::varH
+		STA	$A3
+		LDA	$A4
+		ADC	#$00
+		STA	$A4
+		
+		LDA	#$00
+		STA	game + GAME::varH
+		
+		RTS
+		
+		
 dialogOvervwColOwnT:
 		LDA	#$0F
 		STA	game + GAME::varA
@@ -17087,6 +17349,8 @@ dialogOvervwColOwnT:
 		INX
 		CPX	#$3C
 		BNE	@loop
+
+		JSR	dialogOvervwUpdHeap
 
 		RTS
 
@@ -17139,6 +17403,8 @@ dialogOvervwColOwnR:
 		INX
 		CPX	#$50
 		BNE	@loop
+
+		JSR	dialogOvervwUpdHeap
 
 		RTS
 
@@ -17194,6 +17460,8 @@ dialogOvervwColOwnL:
 		INX
 		CPX	#$28
 		BNE	@loop
+		
+		JSR	dialogOvervwUpdHeap
 
 		RTS
 
@@ -17250,6 +17518,8 @@ dialogOvervwColOwnB:
 		CPX	#$14
 		BNE	@loop
 
+		JSR	dialogOvervwUpdHeap
+
 		RTS
 
 dialogOvervwColOwn:
@@ -17296,6 +17566,8 @@ dialogOvervwColMrtgT:
 		CPX	#$3C
 		BNE	@loop
 
+		JSR	dialogOvervwUpdHeap
+
 		RTS
 
 dialogOvervwColMrtgR:
@@ -17333,6 +17605,8 @@ dialogOvervwColMrtgR:
 		INX
 		CPX	#$50
 		BNE	@loop
+
+		JSR	dialogOvervwUpdHeap
 
 		RTS
 		
@@ -17372,6 +17646,8 @@ dialogOvervwColMrtgL:
 		CPX	#$28
 		BNE	@loop
 
+		JSR	dialogOvervwUpdHeap
+
 		RTS
 		
 dialogOvervwColMrtgB:
@@ -17409,6 +17685,8 @@ dialogOvervwColMrtgB:
 		INX
 		CPX	#$14
 		BNE	@loop
+
+		JSR	dialogOvervwUpdHeap
 
 		RTS
 			
@@ -17491,6 +17769,8 @@ dialogOvervwColImprvT:
 		CPX	#$3C
 		BNE	@loop
 
+		JSR	dialogOvervwUpdHeap
+
 		RTS
 		
 dialogOvervwColImprvR:
@@ -17566,6 +17846,8 @@ dialogOvervwColImprvR:
 		CPX	#$50
 		BNE	@loop
 
+		JSR	dialogOvervwUpdHeap
+
 		RTS
 		
 dialogOvervwColImprvL:
@@ -17638,6 +17920,8 @@ dialogOvervwColImprvL:
 		INX
 		CPX	#$28
 		BNE	@loop
+
+		JSR	dialogOvervwUpdHeap
 
 		RTS
 
@@ -17712,6 +17996,8 @@ dialogOvervwColImprvB:
 		CPX	#$14
 		BNE	@loop
 
+		JSR	dialogOvervwUpdHeap
+
 		RTS
 		
 dialogOvervwColImprv:
@@ -17784,6 +18070,8 @@ dialogOvervwColPlrT:
 		CPX	#$06
 		BNE	@loop
 		
+		JSR	dialogOvervwUpdHeap
+
 		RTS
 		
 dialogOvervwColPlrR:
@@ -17845,6 +18133,8 @@ dialogOvervwColPlrR:
 		CPX	#$06
 		BNE	@loop
 		
+		JSR	dialogOvervwUpdHeap
+
 		RTS
 		
 dialogOvervwColPlrL:
@@ -17910,6 +18200,8 @@ dialogOvervwColPlrL:
 		CPX	#$06
 		BNE	@loop
 		
+		JSR	dialogOvervwUpdHeap
+
 		RTS
 		
 		
@@ -17968,8 +18260,11 @@ dialogOvervwColPlrB:
 		CPX	#$06
 		BNE	@loop
 		
+		JSR	dialogOvervwUpdHeap
+
 		RTS
-		
+
+
 dialogOvervwColPlrs:
 		JSR	dialogOvervwColPlrT
 		JSR	dialogOvervwColPlrR
@@ -18032,6 +18327,10 @@ dialogDlgOvervw0Draw:
 		
 		LDX	#$01
 		JSR	dialogOvervwCollateState
+
+	.if	DEBUG_HEAP
+		JSR	debugCheckHeap
+	.endif
 
 		LDA	#<heap0
 		STA	$FD
@@ -18231,7 +18530,9 @@ dialogTrdSelBakRCashA:
 		.word	$0000
 	
 
+;-------------------------------------------------------------------------------
 doDialogTrdSelGetAddr:
+;-------------------------------------------------------------------------------
 		LDX	game + GAME::sTrdSel
 		LDA	dialogAddrTrdSelSqrLo, X
 		STA	game + GAME::aTrdSlH
@@ -18241,7 +18542,9 @@ doDialogTrdSelGetAddr:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 doDialogTrdSelBckChar:
+;-------------------------------------------------------------------------------
 		LDA	game + GAME::aTrdSlH
 		STA	$A3
 		LDA	game + GAME::aTrdSlH + 1
@@ -18255,7 +18558,9 @@ doDialogTrdSelBckChar:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 doDialogTrdSelRstChar:
+;-------------------------------------------------------------------------------
 		LDA	game + GAME::aTrdSlH
 		STA	$A3
 		LDA	game + GAME::aTrdSlH + 1
@@ -18269,7 +18574,9 @@ doDialogTrdSelRstChar:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 doDialogTrdSelMvFwd:
+;-------------------------------------------------------------------------------
 		JSR	doDialogTrdSelRstChar
 
 		INC	game + GAME::sTrdSel
@@ -18287,7 +18594,9 @@ doDialogTrdSelMvFwd:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 doDialogTrdSelMvBck:
+;-------------------------------------------------------------------------------
 		JSR	doDialogTrdSelRstChar
 
 		DEC	game + GAME::sTrdSel
@@ -18303,6 +18612,7 @@ doDialogTrdSelMvBck:
 		JSR	doDialogTrdSelBckChar
 		
 		RTS
+
 
 ;-------------------------------------------------------------------------------
 doDialogTrdSelGetCashHi:
@@ -19023,7 +19333,9 @@ doDialogTrdSelToggle:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 doDialogTrdSelClose:
+;-------------------------------------------------------------------------------
 		LDA	game + GAME::fTrdSlM
 		STA	game + GAME::gMode
 
@@ -19041,7 +19353,9 @@ doDialogTrdSelClose:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 doDialogTrdSelSetRCashI:
+;-------------------------------------------------------------------------------
 		LDA	#<dialogAddrTrdSelRCash
 		STA	$FD
 		LDA	#>dialogAddrTrdSelRCash
@@ -19086,7 +19400,9 @@ doDialogTrdSelSetRCashI:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 doDialogTrdSelSetRWlthI:
+;-------------------------------------------------------------------------------
 		LDA	#<dialogAddrTrdSelRWealth
 		STA	$FD
 		LDA	#>dialogAddrTrdSelRWealth
@@ -19149,7 +19465,9 @@ doDialogTrdSelSetRWlthI:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 doDialogTrdSelSetRCashA:
+;-------------------------------------------------------------------------------
 		LDA	#<dialogAddrTrdSelRCash
 		STA	$FD
 		LDA	#>dialogAddrTrdSelRCash
@@ -19194,7 +19512,9 @@ doDialogTrdSelSetRCashA:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 doDialogTrdSelSetRWlthA:
+;-------------------------------------------------------------------------------
 
 ;***FIXME	Can I somehow not be duplicating all of this?
 
@@ -19260,7 +19580,9 @@ doDialogTrdSelSetRWlthA:
 		RTS
 
 		
+;-------------------------------------------------------------------------------
 doDialogTrdSelSetCash:
+;-------------------------------------------------------------------------------
 		LDX	#TRADE::money
 		LDA	trade2, X
 		STA	Z:numConvVALUE
@@ -19292,7 +19614,9 @@ doDialogTrdSelSetCash:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 doDialogTrdSelSetState:
+;-------------------------------------------------------------------------------
 		LDY	#$00
 		LDX	#$29
 @loop:
@@ -19351,7 +19675,9 @@ doDialogTrdSelSetState:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 doDialogTrdSelPackData:
+;-------------------------------------------------------------------------------
 		LDY	#TRADE::cntDeed		;We fetch which data from here
 		LDA	trade2, Y
 		JSR	gamePrepTradePtrs
@@ -19414,7 +19740,9 @@ doDialogTrdSelPackData:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 doDialogTrdSelAddCash:
+;-------------------------------------------------------------------------------
 		PHA
 		
 		LDX	dialogTrdSelDoRepay
@@ -19564,7 +19892,9 @@ doDialogTrdSelAddCash:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 doDialogTrdSelSubCash:
+;-------------------------------------------------------------------------------
 		LDX	#TRADE::money
 		STA	game + GAME::varA
 		
@@ -19688,7 +20018,9 @@ doDialogTrdSelSubCash:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 dialogDlgTrdSel0Keys:
+;-------------------------------------------------------------------------------
 		CMP	#'F'
 		BNE	@keysB
 		
@@ -19929,7 +20261,9 @@ dialogDlgTrdSel0Keys:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 dialogDlgTrdSel0Draw:
+;-------------------------------------------------------------------------------
 		JSR	screenBeginButtons
 		
 		LDA	dialogTrdSelDoApprv
@@ -20066,6 +20400,10 @@ dialogDlgTrdSel0Draw:
 		
 		JSR	dialogTrdSel0CollateState
 
+	.if	DEBUG_HEAP
+		JSR	debugCheckHeap
+	.endif
+	
 		LDA	#<heap0
 		STA	$FD
 		LDA	#>heap0
@@ -21636,6 +21974,10 @@ boardDisplayQuad:
 		STA	game + GAME::varH
 
 		JSR	boardCollateState
+		
+	.if	DEBUG_HEAP
+		JSR	debugCheckHeap
+	.endif
 
 		LDA	#<heap0
 		STA	$FD
@@ -22660,16 +23002,17 @@ rulesSqrImprv:
 	.endrep
 
 rulesChestCrds0:
-			.byte	$00, $00, $00, $00, $00, $00, $00, $00 
-			.byte	$00, $00, $00, $00, $00, $00, $00, $00
+		.byte	$00, $00, $00, $00, $00, $00, $00, $00 
+		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 rulesChanceCrds0:
-			.byte	$00, $00, $00, $00, $00, $00, $00, $00
-			.byte	$00, $00, $00, $00, $00, $00, $00, $00
+		.byte	$00, $00, $00, $00, $00, $00, $00, $00
+		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 rulesChestIdx:
-			.byte	$00
+		.byte	$00
 rulesChanceIdx:	
-			.byte	$00
-
+		.byte	$00
+rulesLastActnIdx:
+		.byte	$00
 
 
 	.include	"rules.inc"
@@ -22784,8 +23127,6 @@ rulesShuffleChest:
 		LDX	#$00			;Initialise deck index
 		STX	rulesChestIdx
 
-		JSR	prmptDisplay
-
 		RTS
 
 
@@ -22841,8 +23182,6 @@ rulesShuffleChance:
 
 		LDX	#$00
 		STX	rulesChanceIdx
-
-		JSR	prmptDisplay
 		
 		RTS
 
@@ -26494,6 +26833,8 @@ rulesInitEliminToBank:
 ;		LDA	game + GAME::pElimin
 ;		STA	game + GAME::pActive
 
+		JSR	gamePushState
+
 		LDA	#$00
 		STA	menuElimin0HaveOffer
 
@@ -26831,7 +27172,7 @@ rulesDoCommitMrtg:
 		LDX	game + GAME::varL
 		BPL	@fetchsqr
 		
-		JMP	@complete
+		JMP	@incomplete
 		
 @fetchsqr:
 		LDA	game + GAME::varJ
@@ -26856,7 +27197,8 @@ rulesDoCommitMrtg:
 		BNE	@docalc
 		
 @skipidx:
-		INC	game + GAME::varL
+		LDX	#$FF
+		STX	game + GAME::varL
 		JMP	@loop0
 		
 @docalc:
@@ -26883,7 +27225,7 @@ rulesDoCommitMrtg:
 		CMP	#$FF
 		BNE	@begin0
 		
-		DEC	game + GAME::varL
+		STA	game + GAME::varL
 		JMP	@loop0
 
 @begin0:
@@ -26942,8 +27284,8 @@ rulesDoCommitMrtg:
 		BCS	@complete
 		
 @next:
-		INC	game + GAME::varA
-		LDA	game + GAME::varA
+		INC	game + GAME::varL
+		LDA	game + GAME::varL
 		CMP	#$04
 		BEQ	@incomplete
 		
@@ -27295,6 +27637,9 @@ rulesAutoRecover:
 		STY	game + GAME::varP
 		STX	game + GAME::varK		;varF = player
 		
+		LDA	ui + UI::cLstAct
+		STA	rulesLastActnIdx
+		
 		JSR	rulesDoCopyImprv
 		
 		LDA	#$00
@@ -27309,7 +27654,8 @@ rulesAutoRecover:
 		JSR	rulesDoProcRecoverAll
 
 @tstcomplete:
-		LDA	ui + UI::cActns
+		LDA	ui + UI::cLstAct
+		CMP	rulesLastActnIdx
 		BEQ	@incomplete
 
 		LDA	#UI_ACT_DELY
@@ -27358,8 +27704,6 @@ rulesAutoPay:
 		LDA	game + GAME::varD
 		
 		JSR	rulesAutoRecover
-		
-		LDA	ui + UI::cActns
 		BEQ	@incomplete
 		
 @complete:
@@ -27664,20 +28008,16 @@ rulesAutoBuy:
 		
 		JSR	uiEnqueueAction
 
-;		Init Process
-		LDA	ui + UI::cActns
-		BEQ	@pass
+;	Init Process
+;		BEQ	@pass
 		
 @complete:
-;		Return 1
+;	Return 1
 		LDA	#$01
 		RTS
 
 @pass:
 ;	On pass
-;	
-;		TODO:  Go to auction?
-;
 ;		Return 0
 		LDA	#$00
 		RTS
@@ -28519,6 +28859,9 @@ rulesAutoRepayGroup:
 		
 		
 rulesAutoRepay:
+		LDA	ui + UI::cLstAct
+		STA	rulesLastActnIdx
+
 		LDA	game + GAME::varD
 		STA	game + GAME::varO
 		LDA	game + GAME::varE
@@ -28539,7 +28882,8 @@ rulesAutoRepay:
 		DEX
 		BPL	@loop0
 		
-		LDA	ui + UI::cActns
+		LDA	ui + UI::cLstAct
+		CMP	rulesLastActnIdx
 		BEQ	@incomplete
 		
 @complete:		
@@ -28562,6 +28906,9 @@ rulesAutoRepay:
 
 rulesAutoImprove:
 ;	USES:	varD,E	=	amount surplus and available
+
+		LDA	ui + UI::cLstAct
+		STA	rulesLastActnIdx
 
 		LDX	game + GAME::pActive
 		STX	game + GAME::varK		;varK = player
@@ -28606,7 +28953,8 @@ rulesAutoImprove:
 
 @tstcomp:
 ;	Any actions added?
-		LDA	ui + UI::cActns
+		LDA	ui + UI::cLstAct
+		CMP	rulesLastActnIdx
 		BEQ	@incomplete
 
 @complete:
@@ -28632,7 +28980,7 @@ rulesAutoImprove:
 
 
 rulesDoTapValue:
-;		.Y = min # taps (0 - 8 value increment)
+;		.Y = min # taps (1 - 8 value increment)
 ;		.X = max # taps
 
 		STY	game + GAME::varA
@@ -28648,6 +28996,13 @@ rulesDoTapValue:
 		LSR
 		LSR
 		LSR
+		
+		CMP	#$00
+		BNE	@cont
+		
+		LDA	#$01
+		
+@cont:
 		CLC
 		ADC	game + GAME::varD
 		STA	game + GAME::varD
@@ -28673,7 +29028,7 @@ rulesDoTapValue:
 
 
 rulesDoNudgeValue:
-;		.Y = min # nudges (0 - 16 value increment)
+;		.Y = min # nudges (1 - 16 value increment)
 ;		.X = max # nudges
 
 		STY	game + GAME::varA
@@ -28688,6 +29043,13 @@ rulesDoNudgeValue:
 		LSR
 		LSR
 		LSR
+		
+		CMP	#$00
+		BNE	@cont
+		
+		LDA	#$01
+		
+@cont:
 		CLC
 		ADC	game + GAME::varD
 		STA	game + GAME::varD
@@ -30947,6 +31309,49 @@ initDialog:
 		STA	game + GAME::dirty
 
 		RTS
+
+
+;==============================================================================
+;FOR DEBUG.S
+;==============================================================================
+	.if	DEBUG_HEAP
+debugHeapHigh:
+	.word	$0000
+debugHeapSize:
+	.word	$0000
+	
+	
+debugCheckHeap:
+		JSR	dialogOvervwUpdHeap
+
+;	X>=Y
+		LDA 	$A3
+                CMP 	debugHeapHigh
+		LDA	$A4
+		SBC	debugHeapHigh + 1
+                BCS 	@update
+		
+		RTS
+		
+@update:
+		LDA	$A3
+		STA	debugHeapHigh
+		LDA	$A4
+		STA	debugHeapHigh + 1
+		
+		SEC
+		LDA	$A3
+		SBC	#<heap0
+		STA	debugHeapSize
+		LDA	$A4
+		SBC	#>heap0
+		STA	debugHeapSize + 1
+
+;***FIXME:	Also check if the debugHeapSize + 1 is 2 or more and 
+;	fault if this occurs when have only allocated size remaining.
+
+		RTS
+	.endif
 
 
 ;===============================================================================
