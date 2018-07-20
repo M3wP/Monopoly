@@ -103,7 +103,7 @@ The game is identical to the most recent, standard rules as per my copy
   simplicity to the mechanisms.
 * House/Hotel (improvement) and mortgage management can always be 
   done in the player's turn.  It can can also be done when offered a 
-  trade or receiving a defeated player's deeds for example, when a 
+  trade or receiving a defeated player's deeds for example or when a 
   player has gone into debt out of turn (see the deductions/observations 
   section for more information).  All of these events occur 
   sequentially, not concurrently.  This will affect how improvements are 
