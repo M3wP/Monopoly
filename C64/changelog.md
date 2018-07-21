@@ -24,29 +24,22 @@ this.  *\*ugh\**
 
 ## TODO
 
-* CPU player still needs:  AutoTradeInitiate
 * rulesSuggestDeedValue should tap values based on group significance.
 * AutoAuction should commit equity like AutoBuy does and perhaps not bail so 
   early (push value upwards if its less than what they and other players currently 
   have -- calc minimum as well as max?).
 * AutoTradeApprove could tally "half points" for prime targets and require that they
   be accounted for in other deeds or money (convert extra points too?).
+* AutoTradeInitiate should not grant full groups when not getting one (stations).
 * Is checking must pay after normal (non-elimination) action processing required now?
-  
-* Swap positions of players and improvements on overview.  No longer colour imprvs.
+
+* Change position of players in corners on overview dialog?
 
 * Statistics/Overview from trade approval, must pay.  They should work now.
 * Make dialog elimin0 more informative about the elimination (to player/bank)?
 * Change trade6 menu naming to jump1 menu.
-* Check is normal mode in gameRollDice.
 * Could also do other mode chain integrity checks?  
-* Don't overflow game state stack!  Debug?
-* Check not overflowing action cache contexts.  Debug?
-* Check not overflowing action cache???  Debug?
-* Do not overflow heap??  Only 512 bytes in current allocation.  Should gather 
-  statistics in order to check actual maximum requirements.  Should be okay.
 
-* Allow players to input name?  Do I have enough memory for the feature??
 * Could now instead of copy name on elimin and gameover dialogs, just refer.
 * Optimise trade calculations -- too large!
 
@@ -81,19 +74,51 @@ this.  *\*ugh\**
 ## For Testing (Needs Confirmation):
 
 * Used GO Free cards prevented from appearing in deck until after 
-  shuffle (and while owned by a player).
-* Trade correctly calculates remaining cash and enforces positive.
+  shuffle (and while owned by a player)?
+* Trade correctly calculates remaining cash and enforces positive?
 * Must pay works after trade?  Is it required now?
 * Must pay works after elimination?
 * Multiple eliminations in one turn works?
-* In elimination auctions, auctioned square keeps selection.
+* In elimination auctions, auctioned square keeps selection?
 * Does trading during auctions work?
+* Stress test:  CPU from trade from auction from elimination...
+* Don't overflow game state stack!  Debug?
+  What about CPU from trade from auction from elimination?  I think this requires
+  only 7/8 and I have allocated 10.
+* Check not overflowing action cache contexts.  Debug?
+  What about CPU from trade from auction from elimination?  Is this 3/4 and I have
+  5?
+* Check not overflowing action cache???  Debug?  256 actions should be enough??
+  What about CPU from trade from auction from elimination?  Still have same maximum
+  number of deeds...
+* Do not overflow heap??  Only 512 bytes in current allocation.  Should gather 
+  statistics in order to check actual maximum requirements.  Should be fine, fine, 
+  fine (was only 256 bytes and probably wouldn't overflow).
 
 
 ## Change History 
 
 ### Since Version 0.02.56B
 
+* 21JUL2018
+	* Tweak other delay times.
+	* Tweak action processing initiation delay and add delay after AutoBuy buy.
+	* Add nice delay time control feature to DELY action processing.
+	* Do not roll the dice and buzz when not in normal or action process modes 
+	  in gameRollDice (as a precaution).  Also buzz for the other failures 
+	  there.  This is mostly to give feedback for/control the CPU.  It still 
+	  wouldn't be pretty...
+	* Fix bug preventing address from being displayed on null0 dialog.
+	* Fix bug in rulesGetGroupOwnInfo preventing correct flags returned.
+	* Implement rulesAutoTradeInitiate and utilise by CPU.
+* 20JUL2018
+	* Use named contants instead of hard-coded game modes.
+	* Use gamePushState/gamePopState for mode backup/restore on trdsel dialog.
+	* Debug checking for game state stack, action context, action cache and
+	  display heap.
+	* Fix issue redisplaying state/player after trade decline.
+	* Swap positions of players and improvements on overview.  No 
+	  longer colour imprvs.
 
 
 ### Since Version 0.02.39A

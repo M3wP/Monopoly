@@ -31,7 +31,7 @@
 ;	 30 menus
 ;	 17 dialogs
 ;	 14 CPU behaviours (2 system; 12 game play)
-;	  1 multi-context, stallable action cache (messaging)
+;	  1 multi-context, stall/restartable action cache (messaging)
 ;	 15 core actions (3 system; 1 generic input driver; 11 specific)
 ;	 16 tunes (2 voice)
 ;	 16 sfx (1 voice)
@@ -57,40 +57,43 @@
 ;	  3 house rules (one always enabled:  reshuffle CCCCards)
 ;	    strictly turn-based (with interrupts and flexible management)
 ;
-;	 an estimated 18KB of data, 35.5KB of code, 1.5KB of heap, 5KB system
-;	 more than 650 portrait A4 pages of source code with small font
+;	 an estimated 18.75KB data, 35.75KB code, 1.5KB heap, 5.25KB system
+;	 more than 650 portrait A4 pages of source code with small font or
 ;	 to print in the old landscape style with normal font, 1100 A4 pages
 ;
 ;
 ;Free memory information (as of last update):
-;	* Between end of program and reserved, 4093 bytes (free for program)
-;	* Free in discard, 6 bytes
-;	* Reserved areas, 512 bytes (unused)
-;	* Between rules data and action cache, 307 bytes (free for const data)
-;	* Free in trade data, 41 bytes
+;	* Most of the zero page is unused (still need break-down/rework) except 
+;	  for possible reservation of Kernal data for compatibility (load/save?)
+;	* Free in global state, 18 bytes (free for globals)
+;	* Between end of program and reserved, 2800 bytes (free for program)
+;	* Free in discard, 6 bytes (free for discard)
+;	* Reserved area, 512 bytes (reserved for discard/display heap)
+;	* Between rules data and action heap, 307 bytes (free for constant data)
+;	* Free in trade data, 17 bytes (free for CPU trade processing)
 ;
 ;
 ;Memory map (as of last update):
-;	0000 -	00FF	Zero page
-;	0100 -	01FF	System stack
-;	0200 - 	03FF	Global state
-;	0400 - 	07FF	Screen data and sprite pointers
-;	0800 - 	08FF	Bootstrap/sprite data
-;	0900 -  7FFF	Program area (~30KB)
-;	8000 -	9FFF	Program area (4KB)
-;	A000 -	BE02	Program area (~7.5KB)
-;	BE03 - 	BFFC	Discard/screen heap
-;	BFFD - 	BFFF	Screen heap
-;	C000 -	CDFF	Free
-;	CE00 - 	CFFF	Reserved (may be used for discard/screen heap)
-;	D000 - 	DFFF	System IO
-;	E000 -	F240	Strings data (4673 bytes)
-;	F241 - 	F39E	Screen data (350 bytes)
-;	F39F - 	F9CC	Rules data (1582 bytes)
+;	0000 -	00FF	Zero page (256 bytes)
+;	0100 -	01FF	System stack (256 bytes)
+;	0200 - 	03FF	Global state data (495 bytes used, 17 bytes free)
+;	0400 - 	07FF	System screen and sprite pointer data (1KB)
+;	0800 - 	08FF	Bootstrap/sprite data (256 bytes)
+;	0900 -  7FFF	Program code and data (~30KB)
+;	8000 -	9FFF	Program code and data (8KB)
+;	A000 -	BFFF	Program code and data (8KB)
+;	C000 -	C30F	Program code and data (783 bytes)
+;	C310 -	C50F	Discard/display heap (512 bytes, 6 discard free)
+;	C510 - 	CDFF	Free (~2.25KB)
+;	CE00 - 	CFFF	Reserved (discard/display heap, 512 bytes)
+;	D000 - 	DFFF	System I/O (4KB)
+;	E000 -	F240	Strings const data (4673 bytes)
+;	F241 - 	F39E	Screen const data (350 bytes)
+;	F39F - 	F9CC	Rules const data (1582 bytes)
 ;	F9CD - 	FAFF	Free (307 bytes)
-;	FB00 - 	FEFF	Action cache heap
-;	FF00 -  FFF9	Trade data 
-;	FFFA -	FFFF	System vectors
+;	FB00 - 	FEFF	Action heap (1KB)
+;	FF00 -  FFF9	Trade global data (233 bytes used, 17 bytes free)
+;	FFFA -	FFFF	System vectors (6 bytes)
 ;
 ;
 ;I will need to provide a break-down of the use of zero page at some point for
@@ -112,7 +115,10 @@
 	.define DEBUG_CPU 	0
 	
 	.define	DEBUG_HEAP	0
+	.define	DEBUG_GSTATE	0
 	.define	DEBUG_ACTIONS	0
+	
+	.define	LIST_GLBINF	0
 
 
 ;-------------------------------------------------------------------------------
@@ -150,7 +156,7 @@ sidV2EnvOu	=	$D41B
 SID_ADConv1    	= 	SID + $19
 SID_ADConv2    	= 	SID + $1A
 
-CIA1_PRA        = 	$DC00        ; Port A
+CIA1_PRA        = 	$DC00        		; Port A
 CIA1_PRB	=	$DC01
 CIA1_DDRA	=	$DC02
 CIA1_DDRB	=	$DC03
@@ -301,6 +307,10 @@ uiActnCache	=	$FB00
 	.endstruct
 
 
+	.if 	LIST_GLBINF
+	.out	.concat("- sizeof UI:  ", .string(.sizeof(UI)))
+	.endif
+
 ;-------------------------------------------------------------------------------
 ;musicdefs.inc
 ;-------------------------------------------------------------------------------
@@ -393,9 +403,25 @@ keyZPDecodePtr	=	$F5			;word
 	.endstruct
 
 
+	.if 	LIST_GLBINF
+	.out	.concat("- sizeof IRQGLOBS:  ", .string(.sizeof(IRQGLOBS)))
+	.endif
+	
+	
 ;-------------------------------------------------------------------------------
 ;gamedefs.inc
 ;-------------------------------------------------------------------------------
+GAME_MDE_NORM	=	$00			;0:  Normal
+GAME_MDE_AUCN 	=	$01			;1:  Auction
+GAME_MDE_TRDA	=	$02			;2:  Interrupt (Trade Approve)
+GAME_MDE_MSTP	=	$03			;3:  Interrupt (Must Pay)
+GAME_MDE_ELIM	=	$04			;4:  Interrupt (Elimin Xfer)
+GAME_MDE_OVER	=	$05			;5:  Game Over
+GAME_MDE_PSTP	=	$06			;6:  Player stepping (f/e)
+GAME_MDE_TRDS	=	$07			;7:  Trade selection (f/e)
+GAME_MDE_ACTS	=	$08			;8:  Action stepping (f/e)
+GAME_MDE_QUIT	=	$09			;9:  Quit request
+
 
 	.struct SHRTSTR
 		_COUNT	.byte
@@ -478,7 +504,7 @@ keyZPDecodePtr	=	$F5			;word
 		fPayDbl .byte
 ;		gMdStep .byte			;Remove for game state stack
 		
-		fTrdSlM .byte
+;		fTrdSlM .byte			;Remove for game state stack
 		fTrdSlL .byte
 		sTrdSel .byte
 		aTrdSlH .word
@@ -603,6 +629,19 @@ keyZPDecodePtr	=	$F5			;word
 	.endstruct
 	
 	
+	.struct	TRADEAUTO
+		cTurns	.byte
+		iGroup	.byte
+		iCount	.byte
+		fEscal	.byte
+	.endstruct
+	
+	
+	.if 	LIST_GLBINF
+	.out	.concat("- sizeof GAME:  ", .string(.sizeof(GAME)))
+	.out	.concat("- sizeof PLAYER:  ", .string(.sizeof(PLAYER)))
+	.out	.concat("- sizeof TRADE:  ", .string(.sizeof(TRADE)))
+	.endif
 
 ;-------------------------------------------------------------------------------
 ;ruledefs.inc
@@ -692,15 +731,20 @@ keyZPDecodePtr	=	$F5			;word
 ;globaldefs.inc
 ;-------------------------------------------------------------------------------
 
-ui		=	$0200
-game		=	ui + .sizeof(UI)	;$0214		
-plr0		=	game + .sizeof(GAME)
-plr1		=	plr0 + .sizeof(PLAYER)
-plr2		=	plr1 + .sizeof(PLAYER)
-plr3		=	plr2 + .sizeof(PLAYER)
-plr4		=	plr3 + .sizeof(PLAYER)
-plr5		=	plr4 + .sizeof(PLAYER)
-sqr00		=	plr5 + .sizeof(PLAYER)
+GLOBALS_BEGIN	=	$0200
+
+ui		=	GLOBALS_BEGIN				;$0200
+game		=	ui + .sizeof(UI)			;$0215
+plr0		=	game + .sizeof(GAME)			;$026A
+plr1		=	plr0 + .sizeof(PLAYER)			;$0296
+plr2		=	plr1 + .sizeof(PLAYER)			;$02C2
+plr3		=	plr2 + .sizeof(PLAYER)			;$02EE
+plr4		=	plr3 + .sizeof(PLAYER)			;$031A
+plr5		=	plr4 + .sizeof(PLAYER)			;$0346
+sqr00		=	plr5 + .sizeof(PLAYER)			;$0372
+irqglob		=	sqr00 + (.sizeof(SQUARE) * 40)		;$03C2
+
+GLOBALS_END 	= 	irqglob + .sizeof(IRQGLOBS)		;$03EE
 
 ;keyBuffer0	=	sqr00 + (.sizeof(SQUARE) * 40)
 ;keyBufferSize 	=	keyBuffer0 + 10
@@ -711,11 +755,22 @@ sqr00		=	plr5 + .sizeof(PLAYER)
 ;keyModifierLast =	keyModifierFlag + 1
 ;globalsEnd	=	keyModifierLast + 1
 
-irqglob		=	sqr00 + (.sizeof(SQUARE) * 40)
-globalsEnd 	= 	irqglob + .sizeof(IRQGLOBS)
+	.if 	LIST_GLBINF
+	.out	.concat("- loc ui:  ", .string((.hibyte(ui) * 256) + .lobyte(ui)))
+	.out	.concat("- loc game:  ", .string((.hibyte(game) * 256) + .lobyte(game)))
+	.out	.concat("- loc plr0:  ", .string((.hibyte(plr0) * 256) + .lobyte(plr0)))
+	.out	.concat("- loc plr1:  ", .string((.hibyte(plr1) * 256) + .lobyte(plr1)))
+	.out	.concat("- loc plr2:  ", .string((.hibyte(plr2) * 256) + .lobyte(plr2)))
+	.out	.concat("- loc plr3:  ", .string((.hibyte(plr3) * 256) + .lobyte(plr3)))
+	.out	.concat("- loc plr4:  ", .string((.hibyte(plr4) * 256) + .lobyte(plr4)))
+	.out	.concat("- loc plr5:  ", .string((.hibyte(plr5) * 256) + .lobyte(plr5)))
+	.out	.concat("- loc sqr00:  ", .string((.hibyte(sqr00) * 256) + .lobyte(sqr00)))
+	.out	.concat("- loc irqglob:  ", .string((.hibyte(irqglob) * 256) + .lobyte(irqglob)))
+	.out	.concat("- loc GLOBEND:  ", .string((.hibyte(GLOBALS_END) * 256) + .lobyte(GLOBALS_END)))
+	.out	.concat("- free globals:  ", .string(.lobyte($0400 - GLOBALS_END)))
+	.endif
 
-
-	.assert globalsEnd < $0400, error, .concat("Global data space too large! $", .string(.hibyte(globalsEnd)), .string(.lobyte(globalsEnd))) 
+	.assert GLOBALS_END <= $0400, error, .concat("Global data space too large! ", .string((.hibyte(GLOBALS_END) * 256) + .lobyte(GLOBALS_END))) 
 
 
 ;-------------------------------------------------------------------------------
@@ -738,7 +793,7 @@ globalsEnd 	= 	irqglob + .sizeof(IRQGLOBS)
 	.asciiz		"2061"			;2061 and line end
 _basNext:
 	.word		$0000			;BASIC prog terminator
-	.assert         * = $080D, error, "BASIC interface incorrect!"
+	.assert	* = $080D, error, "BASIC interface incorrect!"
 bootstrap:
 ;	Exclude BASIC (include Kernal and IO)
 		LDA	$00
@@ -759,8 +814,7 @@ bootstrap:
 		
 		JMP	initCore
 	
-	.assert         * < $0840, error, "Bootstrap incorrect!"
-	
+	.assert	* = $0827, error, "Bootstrap incorrect!"
 	
 ;-------------------------------------------------------------------------------
 ;Sprite data
@@ -866,7 +920,7 @@ sprMiniMap:
 ;			.byte	%11111111, %11111111, %11111111
 ;			.byte  	$00
 
-	.assert         * = $0900, error, "Program header incorrect!"
+	.assert	* = $0900, error, "Program header incorrect!"
 
 
 ;-------------------------------------------------------------------------------
@@ -958,19 +1012,36 @@ plrNameHi:
 
 TRADE_BEGIN	=	$FF00
 
-trade0		=	TRADE_BEGIN
-trddeeds0	=	trade0 + .sizeof(TRADE)
-trdrepay0	=	trddeeds0 + 28
-trade1		=	trdrepay0 + 28
-trddeeds1	=	trade1 + .sizeof(TRADE)
-trdrepay1	=	trddeeds1 + 28
-trade2		=	trdrepay1 + 28
-trddeeds2	=	trade2 + .sizeof(TRADE)
-trdrepay2	=	trddeeds2 + 42
+trade0		=	TRADE_BEGIN			;$FF00
+trddeeds0	=	trade0 + .sizeof(TRADE)		;$FF05
+trdrepay0	=	trddeeds0 + 28			;$FF21
+trade1		=	trdrepay0 + 28			;$FF3D
+trddeeds1	=	trade1 + .sizeof(TRADE)		;$FF42
+trdrepay1	=	trddeeds1 + 28			;$FF5E
+trade2		=	trdrepay1 + 28			;$FF7A
+trddeeds2	=	trade2 + .sizeof(TRADE)		;$FF7F
+trdrepay2	=	trddeeds2 + 42			;$FFA9
+trdauto0	=	trdrepay2 + 40			;$FFD1
 
-TRADE_END	=	trdrepay2 + 40
+TRADE_END	=	trdauto0 + (.sizeof(TRADEAUTO) * 6) ;$FFE9
 
-	.assert 	TRADE_END < $FFFA, error, "Trade data too large!"
+
+	.if 	LIST_GLBINF
+	.out	.concat("- loc trade0:  ", .string((.hibyte(trade0) * 256) + .lobyte(trade0)))
+	.out	.concat("- loc trddeeds0:  ", .string((.hibyte(trddeeds0) * 256) + .lobyte(trddeeds0)))
+	.out	.concat("- loc trdrepay0:  ", .string((.hibyte(trdrepay0) * 256) + .lobyte(trdrepay0)))
+	.out	.concat("- loc trade1:  ", .string((.hibyte(trade1) * 256) + .lobyte(trade1)))
+	.out	.concat("- loc trddeeds1:  ", .string((.hibyte(trddeeds1) * 256) + .lobyte(trddeeds1)))
+	.out	.concat("- loc trdrepay1:  ", .string((.hibyte(trdrepay1) * 256) + .lobyte(trdrepay1)))
+	.out	.concat("- loc trade2:  ", .string((.hibyte(trade2) * 256) + .lobyte(trade2)))
+	.out	.concat("- loc trddeeds2:  ", .string((.hibyte(trddeeds2) * 256) + .lobyte(trddeeds2)))
+	.out	.concat("- loc trdrepay2:  ", .string((.hibyte(trdrepay2) * 256) + .lobyte(trdrepay2)))
+	.out	.concat("- loc trdauto0:  ", .string((.hibyte(trdauto0) * 256) + .lobyte(trdauto0)))
+	.out	.concat("- loc TRADEEND:  ", .string((.hibyte(TRADE_END) * 256) + .lobyte(TRADE_END)))
+	.out	.concat("- free trade:  ", .string(.lobyte($FFFA - TRADE_END)))
+	.endif
+
+	.assert	TRADE_END <= $FFFA, error, "Trade data too large!"
 
 ;trade0:	.tag	TRADE
 ;trddeeds0:		
@@ -1070,7 +1141,7 @@ mainHandleUpdates:
 	
 @tststep:
 		LDA	game + GAME::gMode
-		CMP	#$06
+		CMP	#GAME_MDE_PSTP
 		BNE	@tsttrdsel
 		
 		LDA	game + GAME::dlgVis	
@@ -1079,14 +1150,14 @@ mainHandleUpdates:
 		JSR	gamePerfStepping
 		
 @tsttrdsel:
-		CMP	#$07
+		CMP	#GAME_MDE_TRDS
 		BNE	@tsttrdstep
 		
 		JSR	gamePerfTrdSelBlink
 		
 @tsttrdstep:
 		LDA	game + GAME::gMode
-		CMP	#$08
+		CMP	#GAME_MDE_ACTS
 		BNE	@tstdirty
 
 		LDA	game + GAME::dlgVis
@@ -1194,10 +1265,10 @@ mainHandleUpdates:
 		STA	game+GAME::dirty
 		
 		LDA	game + GAME::gMode
-		CMP	#$09
+		CMP	#GAME_MDE_QUIT
 		BEQ	@tstcpu1
 		
-		CMP	#$05
+		CMP	#GAME_MDE_OVER
 		BPL	@human
 		
 @tstcpu1:
@@ -3472,11 +3543,11 @@ plyrIRQ:
 plyrCheckStepping:
 ;-------------------------------------------------------------------------------
 		LDA	game + GAME::gMode	;If in trade selection mode
-		CMP	#$07				
+		CMP	#GAME_MDE_TRDS
 		BEQ	@tstsig
 		
 		LDA	game + GAME::gMode	;If in trade stepping mode
-		CMP	#$08				
+		CMP	#GAME_MDE_ACTS				
 		BEQ	@tstsig
 
 		LDA	game + GAME::fAmStep	;Or square stepping?
@@ -3499,7 +3570,7 @@ plyrCheckStepping:
 		STA	game + GAME::fStpSig
 		
 		LDA	game + GAME::gMode	;If in trade stepping mode
-		CMP	#$08				
+		CMP	#GAME_MDE_ACTS		
 		BEQ	@longwhile
 		
 		LDA	#$11
@@ -3508,7 +3579,7 @@ plyrCheckStepping:
 		RTS
 		
 @longwhile:
-		LDA	#$60
+		LDA	#$66
 		STA	game + GAME::iStpCnt
 
 @exit:
@@ -6301,6 +6372,8 @@ statsDisplay:
 ;FOR UI.S
 ;===============================================================================
 
+uiActionDelayCnt0:
+	.byte	$08, $11, $22, $44, $66
 
 uiActionCallsLo:
 		.byte	<(uiActionFault - 1), <(uiActionTrade - 1)
@@ -6439,7 +6512,12 @@ uiEnqueueAction:
 		LDA	#$FF
 		STA	($A3), Y
 
+	.if	DEBUG_ACTIONS
+		JSR	debugCheckActEnqueueMax
+	.endif
+
 		RTS
+
 
 ;-------------------------------------------------------------------------------
 uiPerformAction:
@@ -6471,6 +6549,10 @@ uiProcessMarkStart:
 		LDA	uiProcessCtxNextPtr + 1
 		STA	$A4
 		STA	uiProcessCtxCurrPtr + 1
+		
+	.if	DEBUG_ACTIONS
+		JSR	debugCheckActCtxCurrMax
+	.endif
 
 		LDY	#$00
 		LDA	uiProcessEnqueuePtr
@@ -6544,7 +6626,7 @@ uiProcessEnd:
 		JSR	gamePopState
 		
 		LDA	game + GAME::gMode
-		CMP	#$08
+		CMP	#GAME_MDE_ACTS
 		BNE	@leave
 		
 		RTS
@@ -6577,7 +6659,7 @@ uiProcessSet:
 		LDA	#$00
 		STA	ui + UI::fInjKey
 		
-		LDA	#$30
+		LDA	#$11
 		STA	game + GAME::iStpCnt
 		LDA	#$00			
 		STA	game + GAME::fStpSig
@@ -6615,7 +6697,7 @@ uiProcessInit:
 
 		JSR	gamePushState
 
-		LDA	#$08
+		LDA	#GAME_MDE_ACTS
 		STA	game + GAME::gMode
 		
 		JSR	uiProcessSet
@@ -6646,17 +6728,33 @@ uiProcessActions:
 		JSR	uiPerformAction
 		
 		LDA	game + GAME::gMode
-		CMP	#$08
+		CMP	#GAME_MDE_ACTS
 		BNE	@exit
 		
 		LDA	ui + UI::cActns
 		BEQ	@terminate
 		
+		JSR	uiPeekAction
+		
+		LDA	$68
+		CMP	#UI_ACT_DELY
+		BNE	@tstendp
+		
+		LDX	$69
+		CPX	#$05
+		BCC	@setdely
+		
+		LDX	#$04
+@setdely:
+		LDA	uiActionDelayCnt0, X
+		STA	game + GAME::iStpCnt
+		JMP	@exit
+		
+@tstendp:
 		LDA	ui + UI::cActns
 		CMP	#$01
 		BNE	@exit
 		
-		JSR	uiPeekAction
 		LDA	$68
 		CMP	#UI_ACT_ENDP
 		BNE	@exit
@@ -6690,7 +6788,7 @@ uiProcessMPay:
 		STA	game + GAME::pMPyLst
 		STA	game + GAME::pMPyCur
 
-		LDA	#$03
+		LDA	#GAME_MDE_MSTP
 		STA	game + GAME::gMode
 		
 		RTS
@@ -6822,7 +6920,7 @@ uiProcessTerminate:
 		JSR	gamePlayersDirty
 		
 		LDA	game + GAME::gMode
-		CMP	#$03
+		CMP	#GAME_MDE_MSTP
 		BEQ	@alreadympay
 		
 		JSR	uiProcessChkAllMPay
@@ -7343,24 +7441,23 @@ cpuPerformIdle:
 ;-------------------------------------------------------------------------------
 cpuPerformPlay:
 ;-------------------------------------------------------------------------------
-		LDA	game + GAME::fMBuy
-		BEQ	@continue
-		
-		
-		LDA	#UI_ACT_FALT
-		STA	$68
-		LDA	game + GAME::pActive
-		STA	$69
-		LDA	#<cpuPerformPlay
-		STA	$6A
-		LDA	#>cpuPerformPlay
-		STA	$6B
-		
-		JSR	uiEnqueueAction
-		
-		RTS
-		
-@continue:
+;		LDA	game + GAME::fMBuy
+;		BEQ	@continue
+;		
+;		LDA	#UI_ACT_FALT
+;		STA	$68
+;		LDA	game + GAME::pActive
+;		STA	$69
+;		LDA	#<cpuPerformPlay
+;		STA	$6A
+;		LDA	#>cpuPerformPlay
+;		STA	$6B
+;		
+;		JSR	uiEnqueueAction
+;		
+;		RTS
+;		
+;@continue:
 		JSR	rulesAutoPlay
 		BNE	@exit
 		
@@ -7452,8 +7549,9 @@ cpuPerformGoneGaol:
 		
 		LDA	#UI_ACT_DELY
 		STA	$68
-		LDA	#$00
+		LDA	#$02
 		STA	$69
+		LDA	#$00
 		STA	$6A
 		STA	$6B
 		
@@ -7879,10 +7977,10 @@ menuDisplay:
 		STA	ui + UI::fUsrInp
 		
 		LDA	game + GAME::gMode
-		CMP	#$08
+		CMP	#GAME_MDE_ACTS
 		BEQ	@disp
 		
-		CMP	#$06
+		CMP	#GAME_MDE_PSTP
 		BEQ	@disp
 		
 		LDA	#$01
@@ -9374,7 +9472,7 @@ menuPagePlay0DefKeys:
 		BNE	@keysV
 
 		LDA	game + GAME::gMode
-		CMP	#$03
+		CMP	#GAME_MDE_MSTP
 		BMI	@tstFunds
 		
 		JMP	@keysBuzz
@@ -9408,7 +9506,7 @@ menuPagePlay0DefKeys:
 		BNE	@keysExit
 		
 		LDA	game + GAME::gMode
-		CMP	#$03
+		CMP	#GAME_MDE_MSTP
 		BPL	@keysExit
 		
 		LDA	#<gameInitiatePStats
@@ -11545,21 +11643,7 @@ menuPageTrade0Draw:
 							;but we need more flags to
 							;do it properly.
 		
-		LDX	#.sizeof(TRADE) - 1		;Clear the wanted data
-		LDA	#$00
-@loop0:
-		STA 	trade0, X
-		
-		DEX
-		BPL	@loop0
-		
-		LDX	#$1B
-@loop1:
-		STA	trddeeds0, X
-		STA	trdrepay0, X
-
-		DEX
-		BPL	@loop1
+		JSR	gameClearTrdWanted
 		
 		LDX	#TRADE::player
 		LDA	menuPlyrSelSelect
@@ -11935,7 +12019,14 @@ menuPageTrade1Keys:
 		LDA	#$FF
 		STA	game + GAME::pLast
 		
+		JSR	rulesFocusOnActive
+		JSR	gamePlayersDirty
+		
 		JSR	gameUpdateMenu
+		
+		LDA	#$01
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
 
 		JMP	@keysDing
 		
@@ -12764,7 +12855,7 @@ menuPageQuit1Keys:
 
 		JSR	rulesDoNextPlyr
 		
-		LDA	#$09
+		LDA	#GAME_MDE_QUIT
 		STA	game + GAME::gMode
 		
 @update:
@@ -12891,12 +12982,20 @@ gamePushState:
 		
 		INC	gameStateIdx
 		
+	.if	DEBUG_GSTATE		
+		JSR	debugCheckGameState
+	.endif
+		
 		RTS
 		
 		
 gamePopState:
 		DEC	gameStateIdx
 		
+	.if	DEBUG_GSTATE		
+		JSR	debugCheckGameState
+	.endif
+	
 		LDA	gameStateIdx
 		ASL
 		TAX
@@ -12908,12 +13007,52 @@ gamePopState:
 		STA	game + GAME::pActive
 
 		LDA	game + GAME::gMode
-		CMP	#$08
+		CMP	#GAME_MDE_ACTS
 		BNE	@exit
 		
 		JSR	uiProcessSet
 		
 @exit:
+		RTS
+
+
+gameClearTrdWanted:
+		LDX	#.sizeof(TRADE) - 1		;Clear the wanted data
+		LDA	#$00
+@loop0:
+		STA 	trade0, X
+		
+		DEX
+		BPL	@loop0
+		
+		LDX	#$1B
+@loop1:
+		STA	trddeeds0, X
+		STA	trdrepay0, X
+
+		DEX
+		BPL	@loop1
+		
+		RTS
+		
+
+gameClearTrdOffer:
+		LDX	#.sizeof(TRADE) - 1		;Clear the wanted data
+		LDA	#$00
+@loop0:
+		STA 	trade1, X
+		
+		DEX
+		BPL	@loop0
+		
+		LDX	#$1B
+@loop1:
+		STA	trddeeds1, X
+		STA	trdrepay1, X
+
+		DEX
+		BPL	@loop1
+		
 		RTS
 
 
@@ -13068,7 +13207,7 @@ gamePerformQuit:
 		STA	game + GAME::pActive
 		STA	game + GAME::pLast
 		
-		LDA	#$05
+		LDA	#GAME_MDE_OVER
 		STA	game + GAME::gMode
 		
 		JSR	gameUpdateMenu
@@ -13639,7 +13778,7 @@ gameMustPayAfterPost:
 		STA	game + GAME::pMPyLst
 		STA	game + GAME::pMPyCur
 
-		LDA	#$03
+		LDA	#GAME_MDE_MSTP
 		STA	game + GAME::gMode
 		
 		JSR	rulesFocusOnActive
@@ -13820,7 +13959,7 @@ gameUpdateMenu:
 		JMP	@tstlosing			;For/from normal mode
 
 @tstTrading:
-		CMP	#$08
+		CMP	#GAME_MDE_ACTS
 		BNE	@tstStepping
 		
 		LDA	#<menuPageTrade6			;game mode 8
@@ -13829,7 +13968,7 @@ gameUpdateMenu:
 		JMP	@update
 
 @tstStepping:
-		CMP	#$06
+		CMP	#GAME_MDE_PSTP
 		BNE	@tstGameOver
 		
 		LDA	#<menuPageJump0			;game mode 6
@@ -13838,14 +13977,14 @@ gameUpdateMenu:
 		JMP	@update
 
 @tstGameOver:
-		CMP	#$05
+		CMP	#GAME_MDE_OVER
 		BNE	@tstelimin
 
 		JSR	gamePerfGameOver		;game mode 5 
 		RTS
 
 @tstelimin:
-		CMP	#$04				;Elimin. interrupt?
+		CMP	#GAME_MDE_ELIM			;Elimin. interrupt?
 		BNE	@tstmustpay
 		
 		LDA	#<menuPageElimin0			;game mode 4
@@ -13854,7 +13993,7 @@ gameUpdateMenu:
 		JMP	@update
 		
 @tstmustpay:
-		CMP	#$03
+		CMP	#GAME_MDE_MSTP
 		BNE	@tsttrade
 
 		LDA	game + GAME::pMPyCur
@@ -13869,7 +14008,7 @@ gameUpdateMenu:
 		RTS
 
 @tsttrade:
-		CMP	#$02
+		CMP	#GAME_MDE_TRDA
 		BNE	@tstauction
 
 		LDA 	#<menuPageTrade1
@@ -13878,7 +14017,7 @@ gameUpdateMenu:
 		JMP	@update
 
 @tstauction:
-		CMP	#$01
+		CMP	#GAME_MDE_AUCN
 		BNE	@tstquit
 		
 		LDA 	#<menuPageAuctn0
@@ -13887,7 +14026,7 @@ gameUpdateMenu:
 		JMP	@update
 		
 @tstquit:
-		CMP	#$09
+		CMP	#GAME_MDE_QUIT
 		BNE	@tstlosing
 
 		LDA 	#<menuPageQuit2
@@ -14659,8 +14798,16 @@ gameInitTrdSelector:
 		ORA	game + GAME::dirty
 		STA	game + GAME::dirty
 
-		LDA	game + GAME::gMode
-		STA	game + GAME::fTrdSlM
+;		LDA	game + GAME::gMode
+;		STA	game + GAME::fTrdSlM
+
+		JSR	gamePushState
+
+;***FIXME:	Check this is okay here
+		LDA	#$11
+		STA	game + GAME::iStpCnt
+		LDA	#GAME_MDE_TRDS
+		STA	game + GAME::gMode
 
 		RTS
 
@@ -14728,7 +14875,7 @@ gameInitTrdIntrptDirect:
 		LDA	trade0, Y
 		STA	game + GAME::pActive
 		
-		LDA	#$02
+		LDA	#GAME_MDE_TRDA
 		STA	game + GAME::gMode
 		
 		JSR	gameUpdateMenu
@@ -15217,8 +15364,9 @@ gamePerfTradeFull:
 	
 		LDA	#UI_ACT_DELY
 		STA	$68
-		LDA	#$00
+		LDA	#$04
 		STA	$69
+		LDA	#$00
 		STA	$6A
 		STA	$6B
 		
@@ -15715,13 +15863,27 @@ gameToggleDialog:
 ;-------------------------------------------------------------------------------
 gameRollDice:
 ;-------------------------------------------------------------------------------
-;***TODO:	Check game mode is 0 else buzz
-
+		LDA	game + GAME::gMode
+		CMP	#GAME_MDE_NORM
+		BEQ	@tstrld
+		
+		CMP	#GAME_MDE_ACTS
+		BEQ	@tstrld
+		
+@buzz:
+		LDA	#<SFXBUZZ
+		LDY	#>SFXBUZZ
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
+		JMP	@exit
+		
+@tstrld:
 		LDA	game + GAME::dieRld
 		CMP	#$01
 		BNE	@test0
 		
-		JMP	@exit
+		JMP	@buzz
 
 @test0:
 		LDX	game + GAME::pActive
@@ -15735,19 +15897,19 @@ gameRollDice:
 		LDA	($FB), Y
 		BPL	@test1
 		
-		JMP	@exit
+		JMP	@buzz
 		
 @test1:
 		LDA	game + GAME::cntHs
 		BPL	@test2
 		
-		JMP	@exit
+		JMP	@buzz
 		
 @test2:
 		LDA	game + GAME::cntHt
 		BPL	@begin
 		
-		JMP	@exit
+		JMP	@buzz
 
 @begin:
 		JSR 	numConvDieRoll
@@ -15972,7 +16134,7 @@ gameStartAuction:
 		
 		JSR	gamePushState
 		
-		LDA	#$01			;Go to auction mode
+		LDA	#GAME_MDE_AUCN		;Go to auction mode
 		STA	game + GAME::gMode
 		
 		LDA	#$FF			;No winner
@@ -17689,16 +17851,22 @@ dialogOvervwColMrtgB:
 		JSR	dialogOvervwUpdHeap
 
 		RTS
-			
+
+
+;-------------------------------------------------------------------------------
 dialogOvervwColMrtg:
+;-------------------------------------------------------------------------------
 		JSR	dialogOvervwColMrtgT
 		JSR	dialogOvervwColMrtgR
 		JSR	dialogOvervwColMrtgL
 		JSR	dialogOvervwColMrtgB
 
 		RTS
-		
+	
+	
+;-------------------------------------------------------------------------------
 dialogOvervwColImprvT:
+;-------------------------------------------------------------------------------
 		LDA	#$0F
 		STA	game + GAME::varA
 ;		LDA	#$06
@@ -17714,14 +17882,14 @@ dialogOvervwColImprvT:
 		AND	#$08
 		BEQ	@hses
 
-		LDA	#$0A
-		PHA
+;		LDA	#$0A
+;		PHA
 		LDA	#$69
 		JMP	@out
 
 @hses:
-		LDA	#$0D
-		PHA	
+;		LDA	#$0D
+;		PHA	
 		
 		LDA	sqr00 + 1, X
 		AND	#$07
@@ -17738,7 +17906,7 @@ dialogOvervwColImprvT:
 		STA	($A3), Y
 		INY
 		
-		LDA	#$06
+		LDA	#$07
 		STA	($A3), Y
 		INY
 
@@ -17746,18 +17914,18 @@ dialogOvervwColImprvT:
 		STA	($A3), Y
 		INY
 		
-		PLA
-		ORA	#$80
-		STA	($A3), Y
-		INY
-		
-		LDA	game + GAME::varA
-		STA	($A3), Y
-		INY
-		
-		LDA	#$06
-		STA	($A3), Y
-		INY
+;		PLA
+;		ORA	#$80
+;		STA	($A3), Y
+;		INY
+;		
+;		LDA	game + GAME::varA
+;		STA	($A3), Y
+;		INY
+;		
+;		LDA	#$06
+;		STA	($A3), Y
+;		INY
 
 		STY	game + GAME::varH
 
@@ -17773,7 +17941,10 @@ dialogOvervwColImprvT:
 
 		RTS
 		
+		
+;-------------------------------------------------------------------------------
 dialogOvervwColImprvR:
+;-------------------------------------------------------------------------------
 		LDA	#$08
 		STA	game + GAME::varA
 ;		LDA	#$19
@@ -17790,14 +17961,14 @@ dialogOvervwColImprvR:
 		AND	#$08
 		BEQ	@hses
 
-		LDA	#$0A
-		PHA
+;		LDA	#$0A
+;		PHA
 		LDA	#$69
 		JMP	@out
 
 @hses:
-		LDA	#$0D
-		PHA	
+;		LDA	#$0D
+;		PHA	
 		
 		LDA	sqr00 + 1, X
 		AND	#$07
@@ -17810,7 +17981,7 @@ dialogOvervwColImprvR:
 		STA	($A3), Y
 		INY
 		
-		LDA	#$19
+		LDA	#$18
 		STA	($A3), Y
 		INY
 		
@@ -17822,19 +17993,18 @@ dialogOvervwColImprvR:
 		STA	($A3), Y
 		INY
 		
-		PLA
-		ORA	#$80
-		STA	($A3), Y
-		INY
-		
-		LDA	#$19
-		STA	($A3), Y
-		INY
-		
-		LDA	game + GAME::varA
-		STA	($A3), Y
-		INY
-
+;		PLA
+;		ORA	#$80
+;		STA	($A3), Y
+;		INY
+;		
+;		LDA	#$19
+;		STA	($A3), Y
+;		INY
+;		
+;		LDA	game + GAME::varA
+;		STA	($A3), Y
+;		INY
 
 		STY	game + GAME::varH
 		
@@ -17850,7 +18020,10 @@ dialogOvervwColImprvR:
 
 		RTS
 		
+		
+;-------------------------------------------------------------------------------
 dialogOvervwColImprvL:
+;-------------------------------------------------------------------------------
 		LDA	#$10
 		STA	game + GAME::varA
 ;		LDA	#$0D
@@ -17866,14 +18039,14 @@ dialogOvervwColImprvL:
 		AND	#$08
 		BEQ	@hses
 
-		LDA	#$0A
-		PHA
+;		LDA	#$0A
+;		PHA
 		LDA	#$69
 		JMP	@out
 
 @hses:
-		LDA	#$0D
-		PHA	
+;		LDA	#$0D
+;		PHA	
 		
 		LDA	sqr00 + 1, X
 		AND	#$07
@@ -17886,7 +18059,7 @@ dialogOvervwColImprvL:
 		STA	($A3), Y
 		INY
 		
-		LDA	#$0D
+		LDA	#$0E
 		STA	($A3), Y
 		INY
 		
@@ -17898,18 +18071,18 @@ dialogOvervwColImprvL:
 		STA	($A3), Y
 		INY
 		
-		PLA
-		ORA	#$80
-		STA	($A3), Y
-		INY
-		
-		LDA	#$0D
-		STA	($A3), Y
-		INY
-		
-		LDA	game + GAME::varA
-		STA	($A3), Y
-		INY
+;		PLA
+;		ORA	#$80
+;		STA	($A3), Y
+;		INY
+;		
+;		LDA	#$0D
+;		STA	($A3), Y
+;		INY
+;		
+;		LDA	game + GAME::varA
+;		STA	($A3), Y
+;		INY
 
 		STY	game + GAME::varH
 		
@@ -17925,7 +18098,10 @@ dialogOvervwColImprvL:
 
 		RTS
 
+
+;-------------------------------------------------------------------------------
 dialogOvervwColImprvB:
+;-------------------------------------------------------------------------------
 		LDA	#$17
 		STA	game + GAME::varA
 ;		LDA	#$12
@@ -17941,14 +18117,14 @@ dialogOvervwColImprvB:
 		AND	#$08
 		BEQ	@hses
 
-		LDA	#$0A
-		PHA
+;		LDA	#$0A
+;		PHA
 		LDA	#$69
 		JMP	@out
 
 @hses:
-		LDA	#$0D
-		PHA	
+;		LDA	#$0D
+;		PHA	
 		
 		LDA	sqr00 + 1, X
 		AND	#$07
@@ -17965,7 +18141,7 @@ dialogOvervwColImprvB:
 		STA	($A3), Y
 		INY
 		
-		LDA	#$12
+		LDA	#$11
 		STA	($A3), Y
 		INY
 		
@@ -17973,18 +18149,18 @@ dialogOvervwColImprvB:
 		STA	($A3), Y
 		INY
 		
-		PLA
-		ORA	#$80
-		STA	($A3), Y
-		INY
-		
-		LDA	game + GAME::varA
-		STA	($A3), Y
-		INY
-		
-		LDA	#$12
-		STA	($A3), Y
-		INY
+;		PLA
+;		ORA	#$80
+;		STA	($A3), Y
+;		INY
+;		
+;		LDA	game + GAME::varA
+;		STA	($A3), Y
+;		INY
+;		
+;		LDA	#$12
+;		STA	($A3), Y
+;		INY
 
 		STY	game + GAME::varH
 		
@@ -18000,7 +18176,10 @@ dialogOvervwColImprvB:
 
 		RTS
 		
+		
+;-------------------------------------------------------------------------------
 dialogOvervwColImprv:
+;-------------------------------------------------------------------------------
 		JSR	dialogOvervwColImprvT
 		JSR	dialogOvervwColImprvR
 		JSR	dialogOvervwColImprvL
@@ -18008,7 +18187,10 @@ dialogOvervwColImprv:
 		
 		RTS
 		
+		
+;-------------------------------------------------------------------------------
 dialogOvervwColPlrT:
+;-------------------------------------------------------------------------------
 ;		LDA	#$0E
 ;		STA	game + GAME::varA	;x pos
 ;		LDA	#$07			;y pos
@@ -18055,7 +18237,7 @@ dialogOvervwColPlrT:
 		STA	($A3), Y
 		INY
 
-		LDA	#$07
+		LDA	#$06
 		STA	($A3), Y
 		INY
 		
@@ -18073,8 +18255,11 @@ dialogOvervwColPlrT:
 		JSR	dialogOvervwUpdHeap
 
 		RTS
-		
+
+
+;-------------------------------------------------------------------------------
 dialogOvervwColPlrR:
+;-------------------------------------------------------------------------------
 ;		LDA	#$18			;x pos
 ;		LDA	#$07			;y pos
 ;		STA	game + GAME::varA	
@@ -18114,7 +18299,7 @@ dialogOvervwColPlrR:
 		STA	($A3), Y
 		INY
 		
-		LDA	#$18
+		LDA	#$19
 		STA	($A3), Y
 		INY
 		
@@ -18137,7 +18322,10 @@ dialogOvervwColPlrR:
 
 		RTS
 		
+
+;-------------------------------------------------------------------------------
 dialogOvervwColPlrL:
+;-------------------------------------------------------------------------------
 ;		LDA	#$0E			;x pos
 ;		LDA	#$11			;y pos
 ;		STA	game + GAME::varA	
@@ -18181,7 +18369,7 @@ dialogOvervwColPlrL:
 		STA	($A3), Y
 		INY
 		
-		LDA	#$0E
+		LDA	#$0D
 		STA	($A3), Y
 		INY
 		
@@ -18205,7 +18393,9 @@ dialogOvervwColPlrL:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 dialogOvervwColPlrB:
+;-------------------------------------------------------------------------------
 ;		LDA	#$18
 ;		STA	game + GAME::varA	;x pos
 ;		LDA	#$11			;y pos
@@ -18245,7 +18435,7 @@ dialogOvervwColPlrB:
 		STA	($A3), Y
 		INY
 
-		LDA	#$11
+		LDA	#$12
 		STA	($A3), Y
 		INY
 		
@@ -19336,8 +19526,10 @@ doDialogTrdSelToggle:
 ;-------------------------------------------------------------------------------
 doDialogTrdSelClose:
 ;-------------------------------------------------------------------------------
-		LDA	game + GAME::fTrdSlM
-		STA	game + GAME::gMode
+;		LDA	game + GAME::fTrdSlM
+;		STA	game + GAME::gMode
+
+		JSR	gamePopState
 
 		LDA	#$00
 		STA	game + GAME::dlgVis
@@ -20435,11 +20627,6 @@ dialogDlgTrdSel0Draw:
 
 		JSR	doDialogTrdSelGetAddr
 		JSR	doDialogTrdSelBckChar
-		
-		LDA	#$11
-		STA	game + GAME::iStpCnt
-		LDA	#$07
-		STA	game + GAME::gMode
 		
 		RTS
 		
@@ -21548,7 +21735,7 @@ dialogWindowNull0:
 			.byte	$90, $09, $0D
 			.word		dialogWindowNullP
 			
-			.byte	$09, $0C, $0D
+			.byte	$90, $0C, $0D
 			.word		dialogWindowNullA
 
 			.byte	$00
@@ -23360,7 +23547,7 @@ rulesInitStepping:
 		
 		JSR	gamePushState
 
-		LDA	#$06
+		LDA	#GAME_MDE_PSTP
 		STA	game + GAME::gMode
 		
 		JSR	gameUpdateMenu
@@ -24701,7 +24888,7 @@ rulesCCCrdProcColMPay:
 		STA	game + GAME::pMPyLst
 		STA	game + GAME::pMPyCur
 
-		LDA	#$03
+		LDA	#GAME_MDE_MSTP
 		STA	game + GAME::gMode
 		
 		JSR	gameUpdateMenu
@@ -26719,7 +26906,7 @@ rulesDoPlayerElimin:
 ;-------------------------------------------------------------------------------
 rulesDoGameOver:
 ;-------------------------------------------------------------------------------
-		LDA	#$05
+		LDA	#GAME_MDE_OVER
 		STA	game + GAME::gMode
 		
 		JSR	rulesDoNextPlyr
@@ -26810,7 +26997,7 @@ rulesInitEliminToPlyr:
 		LDA	game + GAME::pActive
 		STA	trade0, X
 
-		LDA	#$04
+		LDA	#GAME_MDE_ELIM
 		STA	game + GAME::gMode
 		RTS
 		
@@ -27015,16 +27202,16 @@ rulesDoNextPlyr:
 rulesNextTurn:
 ;-------------------------------------------------------------------------------
 		LDA	game + GAME::gMode
-		CMP	#$00
+		CMP	#GAME_MDE_NORM
 		BEQ	@normal
 	
-		CMP	#$05
+		CMP	#GAME_MDE_OVER
 		BNE	@auctn
 		
 		RTS
 		
 @auctn:
-		CMP	#$01
+		CMP	#GAME_MDE_AUCN
 		BNE	@intrpt
 		
 		JSR	gameNextAuction
@@ -27660,8 +27847,9 @@ rulesAutoRecover:
 
 		LDA	#UI_ACT_DELY
 		STA	$68
-		LDA	#$00
+		LDA	#$04
 		STA	$69
+		LDA	#$00
 		STA	$6A
 		STA	$6B
 		
@@ -28007,9 +28195,16 @@ rulesAutoBuy:
 		STA	$6A
 		
 		JSR	uiEnqueueAction
-
-;	Init Process
-;		BEQ	@pass
+		
+		LDA	#UI_ACT_DELY
+		STA	$68
+		LDA	#$03
+		STA	$69
+		LDA	#$00
+		STA	$6A
+		STA	$6B
+		
+		JSR	uiEnqueueAction
 		
 @complete:
 ;	Return 1
@@ -29191,7 +29386,7 @@ rulesGetGroupOwnInfo:
 ;(IN)		varB	=	group
 ;(IN)		varK	=	player
 ;		varH	=	count owned by player
-;		varI	=	count owned by other player
+;		varI	=	count owned by other players
 ;		varJ	= 	temp value
 ;		varF	=	only one other player
 ;		varG	=	temp value
@@ -29281,7 +29476,7 @@ rulesGetGroupOwnInfo:
 
 ;	Yes, increment this own count
 		INC	game + GAME::varH
-		JMP	@checkother
+		JMP	@donext
 		
 @other:
 ;	No, increment other own count
@@ -29329,6 +29524,13 @@ rulesSuggestDeedValue:
 ;		varS,T	=	temp value
 ;(IN)		varK 	=	player
 ;		varL	= 	square * 2
+;
+;Destroyed:
+;		varH	
+;		varI	
+;		varJ	
+;		varF	
+;		varG	
 
 		STA	game + GAME::varA
 		
@@ -29476,6 +29678,7 @@ rulesSuggestDeedValue:
 @exit:
 		RTS
 
+
 rulesAutoAuction:
 ;	Current bid amount in game + GAME::mACurr
 ;	Auctioned square in game + GAME::sAuctn	
@@ -29619,7 +29822,668 @@ rulesAutoAuction:
 		RTS
 
 
+rulesDoTradeInitP:
+		ASL
+		ASL
+		TAX
+		
+		LDA	#$09
+		STA	trdauto0 + 1, X
+		LDA	#$03
+		STA	trdauto0 + 2, X
+		LDA	#$00
+		STA	trdauto0 + 3, X
+		
+rulesDoTradeInitPTime:
+		LDA	sidV2EnvOu
+		LSR
+		LSR
+		LSR
+		LSR
+		LSR
+		LSR
+		
+		CMP	#$01
+		BCS	@cont
+		
+		LDA	#$01
+		
+@cont:
+		STA	trdauto0, X
+		
+		RTS
+
+
+rulesFindUnimprovedGroup:
+		LDY	#$00
+@loop:
+		LDA	sqr00, Y
+		CMP	game + GAME::pActive
+		BNE	@next
+		
+		LDA	sqr00 + 1, Y
+		AND	#$40
+		BEQ	@next
+		
+		LDA	sqr00 + 1, Y
+		AND	#$08
+		BNE	@next
+		
+		JMP	@found
+
+@next:
+		INY
+		INY
+		
+		CPY	#$50
+		BNE	@loop
+
+		LDA	#$00
+		RTS
+
+@found:
+		LDA	#$01
+		RTS
+		
+		
+rulesDoTradeMatchGIdx:
+		LDA	game + GAME::pActive
+		STA	game + GAME::varK
+		
+		LDA	trdauto0 + 1, X
+		TAY
+		LDA	rulesGrpPriority, Y
+		STA	game + GAME::varB
+
+		TAY
+		LDA	rulesGrpLo, Y
+		STA	$FD
+		LDA	rulesGrpHi, Y
+		STA	$FE
+		
+		LDY	#GROUP::count
+		LDA	($FD), Y
+		STA	game + GAME::varH
+		DEC	game + GAME::varH
+		
+		LDA	trdauto0 + 2, X
+		STA	game + GAME::varW
+		CMP	game + GAME::varH
+		BCC	@cont0
+		
+		LDA	game + GAME::varH
+		STA	game + GAME::varW
+		
+@cont0:
+;(IN)		varB	=	group
+;(IN)		varK	=	player
+		JSR	rulesGetGroupOwnInfo
+
+;		varH	=	count owned by player
+;		varI	=	count owned by other player
+;		varJ	= 	temp value
+;		varF	=	only one other player
+;		varG	=	temp value
+		
+		LDA	#$00
+		STA	game + GAME::varV
+		
+		LDA	game + GAME::varH
+		BEQ	@nextgroup
+		
+		LDA	game + GAME::varI
+		BEQ	@nextgroup
+
+		LDA	game + GAME::varF
+		BEQ	@nextgroup
+		
+		LDA	game + GAME::varH
+		CMP	game + GAME::varW
+		BCC	@nextgroup
+		
+		LDA	#$01
+		STA	game + GAME::varV
+
+@nextgroup:
+		LDX	game + GAME::varX
+
+		DEC	trdauto0 + 1, X
+		LDA	trdauto0 + 1, X
+		BPL	@finish
+		
+		LDA	#$09
+		STA	trdauto0 + 1, X
+
+		DEC	trdauto0 + 2, X
+		LDA	trdauto0 + 2, X
+		BNE	@finish
+
+		LDA	#$03
+		STA	trdauto0 + 2, X
+
+@finish:
+		LDA	game + GAME::varV
+		RTS
+
+
+rulesDoTradeMakeWanted:
+		JSR	gameClearTrdWanted
+
+		LDX	game + GAME::varX
+		LDA	trdauto0 + 3, X
+		AND	#$F0
+		LSR
+		LSR
+		LSR
+		LSR
+		STA	game + GAME::varV
+		
+		LDA	trdauto0 + 3, X
+		AND	#$0F
+		CMP	game + GAME::varB
+		BNE	@noescal
+		
+		LDA	#$00
+		STA	game + GAME::varD
+		STA	game + GAME::varE
+		
+		LDY	game + GAME::varV
+		CPY	#$06
+		BEQ	@skipinc
+		
+		INY
+		
+@skipinc:
+		TYA
+		PHA
+		ASL
+		ASL
+		ASL
+		ASL
+		ORA	game + GAME::varB
+		STA	trdauto0 + 3, X
+		
+		PLA
+		PHA
+		LSR
+		TAY
+
+		PLA
+		TAX
+			
+		JSR	rulesDoNudgeValue
+		
+		LDA	game + GAME::varD
+		STA	game + GAME::varO
+		LDA	game + GAME::varE
+		STA	game + GAME::varP
+		
+		JMP	@init
+		
+@noescal:
+		LDX	game + GAME::varX
+		LDA	game + GAME::varB
+		STA	trdauto0 + 3, X
+		
+		LDA	#$00
+		STA	game + GAME::varO
+		STA	game + GAME::varP
+		STA	game + GAME::varV
+
+@init:
+		LDA	game + GAME::varG
+		LDY	#TRADE::player
+		STA	trade0, Y
+		STA	game + GAME::varR
+		STA	game + GAME::varK
+		
+		LDA	#$03
+		STA	game + GAME::varU
+		
+@loop0:
+		LDX	game + GAME::varU
+		BPL	@fetchsqr
+		
+		JMP	@finish
+		
+@fetchsqr:
+		LDA	game + GAME::varB
+		CMP	#$09
+		BNE	@tstutil
+		
+		JSR	rulesStnSqrForIndex
+		JMP	@begin0
+		
+@tstutil:
+		CMP	#$0A
+		BNE	@street
+		
+		CPX	#$02
+		BPL	@skipidx
+
+		JSR	rulesUtilSqrForIndex
+		JMP	@begin0
+
+@street:
+		CPX	#$03
+		BNE	@docalc
+		
+@skipidx:
+		DEC	game + GAME::varU
+		JMP	@loop0
+		
+@docalc:
+		LDA	#$1C
+		LDX	game + GAME::varU
+
+@loop1:
+		INX
+		CPX	#$03
+		BEQ	@cont0
+		
+		SEC
+		SBC	#$0E
+		JMP	@loop1
+		
+@cont0:
+		CLC
+		ADC	game + GAME::varB
+		
+		TAX
+		LDA	rulesGrpSqrs0, X
+		
+		CMP	#$FF
+		BNE	@begin0
+		
+		DEC	game + GAME::varU
+		JMP	@loop0
+
+@begin0:
+		STA	game + GAME::varW
+
+;	Get square ownership
+		ASL
+		TAX
+		LDA	sqr00, X
+		CMP	game + GAME::varR
+		BNE	@donext
+		
+		LDY	#TRADE::cntDeed
+		LDA	trade0, Y
+		TAY
+		LDA	game + GAME::varW
+		STA	trddeeds0, Y
+
+		LDA	sqr00 + 1, X
+		AND	#$80
+		BEQ	@increment
+		
+		LDA	#$81
+		STA	trdrepay0, Y
+
+@increment:
+		INY
+		TYA
+		LDY	#TRADE::cntDeed
+		STA	trade0, Y
+
+		LDA	#$01
+		STA	game + GAME::varV
+
+		LDA	game + GAME::varW
+		JSR	rulesSuggestDeedValue
+
+		CLC
+		LDA	game + GAME::varO
+		ADC	game + GAME::varD
+		STA	game + GAME::varO
+		LDA	game + GAME::varP
+		ADC	game + GAME::varE
+		STA	game + GAME::varP
+
+@donext:
+		DEC	game + GAME::varU
+		LDA	game + GAME::varU
+		CMP	#$FF
+		BEQ	@finish
+		
+		JMP	@loop0
+		
+@finish:
+		LDA	game + GAME::varV
+		RTS		
+		
+		
+rulesDoTradeColSuggest:
+		LDA	#$00
+		STA	game + GAME::varU
+		STA	game + GAME::varV
+	
+		LDY	#$03
+		STY	game + GAME::varX
+		
+		LDX	#$00
+@loop:
+		STX	game + GAME::varW
+
+		LDA	sqr00, X
+		CMP	game + GAME::pActive
+		BNE	@next
+		
+		LDA	rulesSqr0, X
+		CMP	game + GAME::varR
+		BEQ	@next
+		
+		LDA	sqr00 + 1, X
+		AND	#$40
+		BNE	@next
+		
+		LDA	game + GAME::varV
+		JSR	rulesSuggestDeedValue
+		
+		LDY	game + GAME::varX
+		LDA	game + GAME::varD
+		STA	trade2, Y
+		LDA	game + GAME::varE
+		STA	trade2 + 1, Y
+		LDA	game + GAME::varV
+		STA	trade2 + 2, Y
+
+		INC	game + GAME::varU
+
+		INY
+		INY
+		INY
+		STY	game + GAME::varX
+		
+@next:
+		INC	game + GAME::varV
+		
+		LDX	game + GAME::varW
+		INX
+		INX
+		CPX	#$50
+		BNE	@loop
+
+		LDA	game + GAME::varU
+		BEQ	@exit
+
+		ASL
+		CLC
+		ADC	game + GAME::varU
+		
+		LDY	#$00
+		STA	trade2, Y
+		LDA	#$00
+		STA	trade2 + 1, Y
+		STA	trade2 + 2, Y
+		
+		LDA 	#<trade2
+		LDX 	#>trade2
+		JSR 	shell_sort		
+		
+@exit:
+		RTS
+		
+		
+rulesDoTradeMakeOffer:
+		JSR	gameClearTrdOffer
+
+		LDA	game + GAME::varO
+		ORA	game + GAME::varP
+		BNE	@begin
+			
+		LDA	#$00
+		RTS
+		
+@begin:
+		LDA	game + GAME::pActive
+		LDY	#TRADE::player
+		STA	trade1, Y
+		
+;	Get an array of my tradable deeds, sorted by suggested value ascending
+		STA	game + GAME::varK
+		
+;	varB should still be the group for the wanted deeds at this point (varB 
+;	gets reused)
+		LDA	game + GAME::varB
+		STA	game + GAME::varR
+		
+		JSR	rulesDoTradeColSuggest
+		
+;	Copy the target value to holding vars D,E
+		LDA	game + GAME::varO
+		STA	game + GAME::varD
+		LDA	game + GAME::varP
+		STA	game + GAME::varE
+
+;	Get the points value for the group
+		LDX	game + GAME::varR
+		LDA	rulesGrpPointsFull, X
+		STA	game + GAME::varV
+		
+;	Multiply the points value by the number of deeds wanted and prepare
+;	to tap the value for absolute threshold
+		LDY	#TRADE::cntDeed
+		LDA	trade0, Y
+		TAX
+		TAY
+
+		LDA	game + GAME::varV
+		
+@loop0:
+		DEX
+		BEQ	@cont0
+		
+		CLC
+		ADC	game + GAME::varV
+
+		JMP	@loop0
+
+@cont0:
+;	Get a tapping range in order to calculate an absolute threshold
+		LSR
+		TAX
+		INX
+		INY
+		JSR	rulesDoTapValue
+
+;	Our absolute threshold in Q,R
+		LDA	game + GAME::varD
+		STA	game + GAME::varQ
+		LDA	game + GAME::varE
+		STA	game + GAME::varR
+
+		LDA	#$00
+		STA	game + GAME::varA
+		STA	game + GAME::varD
+		STA	game + GAME::varE
+		
+		
+;	For each deed in the sorted array
+		LDX	#$03
+@loop:
+;	Reached the end?  Jump to finish
+		LDA	game + GAME::varU
+		CMP	game + GAME::varA
+		BEQ	@finish
+		
+;	Back-up our current offer value
+		LDA	game + GAME::varD
+		STA	game + GAME::varS
+		LDA	game + GAME::varE
+		STA	game + GAME::varT
+		
+;	Accumulate the new offer value from suggested value
+		CLC
+		LDA	trade2, X
+		ADC	game + GAME::varD
+		STA	game + GAME::varD
+		LDA	trade2 + 1, X
+		ADC	game + GAME::varE
+		STA	game + GAME::varE
+
+;	Have we gone past absolute threshold?
+		LDA	game + GAME::varQ
+		CMP	game + GAME::varD
+		LDA	game + GAME::varR
+		SBC	game + GAME::varE
+		BCS	@addtarget
+
+;	Yes, restore offer and finish
+		LDA	game + GAME::varS
+		STA	game + GAME::varD
+		LDA	game + GAME::varT
+		STA	game + GAME::varE
+		
+		JMP	@finish
+
+@addtarget:
+;	No, add the deed to the trade and test target
+		LDA	trade2 + 2, X
+		PHA
+		LDY	#TRADE::cntDeed
+		LDA	trade1, Y
+		TAY
+		PLA
+		STA	trddeeds1, Y
+		INY
+		TYA
+		LDY	#TRADE::cntDeed
+		STA	trade1, Y
+		
+		JSR	gameAmountIsLessDirect
+		BCS	@finish
+
+@next:
+		INX
+		INX
+		INX
+		INC	game + GAME::varA
+		JMP	@loop
+		
+@finish:
+		SEC
+		LDA	game + GAME::varO
+		SBC	game + GAME::varD
+		STA	game + GAME::varD
+		LDA	game + GAME::varP
+		SBC	game + GAME::varE
+		STA	game + GAME::varE
+
+		BMI	@exit
+		
+		LDY	#TRADE::money
+		LDA	game + GAME::varD
+		STA	trade1, Y
+		INY
+		LDA	game + GAME::varE
+		STA	trade1, Y
+		
+@exit:
+		LDA	#$01
+		RTS
+		
+
+rulesDoTradeValidate:
+		JSR	menuTrade0RWealthRecalc
+		
+		LDA	menuTrade0RemWealth + 2
+		BMI	@incomplete
+		
+		LDA	menuTrade0RemCash + 1
+		BMI	@incomplete
+		
+		JSR	menuTrade1RWealthRecalc
+
+		LDA	menuTrade1RemWealth + 2
+		BMI	@incomplete
+		
+		LDA	menuTrade1RemCash + 1
+		BMI	@incomplete
+		
+		LDA	#$01
+		RTS
+
+@incomplete:
+		LDA	#$00
+		RTS
+
+
 rulesAutoTradeInitiate:
+		JSR	rulesCountOwnedDeeds
+		
+		LDA	game + GAME::varA
+		CMP	#$09
+		BCS	@cont0
+		
+		JMP	@incomplete
+		
+@cont0:
+		LDA	game + GAME::pActive
+		
+		ASL
+		ASL
+		TAX
+		
+	.if	DEBUG_CPU
+	.else
+		LDA	trdauto0, X
+		BEQ	@begin
+		
+		DEC	trdauto0, X
+		JMP	@incomplete
+	.endif
+		
+@begin:
+		JSR	rulesDoTradeInitPTime
+		
+		STX	game + GAME::varX
+		
+		JSR	rulesFindUnimprovedGroup
+		BEQ	@proc
+		
+		JMP	@incomplete
+		
+@proc:
+		JSR	rulesDoTradeMatchGIdx
+		BNE	@cont1
+		
+		LDX	game + GAME::varX
+		LDA	trdauto0 + 1, X
+		CMP	#$09
+		BNE	@proc
+		
+		JMP	@incomplete
+
+@cont1:
+;		varB	=	group
+;		varG	=	other player
+
+		LDA	game + GAME::varG
+		CMP	#$FF
+		BEQ	@incomplete
+
+		JSR	rulesDoTradeMakeWanted
+		BEQ	@incomplete
+		
+		JSR	rulesDoTradeMakeOffer
+		BEQ	@incomplete
+		
+		JSR	rulesDoTradeValidate
+		BEQ	@incomplete
+		
+		JSR	gameInitTrdIntrptDirect
+		
+		LDA	#$01
+		STA	cpuIsIdle
+		RTS
+		
+@incomplete:
+		LDX	game + GAME::varX
+		LDA	#$00
+		STA	trdauto0 + 3, X
+
 		LDA	#$00
 		RTS
 
@@ -30294,6 +31158,9 @@ rulesAutoPlay:
 		STA	($FB), Y
 
 		JSR	rulesAutoImprove
+		BNE	@complete
+
+		JSR	rulesAutoTradeInitiate
 		BNE	@complete
 
 @incomplete:
@@ -31011,6 +31878,242 @@ RTRN:
 		RTS         			;RETURN
 
 
+
+;===============================================================================
+;SORT.S
+;
+;Sort 24 bit elements with leading 16 bit (unsigned) comparison value and 8 bit
+;data.
+;
+;Adapted by dengland from the code at: 
+;http://codebase64.org/doku.php?id=base:shell_sort_16-bit_elements
+;
+;===============================================================================
+
+
+j		=	$20                            ; Uses two bytes. Has to be on zero-page
+j_plus_h	=	$22                        	; Uses two bytes. Has to be on zero-page
+arr_length 	= 	j_plus_h               	; Can safely use the same location as
+						; j_plus_h, but doesn't have to be on ZP
+
+
+;doSort:
+;		lda 	#<data_array
+;		ldx 	#>data_array
+;		jsr 	shell_sort		
+;		
+;		RTS
+
+
+shell_sort:
+		ldy 	#(h_high - h_low - 1)
+                bne 	sort_main         ; Always branch
+insertion_sort:  
+		ldy 	#0
+
+sort_main:       
+		sty 	h_start_index
+                cld
+                sta 	j
+                sta 	in_address
+                
+                clc
+;dengland
+;               adc 	#2
+                adc 	#3
+                sta 	arr_start
+                
+                stx 	j + 1
+                stx 	in_address + 1
+                
+                txa
+                adc 	#0
+                sta 	arr_start + 1
+                
+                ldy 	#0
+                lda 	(j), y
+                sta 	arr_length
+                
+                clc
+                adc 	arr_start
+                sta 	arr_end
+                
+                iny
+                lda 	(j), y
+                sta 	arr_length + 1
+
+                adc 	arr_start + 1
+                sta 	arr_end + 1
+
+;   for (h=1; h < length; h=3*h+1);
+                
+                ldx 	h_start_index     	; Start with highest value of h
+		
+chk_prev_h:      
+		lda 	h_low, x
+                cmp 	arr_length
+                lda 	h_high, x
+                sbc 	arr_length + 1
+                bcc 	end_of_init       	; If h < array_length, we've found the right h
+                dex
+                bpl 	chk_prev_h
+                rts                   		; array length is 0 or 1. No sorting needed.
+
+end_of_init:     
+		inx
+                stx 	h_index
+
+;   while (h=(h-1)/3)
+
+h_loop:          
+		dec 	h_index
+                bpl 	get_h
+                rts                   		; All done!
+                
+get_h:           
+		ldy 	h_index
+                lda 	h_low, y
+                sta 	h
+                clc
+                adc 	in_address        	; ( in_address is arr_start - 2)
+                sta 	i
+                lda 	h_high, y
+                sta 	h + 1
+                adc 	in_address + 1
+                sta 	i + 1
+                
+; for (i=h, j=i, v=arr[i]; i<=length; arr[j+h]=v, i++, j=i, v=arr[i])
+
+i_loop:          
+		lda 	i
+                clc
+;dengland
+;               adc 	#2
+                adc 	#3
+		
+                sta 	i
+                sta 	j
+                lda 	i + 1
+                adc 	#0
+                sta 	i + 1
+                sta 	j + 1
+
+                ldx 	i
+                cpx 	arr_end
+                lda 	i + 1
+                sbc 	arr_end + 1
+                bcs 	h_loop
+
+                ldy 	#0
+                lda 	(j), y
+                sta 	v
+		
+                clc
+                adc 	#1
+                sta 	v_plus_1
+                
+		iny
+                lda 	(j), y
+                sta 	v + 1
+		
+;dengland
+		INY
+		LDA	(j), Y
+		STA	v + 2
+                LDA 	v + 1
+		DEY
+		
+                adc 	#0
+                bcs 	i_loop            ; v=$ffff, so no j-loop necessary
+                sta 	v_plus_1 + 1
+                
+                dey                   ; Set y=0
+
+;         while((j-=h) >= 0 && arr[j] > v)
+
+j_loop:          
+		lda 	j
+                sta 	j_plus_h
+                sec
+                sbc 	h
+                sta 	j
+                tax
+                lda 	j + 1
+                sta 	j_plus_h + 1
+                sbc 	h + 1
+                sta 	j + 1
+
+; Check if we've reached the bottom of the array
+
+                bcc 	exit_j_loop
+                cpx 	arr_start
+                sbc 	arr_start + 1
+                bcc 	exit_j_loop
+                
+; Do the actual comparison:  arr[j] > v
+
+                lda 	(j), y
+                tax
+                iny                   ; Set y=1
+                lda 	(j), y
+                cpx 	v_plus_1
+                sbc 	v_plus_1 + 1
+                bcc 	exit_j_loop
+
+;           arr[j+h]=arr[j];
+		
+;dengland		
+		INY
+		LDA	(j), Y
+		STA	(j_plus_h), Y
+		DEY
+
+                lda 	(j), y
+                sta 	(j_plus_h), y
+                dey                   ; Set y=0
+                txa
+                sta 	(j_plus_h), y
+                bcs 	j_loop            ; Always branch
+
+;       for (i=h, j=i, v=arr[i]; i<length; arr[j+h]=v, i++, j=i, v=arr[i])  ***  arr[j+h]=v part
+
+exit_j_loop:     
+		lda 	v
+                ldy 	#0
+                sta 	(j_plus_h), y
+                iny
+                lda 	v + 1
+                sta 	(j_plus_h), y
+		
+;dengland
+		INY
+		LDA	v + 2
+		STA	(j_plus_h), Y
+		DEY
+		
+                jmp 	i_loop
+
+
+; This describes the sequence h(0)=1; h(n)=k*h(n-1)+1 for k=3 (1,4,13,40...)
+
+;dengland
+h_low:           .byte <3, <12, <39, <120, <363, <1092, <3279, <9840, <29523
+h_high:          .byte >3, >12, >39, >120, >363, >1092, >3279, >9840, >29523
+
+h_start_index:   .byte 0
+h_index:         .byte 0
+h:               .word 0
+in_address:      .word 0
+arr_start:       .word 0
+arr_end:         .word 0
+i:               .word 0
+v:               .word 0
+;dengland
+		.byte 0
+		
+v_plus_1:        .word 0
+
+
 ;===============================================================================
 ;FOR INIT.S
 ;===============================================================================
@@ -31197,6 +32300,9 @@ initPlayers:
 		DEX
 		BPL	@loopDebit
 		
+		LDA	$A3
+		JSR	rulesDoTradeInitP
+		
 		LDX	$A3
 		INX
 		
@@ -31321,10 +32427,12 @@ debugHeapSize:
 	.word	$0000
 	
 	
+;-------------------------------------------------------------------------------
 debugCheckHeap:
+;-------------------------------------------------------------------------------
 		JSR	dialogOvervwUpdHeap
 
-;	X>=Y
+;	X>=Y (A3/A4 >= debugHeapHigh)
 		LDA 	$A3
                 CMP 	debugHeapHigh
 		LDA	$A4
@@ -31347,9 +32455,118 @@ debugCheckHeap:
 		SBC	#>heap0
 		STA	debugHeapSize + 1
 
-;***FIXME:	Also check if the debugHeapSize + 1 is 2 or more and 
-;	fault if this occurs when have only allocated size remaining.
+		CMP	#$02
+		BCC	@exit
+		
+		LDA	game + GAME::pActive
+		STA	cpuFaultPlayer
+		
+		LDA	#<debugCheckHeap
+		STA	cpuFaultAddr
+		LDA	#>debugCheckHeap
+		STA	cpuFaultAddr + 1
 
+		LDA 	#<dialogDlgNull0
+		LDY	#>dialogDlgNull0
+		
+		JSR	dialogSetDialog
+		JSR	dialogDispDefDialog
+		
+@exit:
+		RTS
+	.endif
+
+
+	.if	DEBUG_GSTATE
+;-------------------------------------------------------------------------------
+debugCheckGameState:
+;-------------------------------------------------------------------------------
+		LDA	gameStateIdx
+		CMP	#$0A
+		BCS	@error
+		
+		LDA	gameStateIdx
+		BMI	@error
+		
+		RTS
+
+@error:
+		LDA	game + GAME::pActive
+		STA	cpuFaultPlayer
+		
+		LDA	#<debugCheckGameState
+		STA	cpuFaultAddr
+		LDA	#>debugCheckGameState
+		STA	cpuFaultAddr + 1
+
+		LDA 	#<dialogDlgNull0
+		LDY	#>dialogDlgNull0
+		
+		JSR	dialogSetDialog
+		JSR	dialogDispDefDialog
+		
+		RTS
+	.endif
+
+
+	.if	DEBUG_ACTIONS
+;-------------------------------------------------------------------------------
+debugCheckActEnqueueMax:
+;-------------------------------------------------------------------------------
+;	X>=Y (A3/A4 >= $FF00)
+		LDA 	$A3
+                CMP 	#<$FF00
+		LDA	$A4
+		SBC	#>$FF00
+                BCS 	@error
+		
+		RTS
+		
+@error:
+		LDA	game + GAME::pActive
+		STA	cpuFaultPlayer
+		
+		LDA	#<debugCheckActEnqueueMax
+		STA	cpuFaultAddr
+		LDA	#>debugCheckActEnqueueMax
+		STA	cpuFaultAddr + 1
+
+		LDA 	#<dialogDlgNull0
+		LDY	#>dialogDlgNull0
+		
+		JSR	dialogSetDialog
+		JSR	dialogDispDefDialog
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
+debugCheckActCtxCurrMax:
+;-------------------------------------------------------------------------------
+;	X>=Y (A3/A4 >= $FF00)
+		LDA 	$A3
+                CMP 	#<uiProcessCtxCurrPtr
+		LDA	$A4
+		SBC	#>uiProcessCtxCurrPtr
+                BCS 	@error
+
+		RTS
+		
+@error:
+		LDA	game + GAME::pActive
+		STA	cpuFaultPlayer
+		
+		LDA	#<debugCheckActCtxCurrMax
+		STA	cpuFaultAddr
+		LDA	#>debugCheckActCtxCurrMax
+		STA	cpuFaultAddr + 1
+
+		LDA 	#<dialogDlgNull0
+		LDY	#>dialogDlgNull0
+		
+		JSR	dialogSetDialog
+		JSR	dialogDispDefDialog
+		
 		RTS
 	.endif
 
@@ -31358,7 +32575,7 @@ debugCheckHeap:
 ;HEAP
 ;===============================================================================
 heap0:
-	.assert         heap0 < $CE00, error, "Program too large!"
+	.assert	heap0 <= $CE00, error, "Program too large!"
 	
 
 ;===============================================================================
@@ -31729,4 +32946,6 @@ sprPointer:
 ;			.byte 	%00000000, %00000000, %00000000
 ;			.byte	$00
 
-	.assert         * < $D000, error, "Program too large!"
+	.assert		(* - heap0) <= 512, error, "Discard too large!"
+
+	.assert         * <= $D000, error, "Program too large!"
