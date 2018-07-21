@@ -30,10 +30,8 @@ this.  *\*ugh\**
   have -- calc minimum as well as max?).
 * AutoTradeApprove could tally "half points" for prime targets and require that they
   be accounted for in other deeds or money (convert extra points too?).
-* AutoTradeInitiate should not grant full groups when not getting one (stations).
-* Is checking must pay after normal (non-elimination) action processing required now?
 
-* Change position of players in corners on overview dialog?
+* Is checking must pay after normal (non-elimination) action processing required now?
 
 * Statistics/Overview from trade approval, must pay.  They should work now.
 * Make dialog elimin0 more informative about the elimination (to player/bank)?
@@ -101,6 +99,21 @@ this.  *\*ugh\**
 ### Since Version 0.02.56B
 
 * 21JUL2018
+	* Rework Overvw0 dialog drawing players, improvements and mortgages to reuse
+	  data from TrdSel0 dialog saving some 670 bytes. 
+	* rulesDoTradeMakeWanted applies rejection cooldown to value escalations.
+	* AutoTradeInitiate applies a longer and longer base time to trade on 
+	  rejection until approval (capped).
+	* Don't show money buttons in trade approval on trdsel0.
+	* rulesDoTradeMakeOffer includes mortgage flags in trade details.
+	* AutoRecover shouldn't stop between selling houses and mortgaging any
+	  longer.
+	* Add SFX for trade initiation.
+	* Change the priority of the sfx.
+	* Also don't restart an already playing sfx.
+	* Hack sound driver to not override non silence patterns with sfx
+	  (except for voice 1).  This gives more stable sound I feel.
+	* Do not include stations and utilities in rulesFindUnimprovedGroup.
 	* Tweak other delay times.
 	* Tweak action processing initiation delay and add delay after AutoBuy buy.
 	* Add nice delay time control feature to DELY action processing.

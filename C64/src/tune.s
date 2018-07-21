@@ -600,7 +600,21 @@ mt_init:
 
 mt_playsfx:     sta mt_playsfxlo+1
                 sty mt_playsfxhi+1
-                lda mt_chnsfx,x                   ;Need a priority check?
+		
+;dengland
+		CPX	#$00
+		BEQ	@mt_playsinit
+		LDA 	mt_chnpattnum, X
+		CMP	#$02
+		BEQ	@mt_playsinit
+		CMP	#$2E
+		BEQ	@mt_playsinit
+
+		RTS
+		
+@mt_playsinit:		
+;---
+		lda mt_chnsfx,x                   ;Need a priority check?
                 beq mt_playsfxok
                 tya                               ;Check address highbyte
                 cmp mt_chnsfxhi,x
@@ -609,6 +623,11 @@ mt_playsfx:     sta mt_playsfxlo+1
                 lda mt_playsfxlo+1                ;Check address lowbyte
                 cmp mt_chnsfxlo,x
                 bcc mt_playsfxskip                ;Lower than current -> skip
+		
+;dengland
+		BEQ	mt_playsfxskip
+;---
+		
 mt_playsfxok:   lda #$01
                 sta mt_chnsfx,x
 mt_playsfxlo:   lda #$00
@@ -885,6 +904,17 @@ mt_notrans:
                 bcs mt_repeat
               .ENDIF
                 sta mt_chnpattnum,x             ;Store pattern number
+;dengland		
+		CPX	#$00
+		BEQ	mt_repeatdone2
+		CMP	#$02
+		BEQ	mt_repeatdone2
+		CMP	#$2E
+		BEQ	mt_repeatdone2
+		LDA	#$00
+		STA	mt_chnsfx, X
+;---	
+	
 mt_repeatdone2:
                 iny
                 tya

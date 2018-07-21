@@ -34,7 +34,7 @@
 ;	  1 multi-context, stall/restartable action cache (messaging)
 ;	 15 core actions (3 system; 1 generic input driver; 11 specific)
 ;	 16 tunes (2 voice)
-;	 16 sfx (1 voice)
+;	 17 sfx (1 voice)
 ;	350 constant strings (more than 4.5KB and 23 pages of source)
 ;	  3 threads equivalent (raster IRQ, signal managed; system, main, game)
 ;	  3 configurable input sources (keyboard, joystick, mouse)
@@ -57,7 +57,7 @@
 ;	  3 house rules (one always enabled:  reshuffle CCCCards)
 ;	    strictly turn-based (with interrupts and flexible management)
 ;
-;	 an estimated 18.75KB data, 35.75KB code, 1.5KB heap, 5.25KB system
+;	 an estimated 18.75KB data, 35.5KB code, 1.5KB heap, 5.25KB system
 ;	 more than 650 portrait A4 pages of source code with small font or
 ;	 to print in the old landscape style with normal font, 1100 A4 pages
 ;
@@ -66,7 +66,7 @@
 ;	* Most of the zero page is unused (still need break-down/rework) except 
 ;	  for possible reservation of Kernal data for compatibility (load/save?)
 ;	* Free in global state, 18 bytes (free for globals)
-;	* Between end of program and reserved, 2800 bytes (free for program)
+;	* Between end of program and reserved, 3203 bytes (free for program)
 ;	* Free in discard, 6 bytes (free for discard)
 ;	* Reserved area, 512 bytes (reserved for discard/display heap)
 ;	* Between rules data and action heap, 307 bytes (free for constant data)
@@ -82,9 +82,9 @@
 ;	0900 -  7FFF	Program code and data (~30KB)
 ;	8000 -	9FFF	Program code and data (8KB)
 ;	A000 -	BFFF	Program code and data (8KB)
-;	C000 -	C30F	Program code and data (783 bytes)
-;	C310 -	C50F	Discard/display heap (512 bytes, 6 discard free)
-;	C510 - 	CDFF	Free (~2.25KB)
+;	C000 -	C17C	Program code and data (380 bytes)
+;	C17D -	C37C	Discard/display heap (512 bytes, 6 discard free)
+;	C37D - 	CDFF	Free (~2.75KB)
 ;	CE00 - 	CFFF	Reserved (discard/display heap, 512 bytes)
 ;	D000 - 	DFFF	System I/O (4KB)
 ;	E000 -	F240	Strings const data (4673 bytes)
@@ -931,20 +931,18 @@ SNDBASE:
 	.include	"tune.s"
 	
 ;Include the SFX data
+SFXNUDGE:
+	.include	"nudge.inc"
 SFXDING:
 	.include	"ding.inc"
 SFXDONG:
 	.include	"dong.inc"
 SFXBUZZ:
 	.include 	"buzz.inc"
-SFXNUDGE:
-	.include	"nudge.inc"
 SFXSPLAT:
 	.include	"splat.inc"
 SFXSLAM:
         .include	"slam.inc"
-SFXGONG:
-	.include	"gong.inc"
 SFXLOWZAP:
 	.include	"lowzap.inc"
 SFXRENT0:
@@ -955,12 +953,16 @@ SFXRENT2:
 	.include	"rent2.inc"
 SFXRENT3:
 	.include	"rent3.inc"
-SFXCASH:
-	.include	"cash.inc"
 SFXSLIDE:
 	.include	"slide.inc"
 SFXSLIDELOW:
 	.include	"slidelow.inc"
+SFXCASH:
+	.include	"cash.inc"
+SFXGONG:
+	.include	"gong.inc"
+SFXPULSE:
+	.include	"pulse.inc"
 SFXBELL:
 	.include	"bell.inc"
 
@@ -12019,6 +12021,8 @@ menuPageTrade1Keys:
 		LDA	#$FF
 		STA	game + GAME::pLast
 		
+		JSR	gameCheckCPUDecline
+		
 		JSR	rulesFocusOnActive
 		JSR	gamePlayersDirty
 		
@@ -13013,6 +13017,68 @@ gamePopState:
 		JSR	uiProcessSet
 		
 @exit:
+		RTS
+
+
+gameCheckCPUApprove:
+;		LDX	game + GAME::pActive
+;		LDA	plrLo, X
+;		STA	$FB
+;		LDA	plrHi, X
+;		STA	$FC
+		LDY	#PLAYER::fCPU
+		LDA	($FB), Y
+		BNE	@proc
+		
+		RTS
+		
+@proc:
+		TXA
+		ASL
+		ASL
+		TAX
+		LDA	trdauto0, X
+		AND	#$0F
+		STA	trdauto0, X
+		
+		RTS
+
+
+gameCheckCPUDecline:
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		LDY	#PLAYER::fCPU
+		LDA	($FB), Y
+		BNE	@proc
+		
+		RTS
+		
+@proc:
+		TXA
+		ASL
+		ASL
+		TAX
+		LDA	trdauto0, X
+		AND	#$F0
+		CMP	#$A0
+		BMI	@increment
+		
+		RTS
+
+@increment:
+		CLC
+		ADC	#$10
+		STA	game + GAME::varA
+		
+		LDA	trdauto0, X
+		AND	#$0F
+		ORA	game + GAME::varA
+		
+		STA	trdauto0, X
+		
 		RTS
 
 
@@ -14887,6 +14953,11 @@ gameInitTrdIntrptDirect:
 		ORA	game + GAME::dirty
 		STA	game + GAME::dirty		
 		
+		LDA	#<SFXPULSE
+		LDY	#>SFXPULSE
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
 		RTS
 		
 
@@ -14931,6 +15002,8 @@ gameApproveTrade:
 		RTS
 
 @approve:
+		JSR	gameCheckCPUApprove
+
 		LDY 	#PLAYER::colour
 		LDA	($FB), Y
 		TAX
@@ -17691,422 +17764,50 @@ dialogOvervwColOwn:
 		JSR	dialogOvervwColOwnB
 		
 		RTS
-		
-dialogOvervwColMrtgT:
-		LDA	#$0F
-		STA	game + GAME::varA
-;		LDA	#$06
-;		STA	game + GAME::varB
-		
-		LDX	#$2A
-		
-@loop:
-		LDA	sqr00 + 1, X
-		AND	#$80
-		BEQ	@next
-
-		LDA	#$8B
-		LDY	game + GAME::varH
-		STA	($A3), Y
-		INY
-		
-		LDA	game + GAME::varA
-		STA	($A3), Y
-		INY
-		
-		LDA	#$06
-		STA	($A3), Y
-		INY
-		
-		STY	game + GAME::varH
-		
-@next:
-		INC	game + GAME::varA
-		
-		INX
-		INX
-		CPX	#$3C
-		BNE	@loop
-
-		JSR	dialogOvervwUpdHeap
-
-		RTS
-
-dialogOvervwColMrtgR:
-		LDA	#$08
-		STA	game + GAME::varA
-;		LDA	#$19
-;		STA	game + GAME::varB
-		
-		LDX	#$3E
-		
-@loop:
-		LDA	sqr00 + 1, X
-		AND	#$80
-		BEQ	@next
-
-		LDA	#$8B
-		LDY	game + GAME::varH
-		STA	($A3), Y
-		INY
-		
-		LDA	#$19
-		STA	($A3), Y
-		INY
-		
-		LDA	game + GAME::varA
-		STA	($A3), Y
-		INY
-
-		STY	game + GAME::varH
-		
-@next:
-		INC	game + GAME::varA
-		
-		INX
-		INX
-		CPX	#$50
-		BNE	@loop
-
-		JSR	dialogOvervwUpdHeap
-
-		RTS
-		
-dialogOvervwColMrtgL:
-		LDA	#$10
-		STA	game + GAME::varA
-;		LDA	#$0D
-;		STA	game + GAME::varB
-		
-		LDX	#$16
-		
-@loop:
-		LDA	sqr00 + 1, X
-		AND	#$80
-		BEQ	@next
-
-		LDA	#$8B
-		LDY	game + GAME::varH
-		STA	($A3), Y
-		INY
-		
-		LDA	#$0D
-		STA	($A3), Y
-		INY
-		
-		LDA	game + GAME::varA
-		STA	($A3), Y
-		INY
-
-		STY	game + GAME::varH
-		
-@next:
-		DEC	game + GAME::varA
-		
-		INX
-		INX
-		CPX	#$28
-		BNE	@loop
-
-		JSR	dialogOvervwUpdHeap
-
-		RTS
-		
-dialogOvervwColMrtgB:
-		LDA	#$17
-		STA	game + GAME::varA
-;		LDA	#$12
-;		STA	game + GAME::varB
-		
-		LDX	#$02
-		
-@loop:
-		LDA	sqr00 + 1, X
-		AND	#$80
-		BEQ	@next
-
-		LDA	#$8B
-		LDY	game + GAME::varH
-		STA	($A3), Y
-		INY
-		
-		LDA	game + GAME::varA
-		STA	($A3), Y
-		INY
-		
-		LDA	#$12
-		STA	($A3), Y
-		INY
-		
-		STY	game + GAME::varH
-		
-@next:
-		DEC	game + GAME::varA
-		
-		INX
-		INX
-		CPX	#$14
-		BNE	@loop
-
-		JSR	dialogOvervwUpdHeap
-
-		RTS
 
 
 ;-------------------------------------------------------------------------------
 dialogOvervwColMrtg:
 ;-------------------------------------------------------------------------------
-		JSR	dialogOvervwColMrtgT
-		JSR	dialogOvervwColMrtgR
-		JSR	dialogOvervwColMrtgL
-		JSR	dialogOvervwColMrtgB
-
-		RTS
-	
-	
-;-------------------------------------------------------------------------------
-dialogOvervwColImprvT:
-;-------------------------------------------------------------------------------
-		LDA	#$0F
+		LDA	#$01
 		STA	game + GAME::varA
-;		LDA	#$06
-;		STA	game + GAME::varB
-		
-		LDX	#$2A
+
+		LDX	#$02
 		
 @loop:
 		LDA	sqr00 + 1, X
-		AND	#$0F
+		AND	#$80
 		BEQ	@next
 
-		AND	#$08
-		BEQ	@hses
-
-;		LDA	#$0A
-;		PHA
-		LDA	#$69
-		JMP	@out
-
-@hses:
-;		LDA	#$0D
-;		PHA	
-		
-		LDA	sqr00 + 1, X
-		AND	#$07
+		LDY	game + GAME::varA
+		LDA	dialogAddrTrdSelSqrLo, Y
+		STA	$FD
 		CLC
-		ADC	#$04
-		ORA	#$60
+		LDA	dialogAddrTrdSelSqrHi, Y
+		ADC	#$D4
+		STA	$FE
 		
-@out:
-		LDY	game + GAME::varH
-		STA	($A3), Y
-		INY
-		
-		LDA	game + GAME::varA
-		STA	($A3), Y
-		INY
-		
-		LDA	#$07
-		STA	($A3), Y
-		INY
-
-		LDA	#$FF
-		STA	($A3), Y
-		INY
-		
-;		PLA
-;		ORA	#$80
-;		STA	($A3), Y
-;		INY
-;		
-;		LDA	game + GAME::varA
-;		STA	($A3), Y
-;		INY
-;		
-;		LDA	#$06
-;		STA	($A3), Y
-;		INY
-
-		STY	game + GAME::varH
-
-@next:
-		INC	game + GAME::varA
-		
-		INX
-		INX
-		CPX	#$3C
-		BNE	@loop
-
-		JSR	dialogOvervwUpdHeap
-
-		RTS
-		
-		
-;-------------------------------------------------------------------------------
-dialogOvervwColImprvR:
-;-------------------------------------------------------------------------------
-		LDA	#$08
-		STA	game + GAME::varA
-;		LDA	#$19
-;		STA	game + GAME::varB
-		
-		LDX	#$3E
-		
-@loop:
-		LDA	sqr00 + 1, X
-		
-		AND	#$0F
-		BEQ	@next
-
-		AND	#$08
-		BEQ	@hses
-
-;		LDA	#$0A
-;		PHA
-		LDA	#$69
-		JMP	@out
-
-@hses:
-;		LDA	#$0D
-;		PHA	
-		
-		LDA	sqr00 + 1, X
-		AND	#$07
-		CLC
-		ADC	#$04
-		ORA	#$60
-		
-@out:
-		LDY	game + GAME::varH
-		STA	($A3), Y
-		INY
-		
-		LDA	#$18
-		STA	($A3), Y
-		INY
-		
-		LDA	game + GAME::varA
-		STA	($A3), Y
-		INY
-
-		LDA	#$FF
-		STA	($A3), Y
-		INY
-		
-;		PLA
-;		ORA	#$80
-;		STA	($A3), Y
-;		INY
-;		
-;		LDA	#$19
-;		STA	($A3), Y
-;		INY
-;		
-;		LDA	game + GAME::varA
-;		STA	($A3), Y
-;		INY
-
-		STY	game + GAME::varH
+		LDY	#$00
+		LDA	#$0B
+		STA	($FD), Y
 		
 @next:
 		INC	game + GAME::varA
-		
+
 		INX
 		INX
 		CPX	#$50
 		BNE	@loop
 
-		JSR	dialogOvervwUpdHeap
-
-		RTS
-		
-		
-;-------------------------------------------------------------------------------
-dialogOvervwColImprvL:
-;-------------------------------------------------------------------------------
-		LDA	#$10
-		STA	game + GAME::varA
-;		LDA	#$0D
-;		STA	game + GAME::varB
-		
-		LDX	#$16
-		
-@loop:
-		LDA	sqr00 + 1, X
-		AND	#$0F
-		BEQ	@next
-
-		AND	#$08
-		BEQ	@hses
-
-;		LDA	#$0A
-;		PHA
-		LDA	#$69
-		JMP	@out
-
-@hses:
-;		LDA	#$0D
-;		PHA	
-		
-		LDA	sqr00 + 1, X
-		AND	#$07
-		CLC
-		ADC	#$04
-		ORA	#$60
-		
-@out:
-		LDY	game + GAME::varH
-		STA	($A3), Y
-		INY
-		
-		LDA	#$0E
-		STA	($A3), Y
-		INY
-		
-		LDA	game + GAME::varA
-		STA	($A3), Y
-		INY
-
-		LDA	#$FF
-		STA	($A3), Y
-		INY
-		
-;		PLA
-;		ORA	#$80
-;		STA	($A3), Y
-;		INY
-;		
-;		LDA	#$0D
-;		STA	($A3), Y
-;		INY
-;		
-;		LDA	game + GAME::varA
-;		STA	($A3), Y
-;		INY
-
-		STY	game + GAME::varH
-		
-@next:
-		DEC	game + GAME::varA
-		
-		INX
-		INX
-		CPX	#$28
-		BNE	@loop
-
-		JSR	dialogOvervwUpdHeap
-
 		RTS
 
 
 ;-------------------------------------------------------------------------------
-dialogOvervwColImprvB:
+dialogOvervwColImprv:
 ;-------------------------------------------------------------------------------
-		LDA	#$17
+		LDA	#$01
 		STA	game + GAME::varA
-;		LDA	#$12
-;		STA	game + GAME::varB
-		
+
 		LDX	#$02
 		
 @loop:
@@ -18117,349 +17818,70 @@ dialogOvervwColImprvB:
 		AND	#$08
 		BEQ	@hses
 
-;		LDA	#$0A
-;		PHA
-		LDA	#$69
+		LDA	#$88
 		JMP	@out
 
 @hses:
-;		LDA	#$0D
-;		PHA	
-		
 		LDA	sqr00 + 1, X
 		AND	#$07
 		CLC
-		ADC	#$04
-		ORA	#$60
+		ADC	#$B0
 		
 @out:
-		LDY	game + GAME::varH
-		STA	($A3), Y
-		INY
-		
-		LDA	game + GAME::varA
-		STA	($A3), Y
-		INY
-		
-		LDA	#$11
-		STA	($A3), Y
-		INY
-		
-		LDA	#$FF
-		STA	($A3), Y
-		INY
-		
-;		PLA
-;		ORA	#$80
-;		STA	($A3), Y
-;		INY
-;		
-;		LDA	game + GAME::varA
-;		STA	($A3), Y
-;		INY
-;		
-;		LDA	#$12
-;		STA	($A3), Y
-;		INY
-
-		STY	game + GAME::varH
-		
-@next:
-		DEC	game + GAME::varA
-		
-		INX
-		INX
-		CPX	#$14
-		BNE	@loop
-
-		JSR	dialogOvervwUpdHeap
-
-		RTS
-		
-		
-;-------------------------------------------------------------------------------
-dialogOvervwColImprv:
-;-------------------------------------------------------------------------------
-		JSR	dialogOvervwColImprvT
-		JSR	dialogOvervwColImprvR
-		JSR	dialogOvervwColImprvL
-		JSR	dialogOvervwColImprvB
-		
-		RTS
-		
-		
-;-------------------------------------------------------------------------------
-dialogOvervwColPlrT:
-;-------------------------------------------------------------------------------
-;		LDA	#$0E
-;		STA	game + GAME::varA	;x pos
-;		LDA	#$07			;y pos
-		
-		LDX 	#$00
-		
-@loop:
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
-		LDY	#PLAYER::status
-		LDA	($FB), Y
-		AND	#$01
-		BEQ	@next
-				
-		LDY	#PLAYER::square
-		LDA	($FB), Y
-		
-		CMP	#$14
-		BPL	@test0
-		
-		JMP	@next
-		
-@test0:
-		CMP	#$1E
-		BPL	@next
-		
-		SEC
-		SBC	#$14
-		STA	game + GAME::varA
-		
-		CLC
-		ADC	#$0E
 		PHA
-		
-		LDY	game + GAME::varH
-		LDA	#$6D
-		STA	($A3), Y
-		INY
+
+		LDY	game + GAME::varA
+		LDA	dialogAddrTrdSelRepLo, Y
+		STA	$FD
+		LDA	dialogAddrTrdSelRepHi, Y
+		STA	$FE
 		
 		PLA
-		STA	($A3), Y
-		INY
-
-		LDA	#$06
-		STA	($A3), Y
-		INY
-		
-		LDA	#$FF
-		STA	($A3), Y
-		INY
-		
-		STY	game + GAME::varH
+		LDY	#$00
+		STA	($FD), Y
 		
 @next:
+		INC	game + GAME::varA
+
 		INX
-		CPX	#$06
+		INX
+		CPX	#$50
 		BNE	@loop
-		
-		JSR	dialogOvervwUpdHeap
 
 		RTS
 
 
 ;-------------------------------------------------------------------------------
-dialogOvervwColPlrR:
-;-------------------------------------------------------------------------------
-;		LDA	#$18			;x pos
-;		LDA	#$07			;y pos
-;		STA	game + GAME::varA	
-		
-		LDX 	#$00
-		
-@loop:
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
-		LDY	#PLAYER::status
-		LDA	($FB), Y
-		AND	#$01
-		BEQ	@next
-				
-		LDY	#PLAYER::square
-		LDA	($FB), Y
-		
-		CMP	#$1E
-		BPL	@begin
-		
-		JMP	@next
-		
-@begin:
-		SEC
-		SBC	#$1E
-		STA	game + GAME::varA
-		
-		CLC
-		ADC	#$07
-		PHA
-		
-		LDY	game + GAME::varH
-		LDA	#$6D
-		STA	($A3), Y
-		INY
-		
-		LDA	#$19
-		STA	($A3), Y
-		INY
-		
-		PLA
-		STA	($A3), Y
-		INY
-		
-		LDA	#$FF
-		STA	($A3), Y
-		INY
-		
-		STY	game + GAME::varH
-		
-@next:
-		INX
-		CPX	#$06
-		BNE	@loop
-		
-		JSR	dialogOvervwUpdHeap
-
-		RTS
-		
-
-;-------------------------------------------------------------------------------
-dialogOvervwColPlrL:
-;-------------------------------------------------------------------------------
-;		LDA	#$0E			;x pos
-;		LDA	#$11			;y pos
-;		STA	game + GAME::varA	
-		
-		LDX 	#$00
-		
-@loop:
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
-		LDY	#PLAYER::status
-		LDA	($FB), Y
-		AND	#$01
-		BEQ	@next
-				
-		LDY	#PLAYER::square
-		LDA	($FB), Y
-		
-		CMP	#$0A
-		BPL	@test0
-		
-		JMP	@next
-		
-@test0:
-		CMP	#$14
-		BPL	@next
-		
-		SEC
-		SBC	#$0A
-		STA	game + GAME::varA
-		
-		LDA	#$11
-		SEC
-		SBC	game + GAME::varA
-		PHA
-		
-		LDY	game + GAME::varH
-		LDA	#$6D
-		STA	($A3), Y
-		INY
-		
-		LDA	#$0D
-		STA	($A3), Y
-		INY
-		
-		PLA
-		STA	($A3), Y
-		INY
-
-		LDA	#$FF
-		STA	($A3), Y
-		INY
-		
-		STY	game + GAME::varH
-		
-@next:
-		INX
-		CPX	#$06
-		BNE	@loop
-		
-		JSR	dialogOvervwUpdHeap
-
-		RTS
-		
-		
-;-------------------------------------------------------------------------------
-dialogOvervwColPlrB:
-;-------------------------------------------------------------------------------
-;		LDA	#$18
-;		STA	game + GAME::varA	;x pos
-;		LDA	#$11			;y pos
-		
-		LDX 	#$00
-		
-@loop:
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
-		LDY	#PLAYER::status
-		LDA	($FB), Y
-		AND	#$01
-		BEQ	@next
-				
-		LDY	#PLAYER::square
-		LDA	($FB), Y
-		
-		CMP	#$0A
-		BPL	@next
-		
-		STA	game + GAME::varA
-		LDA	#$18
-		
-		SEC
-		SBC	game + GAME::varA
-		PHA
-		
-		LDY	game + GAME::varH
-		LDA	#$6D
-		STA	($A3), Y
-		INY
-		
-		PLA
-		STA	($A3), Y
-		INY
-
-		LDA	#$12
-		STA	($A3), Y
-		INY
-		
-		LDA	#$FF
-		STA	($A3), Y
-		INY
-		
-		STY	game + GAME::varH
-		
-@next:
-		INX
-		CPX	#$06
-		BNE	@loop
-		
-		JSR	dialogOvervwUpdHeap
-
-		RTS
-
-
 dialogOvervwColPlrs:
-		JSR	dialogOvervwColPlrT
-		JSR	dialogOvervwColPlrR
-		JSR	dialogOvervwColPlrL
-		JSR	dialogOvervwColPlrB
+;-------------------------------------------------------------------------------
+		LDX 	#$00
+		
+@loop:
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+
+		LDY	#PLAYER::status
+		LDA	($FB), Y
+		AND	#$01
+		BEQ	@next
+				
+		LDY	#PLAYER::square
+		LDA	($FB), Y
+		TAY
+		LDA	dialogAddrTrdSelSqrLo, Y
+		STA	$FD
+		LDA	dialogAddrTrdSelSqrHi, Y
+		STA	$FE
+		LDA	#$D7
+		LDY	#$00
+		STA	($FD), Y
+		
+@next:
+		INX
+		CPX	#$06
+		BNE	@loop
 		
 		RTS
 			
@@ -18625,11 +18047,6 @@ dialogWindowTrdSel3:
 ;			.byte	$8F, $05, $07		;Cash btn clrs
 ;			.byte	$8F, $05, $08
 			
-			.byte	$90, $05, $05		;Cash lbls
-			.word		strText3TrdSel0
-			.byte	$2C, $05, $05, $06	;Cash lbl + $ 
-			.byte	$2F, $05, $06, $06	
-			
 			.byte	$00
 
 dialogWindowTrdSel4:
@@ -18639,6 +18056,15 @@ dialogWindowTrdSel4:
 			.word		strOptn4TrdSel0
 
 			.byte	$00
+
+dialogWindowTrdSel5:
+			.byte	$90, $05, $05		;Cash lbls
+			.word		strText3TrdSel0
+			.byte	$2C, $05, $05, $06	;Cash lbl + $ 
+			.byte	$2F, $05, $06, $06	
+			
+			.byte	$00
+
 
 
 dialogAddrTrdSelCash	=	$04F5
@@ -20606,9 +20032,20 @@ dialogDlgTrdSel0Draw:
 		LDA	dialogTrdSelDoElimin
 		BNE	@skipcash
 
+		LDA	dialogTrdSelDoApprv
+		BNE	@skipcashbtns
+
 		LDA	#<dialogWindowTrdSel3
 		STA	$FD
 		LDA	#>dialogWindowTrdSel3
+		STA	$FE
+		
+		JSR	screenPerformList
+		
+@skipcashbtns:
+		LDA	#<dialogWindowTrdSel5
+		STA	$FD
+		LDA	#>dialogWindowTrdSel5
 		STA	$FE
 		
 		JSR	screenPerformList
@@ -27348,6 +26785,39 @@ rulesDoSetPriority:
 		RTS
 	
 
+rulesDoFindGroupImprv:
+		LDA	#$80
+		STA	$A3
+		
+		LDY	#$27
+		LDX	#$4E
+@loop0:	
+		LDA	rulesSqr0, X
+		CMP	game + GAME::varJ
+		BNE	@next0
+
+		LDA	rulesSqrImprv, Y
+		BIT	$A3
+		BNE	@incomplete	
+
+		AND	#$0F
+		BNE	@complete
+
+@next0:
+		DEY
+		DEX
+		DEX
+		BPL	@loop0
+		
+@incomplete:
+		LDA	#$00
+		RTS
+		
+@complete:
+		LDA	#$01
+		RTS
+
+
 rulesDoCommitMrtg:
 ;		varJ	= group
 ;		varK	= player
@@ -27384,9 +26854,11 @@ rulesDoCommitMrtg:
 		BNE	@docalc
 		
 @skipidx:
-		LDX	#$FF
-		STX	game + GAME::varL
-		JMP	@loop0
+;		LDX	#$FF
+;		STX	game + GAME::varL
+;		JMP	@loop0
+
+		JMP	@incomplete
 		
 @docalc:
 		LDA	#$1C
@@ -27431,15 +26903,12 @@ rulesDoCommitMrtg:
 		AND	#$80
 		BNE	@next
 
-		LDX	game + GAME::varJ
-		LDY	#$FF
-
-		JSR	rulesDoCollateImprv
+;		LDX	game + GAME::varJ
+;		LDY	#$FF
+;		JSR	rulesDoCollateImprv
+;		LDA	game + GAME::varA
 		
-		LDA	game + GAME::varA
-		BNE	@next
-		
-		LDX	game + GAME::varI
+;		LDX	game + GAME::varI
 		LDA	rulesSqrImprv, X
 		ORA	#$80
 		STA	rulesSqrImprv, X
@@ -27498,6 +26967,9 @@ rulesDoProcRecoverMrtg:
 
 		LDA	rulesPriMrtg, X
 		BEQ	@next0
+		
+		JSR	rulesDoFindGroupImprv
+		BNE	@next0
 		
 		JSR	rulesDoCommitMrtg
 		BNE	@complete
@@ -27802,6 +27274,9 @@ rulesDoProcRecoverAll:
 		BNE	@complete
 
 @handleMrtg:
+		JSR	rulesDoFindGroupImprv
+		BNE	@next0
+		
 		JSR	rulesDoCommitMrtg
 		BNE	@complete
 				
@@ -29084,8 +28559,9 @@ rulesAutoRepay:
 @complete:		
 		LDA	#UI_ACT_DELY
 		STA	$68
-		LDA	#$00
+		LDA	#$04
 		STA	$69
+		LDA	#$00
 		STA	$6A
 		STA	$6B
 		
@@ -29833,6 +29309,7 @@ rulesDoTradeInitP:
 		STA	trdauto0 + 2, X
 		LDA	#$00
 		STA	trdauto0 + 3, X
+		STA	trdauto0, X
 		
 rulesDoTradeInitPTime:
 		LDA	sidV2EnvOu
@@ -29849,6 +29326,25 @@ rulesDoTradeInitPTime:
 		LDA	#$01
 		
 @cont:
+		STA	game + GAME::varB
+		LDA	trdauto0, X
+		AND	#$F0
+		PHA
+		LSR
+		LSR
+		LSR
+		LSR
+		CLC
+		ADC	game + GAME::varB
+		CMP	#$0F
+		BCC	@update
+		
+		LDA	#$0F
+@update:
+		STA	game + GAME::varB
+		PLA
+		ORA	game + GAME::varB
+
 		STA	trdauto0, X
 		
 		RTS
@@ -29857,6 +29353,13 @@ rulesDoTradeInitPTime:
 rulesFindUnimprovedGroup:
 		LDY	#$00
 @loop:
+		LDA	rulesSqr0, Y
+		CMP	#$09
+		BEQ	@next
+		
+		CMP	#$0A
+		BEQ	@next
+
 		LDA	sqr00, Y
 		CMP	game + GAME::pActive
 		BNE	@next
@@ -30008,7 +29511,18 @@ rulesDoTradeMakeWanted:
 		LSR
 		TAY
 
+		LDA	trdauto0, X
+		AND	#$F0
+		LSR
+		LSR
+		LSR
+		LSR
+		LSR
+		STA	game + GAME::varV
+
 		PLA
+		CLC
+		ADC	game + GAME::varV
 		TAX
 			
 		JSR	rulesDoNudgeValue
@@ -30352,6 +29866,14 @@ rulesDoTradeMakeOffer:
 		LDY	#TRADE::cntDeed
 		STA	trade1, Y
 		
+		STX	game + GAME::varW
+		ASL	
+		TAX
+		LDA	sqr00 + 1, X
+		AND	#$80
+		STA	trdrepay1, Y
+		LDX	game + GAME::varW
+		
 		JSR	gameAmountIsLessDirect
 		BCS	@finish
 
@@ -30426,14 +29948,12 @@ rulesAutoTradeInitiate:
 		ASL
 		TAX
 		
-	.if	DEBUG_CPU
-	.else
 		LDA	trdauto0, X
+		AND	#$0F
 		BEQ	@begin
 		
 		DEC	trdauto0, X
 		JMP	@incomplete
-	.endif
 		
 @begin:
 		JSR	rulesDoTradeInitPTime
