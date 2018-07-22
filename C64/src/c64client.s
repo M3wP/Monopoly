@@ -6438,6 +6438,25 @@ uiProcessCtxNextPtr:
 		.word	uiProcessContext0
 uiProcessEnqueuePtr:
 		.word	uiActnCache
+		
+	.if	DEBUG_ACTIONS
+uiProcessHaveMS:
+		.byte	$00
+uiProcessHaveCancel:
+		.byte	$00
+uiProcessHaveInit:
+		.byte	$00
+uiProcessHaveDeQ:
+		.byte	$00
+uiProcessHavePerf:
+		.byte	$00
+uiProcessHaveEnd:
+		.byte	$00
+uiProcessHaveTerm:
+		.byte	$00
+uiProcessLastProc:
+		.word	$0000
+	.endif
 
 
 ;-------------------------------------------------------------------------------
@@ -6478,6 +6497,11 @@ uiPeekAction:
 ;-------------------------------------------------------------------------------
 uiDequeueAction:
 ;-------------------------------------------------------------------------------
+	.if	DEBUG_ACTIONS
+		LDA	#$01
+		STA	uiProcessHaveDeQ
+	.endif
+
 		DEC	ui + UI::cActns
 		
 		JSR	uiPeekAction
@@ -6554,7 +6578,19 @@ uiEnqueueAction:
 ;-------------------------------------------------------------------------------
 uiPerformAction:
 ;-------------------------------------------------------------------------------
+	.if	DEBUG_ACTIONS
+		LDA	#$01
+		STA	uiProcessHavePerf
+	.endif
+
 		LDX	$68
+
+	.if	DEBUG_ACTIONS
+		LDA	uiActionCallsLo, X
+		STA	uiProcessLastProc
+		LDA	uiActionCallsHi, X
+		STA	uiProcessLastProc + 1
+	.endif
 		
 		LDA	#>(@farreturn - 1)
 		PHA
@@ -6575,6 +6611,14 @@ uiPerformAction:
 ;-------------------------------------------------------------------------------
 uiProcessMarkStart:
 ;-------------------------------------------------------------------------------
+	.if	DEBUG_ACTIONS
+		LDA	#$01
+		STA	uiProcessHaveMS
+		LDA	#$00
+		STA	uiProcessHaveCancel
+		STA	uiProcessHaveInit
+	.endif
+
 		LDA	uiProcessCtxNextPtr
 		STA	$A3
 		STA	uiProcessCtxCurrPtr
@@ -6616,6 +6660,11 @@ uiProcessMarkStart:
 ;-------------------------------------------------------------------------------
 uiProcessCancel:
 ;-------------------------------------------------------------------------------
+	.if	DEBUG_ACTIONS
+		LDA	#$01
+		STA	uiProcessHaveCancel
+	.endif
+	
 		LDA	uiProcessCtxCurrPtr
 		STA	uiProcessCtxNextPtr
 		LDA	uiProcessCtxCurrPtr + 1
@@ -6635,6 +6684,11 @@ uiProcessCancel:
 ;-------------------------------------------------------------------------------
 uiProcessEnd:
 ;-------------------------------------------------------------------------------
+	.if	DEBUG_ACTIONS
+		LDA	#$01
+		STA	uiProcessHaveEnd
+	.endif
+	
 		JSR	uiProcessCancel
 		
 		LDA	uiProcessCtxCurrPtr
@@ -6731,6 +6785,16 @@ uiProcessInit:
 ;		LDA	#>uiActnCache
 ;		STA	$6E
 
+	.if	DEBUG_ACTIONS
+		LDA	#$01
+		STA	uiProcessHaveInit
+		LDA	#$00
+		STA	uiProcessHaveDeQ
+		STA	uiProcessHavePerf
+		STA	uiProcessHaveEnd
+		STA	uiProcessHaveTerm
+	.endif
+
 		LDA	uiProcessCtxCurrPtr
 		STA	$A3
 		LDA	uiProcessCtxCurrPtr + 1
@@ -6758,6 +6822,12 @@ uiProcessInit:
 ;-------------------------------------------------------------------------------
 uiProcessActionCache:
 ;-------------------------------------------------------------------------------
+	.if	DEBUG_ACTIONS
+		LDA	#$00
+		STA	uiProcessHaveDeQ
+		STA	uiProcessHavePerf
+	.endif
+	
 		LDA	ui + UI::cActns
 		BEQ	@terminate
 		
@@ -6808,11 +6878,8 @@ uiProcessActionCache:
 		BNE	@exit
 		
 		JSR	uiDequeueAction
-;		JMP	@exit
 		
 @terminate:
-;		JSR	uiInitQueue
-		
 		JSR	uiProcessTerminate
 		
 @exit:
@@ -6881,6 +6948,11 @@ uiProcessChkAllMPay:
 ;-------------------------------------------------------------------------------
 uiProcessTerminate:
 ;-------------------------------------------------------------------------------
+	.if	DEBUG_ACTIONS
+		LDA	#$01
+		STA	uiProcessHaveTerm
+	.endif
+	
 		LDA	#$00
 		STA	uiProcessCtxCurrPtr
 		STA	uiProcessCtxCurrPtr + 1
@@ -16862,8 +16934,7 @@ dialogDlgCCCCard0Keys:
 		LDX	#$07
 		JSR	SNDBASE + 6
 		
-		LDA	#$01
-		EOR	game + GAME::dlgVis
+		LDA	#$00
 		STA	game + GAME::dlgVis
 		LDA	#$01
 		EOR	game + GAME::pVis
@@ -22182,8 +22253,7 @@ boardGenUpdateHeap:
 boardGenAllH:
 ;-------------------------------------------------------------------------------
 		LDX	game + GAME::varI	;get imprv
-		INX
-		LDA	sqr00, X
+		LDA	sqr00 + 1, X
 		
 		AND	#$40
 		BEQ	@done
@@ -22192,7 +22262,6 @@ boardGenAllH:
 		LDY	game + GAME::varH	;store on heap
 		STA	($A3), Y
 		INC	game + GAME::varH
-		INY
 		
 		LDA	game + GAME::varA	;get X
 		INY				;store on heap
@@ -24329,6 +24398,8 @@ rulesCCCrdProcInc:				;get cash
 		JSR	prmptChanceAdd
 		
 @cont:
+		JSR	gameUpdateMenu
+
 		LDY	#>SFXCASH
 		LDA	#<SFXCASH
 		LDX	#$07
@@ -24656,6 +24727,8 @@ rulesCCCrdProcCol:				;collect from all players
 		CPX	game + GAME::pActive
 		BNE	@loop1
 		
+		JSR	gameUpdateMenu
+		
 @exit1:
 		RTS
 
@@ -24758,6 +24831,8 @@ rulesCCCrdProcGGF:				;get out free
 		LDA	#$02
 		ORA	game + GAME::dirty
 		STA	game + GAME::dirty
+		
+		JSR	gameUpdateMenu
 		
 		RTS
 

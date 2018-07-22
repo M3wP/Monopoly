@@ -26,11 +26,6 @@ this.  *\*ugh\**
 
 * Still not keeping focus and selection in auctions!
 
-* Need to clear rolls from inactive players on setup menu "roll for first".
-
-* There is a bug which causes the CPU player to jam up.  It seems it has something
-  to do with posting from gaol?
-
 * AutoAuction should commit equity like AutoBuy does and not bail so early (push 
   value upwards if its less than what they and other players currently have -- calc 
   minimum as well as max and cover when required with AutoRecover).
@@ -110,7 +105,12 @@ this.  *\*ugh\**
 
 ### Since Version 0.02.56B
 
+* 23JUL2018
+	* Fix horrendous regression in boardGenAllH.  Thank you Git.
+	* Add more extensive debugging for processing actions.
 * 22JUL2018
+	* Always call gameUpdateMenu from CCCCard procs.  This should fix CPU
+	  player jam coming out of gaol onto a CCCCard.
 	* I am enabling the heap and action useage debugging in builds for now.
 	* Extend board display use of heap to more than 256 bytes (to be sure).
 	* Clear rolls from inactive players on setup4 menu.
