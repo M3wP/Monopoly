@@ -24,12 +24,22 @@ this.  *\*ugh\**
 
 ## TODO
 
+* Still not keeping focus and selection in auctions!
+
+* Need to clear rolls from inactive players on setup menu "roll for first".
+
+* There is a bug which causes the CPU player to jam up.  It seems it has something
+  to do with posting from gaol?
+
+* AutoAuction should commit equity like AutoBuy does and not bail so early (push 
+  value upwards if its less than what they and other players currently have -- calc 
+  minimum as well as max and cover when required with AutoRecover).
+* AutoImprove is too "scared" by lots of other player improvements.  Should feel
+  "pressure" to improve when behind.
 * rulesSuggestDeedValue should tap values based on group significance.
-* AutoAuction should commit equity like AutoBuy does and perhaps not bail so 
-  early (push value upwards if its less than what they and other players currently 
-  have -- calc minimum as well as max?).
-* AutoTradeApprove could tally "half points" for prime targets and require that they
-  be accounted for in other deeds or money (convert extra points too?).
+* AutoTradeApprove could tally "half points" for prime targets, getting almost and
+  all of a group and require that they be accounted for in other deeds or money 
+  (convert extra points too?).
 
 * Is checking must pay after normal (non-elimination) action processing required now?
 
@@ -64,6 +74,7 @@ this.  *\*ugh\**
 
 ## Optimisation Targets:
 
+* The board displaying is not that great (fix all that INC varH).
 * The trdsel0 dialog currently uses some 3KB of memory on top of the overview 
   dialog's nearly 1.5KB.  This is massive.  It should be optimised somehow.
 * Zero page utilisation (get rid of all those reloads for current player!  IRQ!)
@@ -76,6 +87,7 @@ this.  *\*ugh\**
 * Trade correctly calculates remaining cash and enforces positive?
 * Must pay works after trade?  Is it required now?
 * Must pay works after elimination?
+* Elimination works from must pay?
 * Multiple eliminations in one turn works?
 * In elimination auctions, auctioned square keeps selection?
 * Does trading during auctions work?
@@ -98,7 +110,26 @@ this.  *\*ugh\**
 
 ### Since Version 0.02.56B
 
+* 22JUL2018
+	* I am enabling the heap and action useage debugging in builds for now.
+	* Extend board display use of heap to more than 256 bytes (to be sure).
+	* Clear rolls from inactive players on setup4 menu.
+	* Put repay and fee sfx on voice 1.
+	* Fix colour wrong for acquired prompt.
+	* SFX for trade declined.
+	* cpuHaveMenuUpdate deprecated, clear up setup cpuEngageBehaviour.
+	* Clean up setting dirty flag after menuSetMenu and in setup.
+	* menuSetMenu always updates dirty flag when changing display.
+	* Add sfx for next player's turn.
+	* Don't always need to call gamePlayersDirty after rulesFocusOnActive.
+	* Try to prevent CPU from changing focus and selection in auctions.
+	* Tidy mode checking in mainHandleUpdates.
+	* Player positions for square 29 not correct.  Move for 30 (left) and 20 
+	  (right) also.
+	* Don't delay before roll again with doubles in AutoPlay.
+	* Demo play version compile time option.
 * 21JUL2018
+	* Prompt for deed acquisition in trade.
 	* Rework Overvw0 dialog drawing players, improvements and mortgages to reuse
 	  data from TrdSel0 dialog saving some 670 bytes. 
 	* rulesDoTradeMakeWanted applies rejection cooldown to value escalations.

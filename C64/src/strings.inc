@@ -381,5 +381,6 @@ tokPrmptTrdDecln = $F211
 tokPrmptThinking = $F21C
 tokPrmptConstruct = $F22D
 tokPrmptAuction = $F238
+tokPrmptAcquired = $F241
 
-STRINGS_END = $F241
+STRINGS_END = $F24B

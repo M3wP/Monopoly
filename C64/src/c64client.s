@@ -33,8 +33,8 @@
 ;	 14 CPU behaviours (2 system; 12 game play)
 ;	  1 multi-context, stall/restartable action cache (messaging)
 ;	 15 core actions (3 system; 1 generic input driver; 11 specific)
-;	 16 tunes (2 voice)
-;	 17 sfx (1 voice)
+;	 15 tunes (2 voice)
+;	 19 sfx (1 voice)
 ;	350 constant strings (more than 4.5KB and 23 pages of source)
 ;	  3 threads equivalent (raster IRQ, signal managed; system, main, game)
 ;	  3 configurable input sources (keyboard, joystick, mouse)
@@ -114,9 +114,11 @@
 	.define DEBUG_KEYS	0
 	.define DEBUG_CPU 	0
 	
-	.define	DEBUG_HEAP	0
-	.define	DEBUG_GSTATE	0
-	.define	DEBUG_ACTIONS	0
+	.define	DEBUG_HEAP	1
+	.define	DEBUG_GSTATE	1
+	.define	DEBUG_ACTIONS	1
+	
+	.define DEBUG_DEMO	0
 	
 	.define	LIST_GLBINF	0
 
@@ -939,6 +941,8 @@ SFXDONG:
 	.include	"dong.inc"
 SFXBUZZ:
 	.include 	"buzz.inc"
+SFXRUB:
+	.include	"rub.inc"
 SFXSPLAT:
 	.include	"splat.inc"
 SFXSLAM:
@@ -963,6 +967,8 @@ SFXGONG:
 	.include	"gong.inc"
 SFXPULSE:
 	.include	"pulse.inc"
+SFXZING:
+	.include	"zing.inc"
 SFXBELL:
 	.include	"bell.inc"
 
@@ -1009,8 +1015,6 @@ plrNameHi:
 ;Global variable data
 ;-------------------------------------------------------------------------------
 
-
-;***	209 bytes of 250
 
 TRADE_BEGIN	=	$FF00
 
@@ -1150,22 +1154,28 @@ mainHandleUpdates:
 		BNE	@tsttrdsel		
 		
 		JSR	gamePerfStepping
+		JMP	@tstdirty
 		
 @tsttrdsel:
+;		LDA	game + GAME::gMode
 		CMP	#GAME_MDE_TRDS
 		BNE	@tsttrdstep
 		
 		JSR	gamePerfTrdSelBlink
+		JMP	@tstdirty
 		
 @tsttrdstep:
-		LDA	game + GAME::gMode
+;		LDA	game + GAME::gMode
 		CMP	#GAME_MDE_ACTS
 		BNE	@tstdirty
 
+	.if	DEBUG_DEMO
+	.else
 		LDA	game + GAME::dlgVis
 		BNE	@tstdirty
+	.endif
 
-		JSR	uiProcessActions
+		JSR	uiProcessActionCache
 
 @tstdirty:
 		LDA	game + GAME::dirty
@@ -5125,9 +5135,8 @@ plyrDispSetBaseV:
 		RTS
 
 ;-------------------------------------------------------------------------------
-;plyrDispQuadH
-;-------------------------------------------------------------------------------
 plyrDispQuadH:
+;-------------------------------------------------------------------------------
 		LDA	bQuadPosLo, X
 		STA	$FD
 		LDA	bQuadPosHi, X
@@ -5601,7 +5610,6 @@ prmptAuction:
 		
 		LDA	prmptTemp2
 		AND	#$0F
-;		ORA	#$80
 		STA	prmptTemp2
 		
 		LDA	#$20
@@ -5610,7 +5618,8 @@ prmptAuction:
 		
 		RTS
 	
-	
+
+
 ;-------------------------------------------------------------------------------
 prmptClearOrRoll:
 ;-------------------------------------------------------------------------------
@@ -5957,6 +5966,27 @@ prmptForSale:
 
 		RTS
 
+
+;-------------------------------------------------------------------------------
+prmptAcquired:
+;-------------------------------------------------------------------------------
+		STX	prmptClr1
+
+		LDA	#<tokPrmptAcquired
+		STA	prmptTok1
+		LDA	#>tokPrmptAcquired
+		STA	prmptTok1 + 1
+		
+		LDA	prmptTemp2
+		AND	#$F0
+		STA	prmptTemp2
+		
+		LDA	#$20
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
+		
+		RTS
+		
 
 ;-------------------------------------------------------------------------------
 prmptForfeit:
@@ -6641,9 +6671,18 @@ uiProcessEnd:
 		STA	game + GAME::fStpSig
 		STA	game + GAME::kWai
 		
+		LDA	game + GAME::gMode
+		CMP	#GAME_MDE_AUCN
+		BNE	@otherm
+		
+		LDA	game + GAME::sAuctn
+		JSR	rulesFocusOnSquare
+		JMP	@update
+		
+@otherm:
 		JSR	rulesFocusOnActive
-		JSR	gamePlayersDirty
 
+@update:
 		JSR	gameUpdateMenu
 
 		LDA	#$01
@@ -6666,6 +6705,13 @@ uiProcessSet:
 		LDA	#$00			
 		STA	game + GAME::fStpSig
 		
+	.if	DEBUG_DEMO
+		LDA	game + GAME::dlgVis
+		BEQ	@update
+		
+		RTS
+@update:
+	.endif
 		LDA	#<$DA18
 		STA	game + GAME::aWai
 		LDA	#>$DA18
@@ -6710,7 +6756,7 @@ uiProcessInit:
 		
 
 ;-------------------------------------------------------------------------------
-uiProcessActions:
+uiProcessActionCache:
 ;-------------------------------------------------------------------------------
 		LDA	ui + UI::cActns
 		BEQ	@terminate
@@ -6855,16 +6901,8 @@ uiProcessTerminate:
 		LDA	#$FF
 		STA	($6D), Y
 		
-		JSR	uiActionDeselect
-		
 		LDA	ui + UI::fActTyp
 		BNE	@endelimin
-
-;		Pop player and mode from trade 
-;		LDA	ui + UI::pActBak
-;		STA	game + GAME::pActive
-;		LDA	ui + UI::gMdAct
-;		STA	game + GAME::gMode
 
 		JSR	gamePopState
 
@@ -6875,20 +6913,19 @@ uiProcessTerminate:
 		STA	game + GAME::fStpSig
 		STA	game + GAME::kWai
 		
+		LDA	game + GAME::gMode
+		CMP	#GAME_MDE_AUCN
+		BNE	@othermn
+		
+		LDA	game + GAME::sAuctn
+		JSR	rulesFocusOnSquare
+		JMP	@updaten
+		
+@othermn:
+		JSR	uiActionDeselect
 		JSR	rulesFocusOnActive
-		JSR	gamePlayersDirty
 
-;		LDX	game + GAME::pActive	
-;		LDA	plrLo, X		
-;		STA	$FB
-;		LDA	plrHi, X
-;		STA	$FC
-;		
-;		LDY	#PLAYER::colour
-;		LDA	($FB), Y
-;		TAX
-;		JSR	prmptClearOrRoll
-
+@updaten:
 		JSR	uiProcessChkAllMPay	
 
 		JSR	gameUpdateMenu
@@ -6902,11 +6939,8 @@ uiProcessTerminate:
 		RTS
 
 @endelimin:
-;		LDA	ui + UI::pActBak
-;		STA	game + GAME::pActive
-;		LDA	ui + UI::gMdAct
-;		STA	game + GAME::gMode
-
+		JSR	uiActionDeselect
+		
 		JSR	gamePopState
 	
 		LDA	#$FF
@@ -6919,7 +6953,6 @@ uiProcessTerminate:
 		JSR	rulesDoNextPlyr
 		
 		JSR	rulesFocusOnActive
-		JSR	gamePlayersDirty
 		
 		LDA	game + GAME::gMode
 		CMP	#GAME_MDE_MSTP
@@ -7284,12 +7317,12 @@ uiActionEndProc:
 ;===============================================================================
 ;cpuLastActCnt:
 ;		.byte	$00
-cpuHaveMenuUpdate:
+cpuHaveMenuUpdate:				;**FIXME:	deprecated
 		.byte	$00
 		
-cpuLastPerform:					;***FIXME:	deprecated
+cpuLastPerform:					;***FIXME:	debug only
 		.word	$0000
-cpuThisPerform:					;***FIXME:	deprecated
+cpuThisPerform:					;***FIXME:	debug only
 		.word	cpuPerformIdle
 
 cpuIsIdle:
@@ -7313,8 +7346,8 @@ cpuEngageBehaviour:
 		JMP	@havefault
 		
 @tstupd:
-		LDA	cpuHaveMenuUpdate
-		BEQ	@update
+;		LDA	cpuHaveMenuUpdate
+;		BEQ	@update
 	
 ;		LDA	ui + UI::cActns
 ;		STA	cpuLastActCnt
@@ -8047,8 +8080,8 @@ menuDisplay:
 		RTS
 
 @haveupdate:
-		LDA	#$01
-		STA	cpuHaveMenuUpdate
+;		LDA	#$01
+;		STA	cpuHaveMenuUpdate
 		
 		LDA	menuActivePage0 + MENUPAGE::aDraw
 		STA	menuLastDrawFunc
@@ -8072,8 +8105,8 @@ menuSetPage:
 		LDA	($FD), Y
 		STA	menuActivePage0 + MENUPAGE::aKeys + 1
 
-		LDA	#$00
-		STA	cpuHaveMenuUpdate
+;		LDA	#$00
+;		STA	cpuHaveMenuUpdate
 
 		LDY	#MENUPAGE::aDraw
 		LDA	($FD), Y
@@ -8088,6 +8121,10 @@ menuSetPage:
 @havedraw:
 		LDA	#$01
 		STA	cpuHaveMenuUpdate
+		
+		LDA	#$08
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty
 
 @cont:
 		LDY	#MENUPAGE::aDraw
@@ -8195,9 +8232,9 @@ menuPageSetup0Keys:
 		
 		JSR	menuSetPage
 
-		LDA	#$01
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty
+;		LDA	#$01
+;		ORA	game + GAME::dirty
+;		STA	game + GAME::dirty
 
 		PLA
 
@@ -8380,7 +8417,7 @@ menuPageSetup1Keys:
 		
 		LDX	menuTemp0
 
-		LDA	#$01
+		LDA	#$0A
 		ORA	game + GAME::dirty
 		STA	game + GAME::dirty		
 		
@@ -8399,9 +8436,9 @@ menuPageSetup1Keys:
 		
 		JSR	menuSetPage
 		
-		LDA	#$01
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty
+;		LDA	#$01
+;		ORA	game + GAME::dirty
+;		STA	game + GAME::dirty
 
 @exit:
 		RTS
@@ -8510,7 +8547,7 @@ menuPageSetup2Keys:
 		
 		JSR	menuSetPage
 
-		LDA	#$01
+		LDA	#$02
 		ORA	game + GAME::dirty
 		STA	game + GAME::dirty
 
@@ -8585,9 +8622,9 @@ menuPageSetup3Keys:
 		
 		JSR	menuSetPage
 
-		LDA	#$08
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty
+;		LDA	#$08
+;		ORA	game + GAME::dirty
+;		STA	game + GAME::dirty
 		
 		RTS
 		
@@ -8664,18 +8701,19 @@ menuPageSetup4Keys:
 		BNE	@tstR
 		
 		CMP	#'B'
-		BNE	@exit
+		BEQ	@begin
 		
+		JMP	@exit
+		
+@begin:
 		LDA	#musTuneStart
 		JSR	SNDBASE + 0	
 
+;	Set both shuffles
 		LDA	#$C0
 		ORA	game + GAME::dirty
 		STA	game + GAME::dirty		
 
-;		JSR	rulesShuffleChest
-;		JSR	rulesShuffleChance
-		
 		JSR	prmptClear
 		
 		LDA	#$00
@@ -8684,12 +8722,6 @@ menuPageSetup4Keys:
 		LDA	#$01
 		STA	game + GAME::pVis
 
-		JSR	gameUpdateMenu
-		
-		LDA	#$01
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty		
-
 		JSR	gamePlayersDirty
 		
 		LDA	menuTemp0 + 1
@@ -8697,6 +8729,24 @@ menuPageSetup4Keys:
 		
 		LDA	#$FF
 		STA	game + GAME::pLast
+		
+	.if	DEBUG_DEMO
+		LDX	#$00
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+		
+		LDA	#$01
+		LDY	#PLAYER::fCPU
+		STA	($FB), Y
+	.endif
+	
+		JSR	gameUpdateMenu
+		
+		LDA	#$01
+		ORA	game + GAME::dirty
+		STA	game + GAME::dirty		
 		
 		RTS
 		
@@ -8738,7 +8788,7 @@ menuPageSetup4Keys:
 @cont:
 		INC	game + GAME::pActive
 
-		LDA	#$01
+		LDA	#$0A
 		ORA	game + GAME::dirty
 		STA	game + GAME::dirty		
 		
@@ -8814,7 +8864,7 @@ menuPageSetup4Draw:
 	
 @next0:
 		INX
-		CPX	game + GAME::pCount
+		CPX	#$06
 		BNE	@loop0
 
 		LDA	menuTemp0
@@ -8999,9 +9049,9 @@ menuPageSetup6Keys:
 		
 		JSR	menuSetPage
 
-		LDA	#$01
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty
+;		LDA	#$01
+;		ORA	game + GAME::dirty
+;		STA	game + GAME::dirty
 		
 		JMP	@keysDing
 		
@@ -9127,9 +9177,9 @@ menuPageSetup7Keys:
 		JSR	menuPushPage
 		
 @cont:
-		LDA	#$01
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty
+;		LDA	#$01
+;		ORA	game + GAME::dirty
+;		STA	game + GAME::dirty
 		
 		LDA	#<SFXDING
 		LDY	#>SFXDING
@@ -9269,15 +9319,18 @@ menuPageSetup9Keys:
 		JMP	@exit
 
 @tstupper:
-		CMP	#'5'
+		CMP	#'6'
 		BMI	@begin
 		
 		JMP	@exit
 		
 @begin:
+	.if	DEBUG_DEMO
+		LDX	#$01
+	.else
 		SEC
 		SBC	#'0'
-
+		
 		CMP	#$00
 		BEQ	@done
 		
@@ -9292,6 +9345,7 @@ menuPageSetup9Keys:
 		LDA	game + GAME::pCount
 		SBC	game + GAME::varA
 		TAX
+	.endif
 
 		LDA	#$01
 		STA	game + GAME::varC
@@ -9342,7 +9396,7 @@ menuPageSetup9Keys:
 		
 		JSR	menuSetPage
 
-		LDA	#$01
+		LDA	#$02
 		ORA	game + GAME::dirty
 		STA	game + GAME::dirty
 		
@@ -9604,9 +9658,9 @@ menuPagePlay0StdKeys:
 		
 		JSR	menuSetPage
 		
-		LDA	#$08
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty
+;		LDA	#$08
+;		ORA	game + GAME::dirty
+;		STA	game + GAME::dirty
 		
 		JMP	@keysDing
 @keysN:
@@ -9621,7 +9675,8 @@ menuPagePlay0StdKeys:
 		
 @donext:
 		JSR	rulesNextTurn
-		JMP	@keysDing
+;		JMP	@keysDing
+		JMP	@keysExit
 		
 @keysR:
 		CMP	#'R'
@@ -9649,9 +9704,9 @@ menuPagePlay0StdKeys:
 		LDY	#>menuPageSetup3
 		JSR	menuPushPage
 		
-		LDA	#$08
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty
+;		LDA	#$08
+;		ORA	game + GAME::dirty
+;		STA	game + GAME::dirty
 		
 		JMP	@keysDing
 
@@ -9671,9 +9726,9 @@ menuPagePlay0StdKeys:
 		LDY	#>menuPageSetup8
 		JSR	menuPushPage
 		
-		LDA	#$08
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty
+;		LDA	#$08
+;		ORA	game + GAME::dirty
+;		STA	game + GAME::dirty
 		
 		JMP	@keysDing
 
@@ -9760,9 +9815,9 @@ menuPagePlay0Keys:
 		
 		JSR	menuSetPage
 		
-		LDA	#$08
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty
+;		LDA	#$08
+;		ORA	game + GAME::dirty
+;		STA	game + GAME::dirty
 		
 		JMP	@keysDing
 		
@@ -10039,9 +10094,9 @@ menuPagePlay2Keys:
 		
 		JSR	menuSetPage
 		
-		LDA	#$08
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty
+;		LDA	#$08
+;		ORA	game + GAME::dirty
+;		STA	game + GAME::dirty
 		
 		JMP	@keysDing
 		
@@ -10314,7 +10369,8 @@ menuPageAuctnDefKeys:
 
 		JSR	menuPageAuctn0Bid
 		JSR	rulesNextTurn
-		JMP	@keysUpdateAll
+;		JMP	@keysUpdateAll
+		JMP	@realUpdate
 		
 @keysP:
 		CMP	#'P'
@@ -10332,7 +10388,8 @@ menuPageAuctnDefKeys:
 		
 		JSR	menuPageAuctn0Pass
 		JSR	rulesNextTurn
-		JMP	@keysUpdateAll
+;		JMP	@keysUpdateAll
+		JMP	@realUpdate
 		
 
 @keysF:
@@ -10353,7 +10410,8 @@ menuPageAuctnDefKeys:
 		
 		JSR	menuPageAuctn0Forf
 		JSR	rulesNextTurn
-		JMP	@keysUpdateAll
+;		JMP	@keysUpdateAll
+		JMP	@realUpdate
 		
 @tstCurrBid:
 		LDA	game + GAME::mACurr
@@ -10416,6 +10474,7 @@ menuPageAuctnDefKeys:
 		LDX	#$07
 		JSR	SNDBASE + 6
 		
+@realUpdate:
 		LDA	#$01
 		ORA	game + GAME::dirty
 		STA	game + GAME::dirty
@@ -10448,9 +10507,9 @@ menuPageAuctn0Keys:
 		LDX	#$07
 		JSR	SNDBASE + 6
 		
-		LDA	game + GAME::dirty
-		ORA	#$08
-		STA	game + GAME::dirty
+;		LDA	game + GAME::dirty
+;		ORA	#$08
+;		STA	game + GAME::dirty
 
 		RTS
 
@@ -10551,9 +10610,9 @@ menuPageAuctn1Keys:
 		LDX	#$07
 		JSR	SNDBASE + 6
 		
-		LDA	game + GAME::dirty
-		ORA	#$01
-		STA	game + GAME::dirty
+;		LDA	game + GAME::dirty
+;		ORA	#$01
+;		STA	game + GAME::dirty
 
 		RTS
 		
@@ -10622,10 +10681,10 @@ menuPageGaol0Keys:
 		
 		JSR	rulesNextTurn
 
-		LDA	#<SFXDING
-		LDY	#>SFXDING
-		LDX	#$07
-		JSR	SNDBASE + 6
+;		LDA	#<SFXDING
+;		LDY	#>SFXDING
+;		LDX	#$07
+;		JSR	SNDBASE + 6
 
 @keysDone:
 
@@ -10706,10 +10765,10 @@ menuPageGaol1DefKeys:
 		
 		JSR	rulesNextTurn
 		
-		LDA	#<SFXDING
-		LDY	#>SFXDING
-		LDX	#$07
-		JSR	SNDBASE + 6
+;		LDA	#<SFXDING
+;		LDY	#>SFXDING
+;		LDX	#$07
+;		JSR	SNDBASE + 6
 		
 		JMP	@keysExit
 
@@ -10749,9 +10808,9 @@ menuPageGaol1Keys:
 		LDX	#$07
 		JSR	SNDBASE + 6
 
-		LDA	game + GAME::dirty
-		ORA	#$08
-		STA	game + GAME::dirty
+;		LDA	game + GAME::dirty
+;		ORA	#$08
+;		STA	game + GAME::dirty
 
 		RTS
 		
@@ -10873,9 +10932,9 @@ menuPageGaol2Keys:
 		LDX	#$07
 		JSR	SNDBASE + 6
 		
-		LDA	game + GAME::dirty
-		ORA	#$01
-		STA	game + GAME::dirty
+;		LDA	game + GAME::dirty
+;		ORA	#$01
+;		STA	game + GAME::dirty
 
 		RTS
 		
@@ -12024,10 +12083,14 @@ menuPageTrade1Keys:
 		JSR	gameCheckCPUDecline
 		
 		JSR	rulesFocusOnActive
-		JSR	gamePlayersDirty
 		
 		JSR	gameUpdateMenu
-		
+
+		LDA	#<SFXRUB
+		LDY	#>SFXRUB
+		LDX	#$07
+		JSR	SNDBASE + 6
+
 		LDA	#$01
 		ORA	game + GAME::dirty
 		STA	game + GAME::dirty
@@ -12582,8 +12645,11 @@ menuPagePlyrSel0Keys:
 @done:
 		JSR	menuPopPage
 
+;***FIXME:	What???
 		LDA	#$20
 		ORA	game + GAME::dirty
+
+		ORA	#$08
 		STA	game + GAME::dirty
 		
 		LDA	#<SFXDING
@@ -12796,9 +12862,9 @@ menuPageQuit0Keys:
 
 		JSR	menuSetPage
 
-		LDA	#$08
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty
+;		LDA	#$08
+;		ORA	game + GAME::dirty
+;		STA	game + GAME::dirty
 
 		JMP	@ding
 
@@ -13687,7 +13753,11 @@ gamePerfStepping:
 		STA	game + GAME::fStpSig
 		
 		JSR	rulesFocusOnActive
-		JSR	gamePlayersDirty		
+		
+;	Always need to do at least this
+		LDY	#PLAYER::dirty
+		LDA	#$01
+		STA	($FB), Y
 		
 		RTS
 
@@ -13848,16 +13918,15 @@ gameMustPayAfterPost:
 		STA	game + GAME::gMode
 		
 		JSR	rulesFocusOnActive
-		JSR	gamePlayersDirty		
 
 		LDA	#<menuPageMustPay0
 		LDY	#>menuPageMustPay0
 		
 		JSR	menuSetPage
 
-		LDA	#$08
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty
+;		LDA	#$08
+;		ORA	game + GAME::dirty
+;		STA	game + GAME::dirty
 		
 		RTS
 		
@@ -13872,7 +13941,10 @@ gameSwitchMPayToElmin:
 		STA	$FC
 		
 		JSR	gamePerfLosing
-		JSR	rulesDoPlayerElimin
+		
+;***FIXME:	This should be done in NextPlayer which is called by the dialog
+;		so mustn't be called here?
+;		JSR	rulesDoPlayerElimin
 		
 		RTS
 		
@@ -13924,16 +13996,15 @@ gameUpdateForMustPay:
 
 @update:
 		JSR	rulesFocusOnActive
-		JSR	gamePlayersDirty		
 		
 		LDA	#<menuPageMustPay0
 		LDY	#>menuPageMustPay0
 		
 		JSR	menuSetPage
 
-		LDA	#$08
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty
+;		LDA	#$08
+;		ORA	game + GAME::dirty
+;		STA	game + GAME::dirty
 		
 		RTS
 		
@@ -13965,7 +14036,6 @@ gameRestoreFromMustPay:
 		STA	game + GAME::pLast
 		
 		JSR	rulesFocusOnActive
-		JSR	gamePlayersDirty
 
 ;***dengland	This is going to call back into gameUpdateMenu but it should be
 ;		fine.
@@ -13992,6 +14062,9 @@ gamePerfGameOver:
 ;-------------------------------------------------------------------------------
 gamePerfLosing:
 ;-------------------------------------------------------------------------------
+	.if	DEBUG_DEMO
+		JSR	rulesNextTurn
+	.else
 		LDA	game + GAME::pActive
 		STA	dialogTempElimin0P
 
@@ -14000,11 +14073,12 @@ gamePerfLosing:
 		
 		JSR	dialogSetDialog
 		JSR	dialogDispDefDialog
+	.endif
 
 		LDA	game + GAME::pCount
-		CMP	#$02
-		BEQ	@over
-
+		CMP	#$03
+		BCC	@over
+		
 		LDA	#musTunePlyrElim
 		JSR	SNDBASE + 0
 		
@@ -14201,9 +14275,9 @@ gameUpdateMenu:
 @update:
 		JSR	menuSetPage
 
-		LDA	#$08
-		ORA	game + GAME::dirty
-		STA	game + GAME::dirty
+;		LDA	#$08
+;		ORA	game + GAME::dirty
+;		STA	game + GAME::dirty
 		
 		RTS
 
@@ -14617,9 +14691,12 @@ gameNextAuction:
 		JSR	prmptClearOrRoll
 
 		JSR	rulesFocusOnActive
-		JSR	gamePlayersDirty
 		
 @update:
+		LDA	#<SFXZING
+		LDY	#>SFXZING
+		LDX	#$00
+		JSR	SNDBASE + 6
 		
 		JSR	gameUpdateMenu
 
@@ -14947,7 +15024,6 @@ gameInitTrdIntrptDirect:
 		JSR	gameUpdateMenu
 
 		JSR	rulesFocusOnActive
-		JSR	gamePlayersDirty
 		
 		LDA	#$01
 		ORA	game + GAME::dirty
@@ -15512,11 +15588,11 @@ gameToggleManage:
 		JMP	@mngdone
 	
 @plyract:
-		JSR	rulesFocusOnActive	;**todo check if board changed
+		JSR	rulesFocusOnActive	;***TODO: check if board changed
 		
 		
 @mngdone:
-		LDA	#$01			
+		LDA	#$09			
 		ORA	game + GAME::dirty
 		STA	game + GAME::dirty
 
@@ -16512,10 +16588,94 @@ dialogDisplay:
 		BNE	@cont
 
 		JSR	dialogDefDraw
-@cont:
 		
+	.if	DEBUG_DEMO
+		LDA	#>(@farreturn - 1)
+		PHA
+		LDA	#<(@farreturn - 1)
+		PHA
+	.endif
+		
+@cont:
 		JMP	(dialogDrawHandler)
-
+		
+	.if	DEBUG_DEMO
+@farreturn:
+		LDA	#<dialogDlgGameOver0Draw
+		CMP	dialogDrawHandler
+		BNE	@tststart
+		
+		LDA	#>dialogDlgGameOver0Draw
+		CMP	dialogDrawHandler + 1
+		BNE	@tststart
+		
+		RTS
+		
+@tststart:
+		LDA	#<dialogDlgStart0Draw
+		CMP	dialogDrawHandler
+		BNE	@tstnull
+		
+		LDA	#>dialogDlgStart0Draw
+		CMP	dialogDrawHandler + 1
+		BNE	@tstnull
+		
+		RTS
+		
+@tstnull:
+		LDA	#<dialogDlgNull0Draw
+		CMP	dialogDrawHandler
+		BNE	@off
+		
+		LDA	#>dialogDlgNull0Draw
+		CMP	dialogDrawHandler + 1
+		BNE	@off
+		
+		RTS
+		
+@off:
+		LDA	#$01
+		STA	ui + UI::fActInt
+		LDA	#$00
+		STA	ui + UI::fActTyp
+		
+		JSR	uiProcessMarkStart
+		
+		LDA	#UI_ACT_DELY
+		STA	$68
+		LDA	#$04
+		STA	$69
+		LDA	#$00
+		STA	$6A
+		STA	$6B
+		
+		JSR	uiEnqueueAction
+		
+		LDA	#UI_ACT_SKEY
+		STA	$68
+		LDA	#' '
+		STA	$69
+		LDA	#$00
+		STA	$6A
+		STA	$6B
+		
+		JSR	uiEnqueueAction
+		
+		LDA	#UI_ACT_ENDP
+		STA	$68
+		LDA	#$00
+		STA	$69
+		STA	$6A
+		STA	$6B
+		
+		JSR	uiEnqueueAction
+		
+		JSR	uiProcessInit
+		
+		RTS
+	.endif
+	
+	
 ;-------------------------------------------------------------------------------
 dialogDefKeys:
 ;-------------------------------------------------------------------------------
@@ -17238,7 +17398,7 @@ dialogDlgElimin0Keys:
 		LDA	#$10
 		ORA	game + GAME::dirty
 		STA	game + GAME::dirty
-		
+
 		JSR	rulesNextTurn
 
 		RTS
@@ -21999,7 +22159,24 @@ boardCollateVSqr:
 		
 @exit:
 		RTS
+
+
+;-------------------------------------------------------------------------------
+boardGenUpdateHeap:
+;-------------------------------------------------------------------------------
+		CLC
+		LDA	$A3
+		ADC	game + GAME::varH
+		STA	$A3
+		LDA	$A4
+		ADC	#$00
+		STA	$A4
 		
+		LDA	#$00
+		STA	game + GAME::varH
+		
+		RTS
+
 		
 ;-------------------------------------------------------------------------------
 boardGenAllH:
@@ -22015,6 +22192,7 @@ boardGenAllH:
 		LDY	game + GAME::varH	;store on heap
 		STA	($A3), Y
 		INC	game + GAME::varH
+		INY
 		
 		LDA	game + GAME::varA	;get X
 		INY				;store on heap
@@ -22045,6 +22223,8 @@ boardGenAllH:
 		INC	game + GAME::varH
 		
 @done:
+		JSR	boardGenUpdateHeap
+
 		RTS
 		
 ;-------------------------------------------------------------------------------
@@ -22091,6 +22271,8 @@ boardGenAllV:
 		INC	game + GAME::varH
 		
 @done:
+		JSR	boardGenUpdateHeap
+		
 		RTS
 		
 ;-------------------------------------------------------------------------------
@@ -22148,6 +22330,8 @@ boardGenOwnH:
 		INC	game + GAME::varH
 		
 @done:
+		JSR	boardGenUpdateHeap
+		
 		RTS
 
 ;-------------------------------------------------------------------------------
@@ -22205,9 +22389,11 @@ boardGenOwnV:
 		INC	game + GAME::varH
 		
 @done:
+		JSR	boardGenUpdateHeap
+		
 		RTS
 		
-		
+
 ;-------------------------------------------------------------------------------
 boardGenMrtgSelH:
 ;-------------------------------------------------------------------------------
@@ -22314,6 +22500,8 @@ boardGenMrtgSelH:
 		BNE	@loop
 
 @done:
+		JSR	boardGenUpdateHeap
+		
 		RTS
 
 
@@ -22424,6 +22612,8 @@ boardGenMrtgSelV:
 		BNE	@loop
 
 @done:
+		JSR	boardGenUpdateHeap
+		
 		RTS
 		
 		
@@ -22580,6 +22770,8 @@ boardGenImprvPerf:
 		INC	game + GAME::varH
 		
 @done:
+		JSR	boardGenUpdateHeap
+		
 		RTS
 
 
@@ -22810,7 +23002,9 @@ rulesShuffleChance:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 rulesCalcQForSquare:
+;-------------------------------------------------------------------------------
 		CPX	#$01
 		BEQ	@alt
 
@@ -22881,8 +23075,10 @@ rulesCalcQForSquare:
 @exit:
 		RTS
 		
-		
+
+;-------------------------------------------------------------------------------
 rulesFocusOnActive:
+;-------------------------------------------------------------------------------
 		LDX	game + GAME::pActive
 		LDA	plrLo, X
 		STA	$FB
@@ -22892,6 +23088,7 @@ rulesFocusOnActive:
 		LDY	#PLAYER::square
 		LDA	($FB), Y
 		
+rulesFocusOnSquare:
 		LDX	#$00
 		JSR	rulesCalcQForSquare
 		
@@ -22913,7 +23110,9 @@ rulesFocusOnActive:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 rulesCalcNextSqr:
+;-------------------------------------------------------------------------------
 ;		STA	game + GAME::varJ	;current square
 		STX	game + GAME::varK	;movement
 		
@@ -25696,7 +25895,7 @@ rulesUnmortgageImmed:
 
 		LDA	#<SFXRENT2
 		LDY	#>SFXRENT2
-		LDX	#$07
+		LDX	#$00
 		JSR	SNDBASE + 6
 
 		JMP	@toggle
@@ -25789,7 +25988,7 @@ rulesMortgageFeeImmed:
 		
 		LDA	#<SFXRENT1
 		LDY	#>SFXRENT1
-		LDX	#$07
+		LDX	#$00
 		JSR	SNDBASE + 6
 	
 		RTS
@@ -25992,7 +26191,7 @@ rulesToggleMrtg:
 
 		LDA	#<SFXRENT2
 		LDY	#>SFXRENT2
-		LDX	#$07
+		LDX	#$00
 		JSR	SNDBASE + 6
 
 		JMP	@toggle
@@ -26177,6 +26376,18 @@ rulesTradeTitleDeed:
 		
 		LDX	game + GAME::varF
 		JSR	rulesDoXferDeed
+
+;***FIXME:	Need to fetch this back
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+
+		LDY	#PLAYER::colour
+		LDA	($FB), Y
+		TAX
+		JSR	prmptAcquired
 		
 		LDA	#$01
 		ORA	game + GAME::dirty
@@ -26701,6 +26912,11 @@ rulesNextTurn:
 		RTS
 		
 @cont2:
+		LDA	#<SFXZING
+		LDY	#>SFXZING
+		LDX	#$00
+		JSR	SNDBASE + 6
+		
 		JSR	rulesDoNextPlyr
 		
 		JSR	gameUpdateMenu
@@ -30648,19 +30864,18 @@ rulesAutoPlay:
 		LDA	#$00
 		STA	($FB), Y
 
-		LDA	game + GAME::dieDbl
-		BEQ	@doroll
-		
-		LDA	#UI_ACT_DELY
-		STA	$68
-		LDA	#$00
-		STA	$69
-		STA	$6A
-		STA	$6B
-		
-		JSR	uiEnqueueAction
-
-@doroll:
+;		LDA	game + GAME::dieDbl
+;		BEQ	@doroll
+;		LDA	#UI_ACT_DELY
+;		STA	$68
+;		LDA	#$00
+;		STA	$69
+;		STA	$6A
+;		STA	$6B
+;		
+;		JSR	uiEnqueueAction
+;
+;@doroll:
 		LDA	#UI_ACT_ROLL
 		STA	$68
 		LDA	game + GAME::pActive
@@ -31763,8 +31978,9 @@ initPlayers:
 		LDY	#PLAYER::status
 		STA	($FB), Y
 
-		LDY	#PLAYER::square
 		LDA	#$00
+		
+		LDY	#PLAYER::square
 		STA	($FB), Y
 		
 		LDY	#PLAYER::equity
@@ -31778,15 +31994,16 @@ initPlayers:
 		LDY	#PLAYER::fCPU
 		STA	($FB), Y
 		
-		LDY	#PLAYER::colour
 		LDA	plrColours, X
+		
+		LDY	#PLAYER::colour
 		STA	($FB), Y
 		
 		LDY	#PLAYER::money
-		LDA	#$DC
+		LDA	#<1500
 		STA	($FB), Y
 		INY
-		LDA	#$05
+		LDA	#>1500
 		STA	($FB), Y
 		
 		LDX	#$00

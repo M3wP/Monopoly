@@ -179,7 +179,7 @@ bQuadPos1:
 			
 bQuadPos2:
 			.byte	$3E
-			.word	$00BC
+			.word	$00C4	;bc
 			.word	$00E4
 			.word	$00FC
 			.word	$0114
@@ -198,9 +198,9 @@ bQuadPos3:
 			.word	$00CC
 			.word	$00E4
 			.word	$00FC
-			.word	$011C
-			.word	$0134
-			.word	$0134
+			.word	$0114	
+			.word	$012C	;134
+			.word	$0134	
 			.byte	$66
 			.byte	$7E
 			.byte	$96

@@ -1293,6 +1293,9 @@ tokPrmptConstruct:	;.CONSTRCT$
 tokPrmptAuction:	;.AUCTION
 			.byte 	$08, $51, $01, $15, $03, $14, $09, $0F
 			.byte	$0E
+tokPrmptAcquired:	;.ACQUIRED
+			.byte 	$09, $51, $01, $03, $11, $15, $09, $12
+			.byte 	$05, $04
 			
 STRINGS_END	=	*
 	.assert	* < $F400, error, "Strings data too large for current allocation!"
