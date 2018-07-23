@@ -106,6 +106,19 @@ this.  *\*ugh\**
 ### Since Version 0.02.56B
 
 * 23JUL2018
+	* Select square when must buy for humans to look cool too.
+	* No longer use parameters passed in gameDeselect.
+	* Don't clear prmpt1 (second) on roll, instead on move to square.
+	* Fix demo version issues with dialogs.
+	* Change the way dialogs are updated and displayed.
+	* "Victor" now improves after trade group success.
+	* Change use of game dirty flag from hard-coded values to defined consts.
+	* Reduce flicker for dialogs/generally and prep for dirty flags changes.
+	* More CPU debugging.
+	* Change interpretation of game dirty flag $04 (not only select).
+	* Dirty flag updating in gameSelect and gameDeselect.
+	* Try to reduce the amount of flicker by using the dirty flags better after
+	  rulesFocusOnActive.
 	* Fix horrendous regression in boardGenAllH.  Thank you Git.
 	* Add more extensive debugging for processing actions.
 * 22JUL2018
