@@ -24,8 +24,6 @@ this.  *\*ugh\**
 
 ## TODO
 
-* Still not keeping focus and selection in auctions!
-
 * AutoAuction should commit equity like AutoBuy does and not bail so early (push 
   value upwards if its less than what they and other players currently have -- calc 
   minimum as well as max and cover when required with AutoRecover).
@@ -105,6 +103,18 @@ this.  *\*ugh\**
 
 ### Since Version 0.02.56B
 
+* 25JUL2018
+	* Change dialog delay in demo version.
+	* Clear prompts when leaving setup1 menu.
+	* Fix selection and not board update regression.
+	* Focus on selected deed/square when going into management and restored
+	  deed/square when leaving.
+	* Restore auction prompt when return from management etc.
+	* Attempt to prevent selection changes while processing actions when coming
+	  from an auction (again).
+	* Restore focus on auctioned deed/square when next in auction.
+* 24JUL2018
+	* Fix demo version page boundary indirect jump by moving menuActivePage0.
 * 23JUL2018
 	* Select square when must buy for humans to look cool too.
 	* No longer use parameters passed in gameDeselect.

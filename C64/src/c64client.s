@@ -26,41 +26,41 @@
 ;
 ;
 ;Contents:
-;	 20 modules (8 system; 7 display segment; 5 core -- 1 multi)
-;	 11 game modes (6 core; 5 user -- 1 psuedo; stackable w/ limits)
-;	 30 menus
-;	 17 dialogs
-;	  1 CPU player personality ("Victor")
-;	 14 CPU behaviours (2 system; 12 game play)
-;	  1 multi-context, stall/restartable action cache (messaging)
-;	 15 core actions (3 system; 1 generic input driver; 11 specific)
-;	 15 tunes (2 voice)
-;	 19 sfx (1 voice)
-;	350 constant strings (more than 4.5KB and 23 pages of source)
-;	  3 threads equivalent (raster IRQ, signal managed; system, main, game)
-;	  3 configurable input sources (keyboard, joystick, mouse)
-;	  2 sprite zones (by raster split)
+;	  20 modules (8 system; 7 display segment; 5 core -- 1 multi)
+;	  11 game modes (6 core; 5 user -- 1 psuedo; stackable w/ limits)
+;	   3 configurable input sources (keyboard, joystick, mouse)
+;	  30 menus
+;	  17 dialogs (1 with complex, multi-state user input)
+;	   1 CPU player personality ("Victor")
+;	  14 CPU behaviours (2 system; 12 game play)
+;	   1 multi-context, stall/restartable action cache (messaging system)
+;	  15 core actions (3 system; 1 generic input driver; 11 specific)
+;	  15 tunes (2 voice)
+;	  19 sfx (1 voice)
+;	 350 constant strings (more than 4.5KB and 23 pages of source)
+;	   3 threads equivalent (raster IRQ, signal managed; system, main, game)
+;	   2 sprite zones (by raster split)
 ;
-;	 40 game board squares
-;	  4 board quadrants
-;	 10 player colours
-;	 28 title deed cards (plus title cards for all other squares)
-;	 16 chance cards
-;	 16 community chest cards
-;	 32 houses
-;	 12 hotels
-;	  2 dice
-;	 16 bit signed money, 24 bit signed wealth, 16 bit signed score
+;	  40 game board squares
+;	   4 board quadrants or overview and with mini-map
+;	  10 player colours
+;	  28 title deed cards (plus title cards for all other squares)
+;	  16 chance cards
+;	  16 community chest cards
+;	  32 houses
+;	  12 hotels
+;	   2 dice
+;	  16 bit signed money, 24 bit signed wealth, 16 bit signed score
 ;
-;	2-6 players
-;	 8+ years
+;	 2-6 players
+;	  8+ years
 ;
-;	  3 house rules (one always enabled:  reshuffle CCCCards)
-;	    strictly turn-based (with interrupts and flexible management)
+;	   3 house rules (one always enabled:  reshuffle CCCCards)
+;	     strictly turn-based (with interrupts and flexible management)
 ;
-;	 an estimated 18.75KB data, 35.5KB code, 1.5KB heap, 5.25KB system
-;	 more than 650 portrait A4 pages of source code with small font or
-;	 to print in the old landscape style with normal font, 1100 A4 pages
+;	  an estimated 18.75KB data, 35.5KB code, 1.5KB heap, 5.25KB system
+;	 650 portrait A4 pages of source code with small font
+;	1100 A4 pages to print the old landscape list style with normal font
 ;
 ;
 ;Free memory information (as of last update):
@@ -120,7 +120,7 @@
 	.define	DEBUG_GSTATE	1
 	.define	DEBUG_ACTIONS	1
 	
-	.define DEBUG_DEMO	0
+	.define DEBUG_DEMO	1
 	
 	.define	LIST_GLBINF	0
 
@@ -308,6 +308,14 @@ uiActnCache	=	$FB00
 		
 		fInjKey .byte
 		fUsrInp .byte
+	.endstruct
+	
+	
+	.struct	UIACTION
+		action	.byte
+		parmA	.byte
+		parmBLo	.byte
+		parmBHi	.byte
 	.endstruct
 
 
@@ -646,7 +654,7 @@ GAME_DRT_SHF0	=	$80
 	
 	
 	.struct	TRADEAUTO
-		cTurns	.byte
+		fTurns	.byte
 		iGroup	.byte
 		iCount	.byte
 		fEscal	.byte
@@ -1263,6 +1271,10 @@ mainHandleUpdates:
 		AND	#GAME_DRT_MENU
 		BNE	@updMenu
 
+		LDA	game + GAME::dirty
+		AND	#GAME_DRT_BRDQ
+		BEQ	@updTstCont1
+		
 @updAll:
 	.if	DEBUG_IRQ
 		LDA	#$0E
@@ -5631,6 +5643,10 @@ prmptAuction:
 		LDA	#>tokPrmptAuction
 		STA	prmptTok0 + 1
 		
+		LDA	prmptTemp3
+		ORA	#$02
+		STA	prmptTemp3
+		
 		LDA	prmptTemp2
 		AND	#$0F
 		STA	prmptTemp2
@@ -5647,14 +5663,21 @@ prmptAuction:
 prmptClearOrRoll:
 ;-------------------------------------------------------------------------------
 		LDA	prmptTemp3
-		AND	#$01
-		BNE	@roll
+		AND	#$0F
+		BNE	@tstroll
 		
 		JSR	prmptClear1
 		RTS
 		
-@roll:
+@tstroll:
+		AND	#$02
+		BNE	@auctn
+		
 		JSR	prmptRolled
+		RTS
+		
+@auctn:
+		JSR	prmptAuction
 		RTS
 		
 
@@ -6835,6 +6858,14 @@ uiProcessInit:
 		LDA	($A3), Y
 		STA	$6E
 
+		LDA	game + GAME::gMode
+		CMP	#GAME_MDE_AUCN
+		BNE	@perf
+		
+		LDA	#$02
+		STA	ui + UI::fActTyp
+
+@perf:
 		JSR	gamePushState
 
 		LDA	#GAME_MDE_ACTS
@@ -6868,8 +6899,13 @@ uiProcessActionCache:
 		RTS
 		
 @proc:
-		JSR	uiActionDeselect
+		LDA	ui + UI::fActTyp
+		CMP	#$02
+		BEQ	@perf
 		
+		JSR	uiActionDeselect
+	
+@perf:	
 		JSR	uiDequeueAction
 		JSR	uiPerformAction
 		
@@ -7002,7 +7038,8 @@ uiProcessTerminate:
 		STA	($6D), Y
 		
 		LDA	ui + UI::fActTyp
-		BNE	@endelimin
+		CMP	#$01
+		BEQ	@endelimin
 
 		JSR	gamePopState
 
@@ -7853,13 +7890,6 @@ menuLastDrawFunc:
 		.word	$0000
 
 
-menuPageBlank0:
-		.word	menuPageBlank0Keys
-		.word	menuDefDraw
-		.byte	$00			;Have to say 0 so not drawn
-						;twice.
-		.word	cpuPerformIdle
-		
 menuActivePage0:
 		.word	menuPageBlank0Keys
 		.word	menuDefDraw
@@ -7878,6 +7908,13 @@ menuActivePage2:
 		.byte	$00
 		.word	cpuPerformFault
 	
+menuPageBlank0:
+		.word	menuPageBlank0Keys
+		.word	menuDefDraw
+		.byte	$00			;Have to say 0 so not drawn
+						;twice.
+		.word	cpuPerformIdle
+		
 menuPagePlay0:
 		.word	menuPagePlay0Keys
 		.word	menuPagePlay0Draw
@@ -8540,9 +8577,7 @@ menuPageSetup1Keys:
 		
 		JSR	menuSetPage
 		
-;		LDA	#$01
-;		ORA	game + GAME::dirty
-;		STA	game + GAME::dirty
+		JSR	prmptClear
 
 @exit:
 		RTS
@@ -14426,24 +14461,10 @@ gameMoveSelectFwd:
 		
 @cont:
 		PHA
-		JSR	gameMoveSelect
+		JSR	gameSelect
 
 		PLA
-		LDX	#$00
-		JSR	rulesCalcQForSquare
-		
-		CMP	game + GAME::qVis
-		BEQ	@exit
-		
-		STA	game + GAME::qVis
-
-		JSR	gamePlayersDirty
-		
-		LDA	game + GAME::dirty
-		ORA	#GAME_DRT_BRDQ
-		STA	game + GAME::dirty
-
-@exit:
+		JSR	rulesFocusOnSquare
 
 		RTS
 
@@ -14461,24 +14482,11 @@ gameMoveSelectBck:
 		
 @cont:
 		PHA
-		JSR	gameMoveSelect
+		JSR	gameSelect
 
 		PLA
-		LDX	#$01
-		JSR	rulesCalcQForSquare
+		JSR	rulesFocusOnSquare
 		
-		CMP	game + GAME::qVis
-		BEQ	@exit
-		
-		STA	game + GAME::qVis
-
-		JSR	gamePlayersDirty
-		
-		LDA	game + GAME::dirty
-		ORA	#GAME_DRT_BRDQ
-		STA	game + GAME::dirty
-		
-@exit:
 		RTS
 		
 		
@@ -14766,6 +14774,9 @@ gameNextAuction:
 		CMP	game + GAME::pActive	;bidder?
 		BEQ	@auctionover		;Yes, auction over
 		
+		LDA	game + GAME::sAuctn
+		JSR	rulesFocusOnSquare
+		
 		JMP	@update
 		
 @auctionover:	
@@ -14792,6 +14803,10 @@ gameNextAuction:
 		LDX	game + GAME::pActive
 		JSR	rulesSubCash
 
+		LDA 	prmptTemp3
+		AND	#$FD
+		STA	prmptTemp3
+		
 		LDY	#PLAYER::colour
 		LDA	($FB), Y
 		TAX
@@ -14832,9 +14847,9 @@ gameNextAuction:
 		
 		JSR	gameUpdateMenu
 
-		LDA	game + GAME::dirty
-		ORA	#GAME_DRT_ALLD
-		STA	game + GAME::dirty
+;		LDA	game + GAME::dirty
+;		ORA	#GAME_DRT_ALLD
+;		STA	game + GAME::dirty
 
 		RTS
 		
@@ -15714,26 +15729,13 @@ gameToggleManage:
 		
 		JSR	gameSelect
 		
-		LDX	#$00
-		JSR	rulesCalcQForSquare
+		LDA	game + GAME::sSelect
+		JSR	rulesFocusOnSquare
 		
-		CMP	game + GAME::qVis
-		BEQ	@mngdone
-		
-		STA	game + GAME::qVis
-		JSR	gamePlayersDirty
-		
-		JMP	@mngdone
+		JMP	@exit
 	
 @plyract:
 		JSR	rulesFocusOnActive	;***TODO: check if board changed
-		
-		
-@mngdone:
-;		LDA	game + GAME::dirty
-;		ORA	#$08
-;		STA	game + GAME::dirty
-
 		JMP	@exit
 
 @cont:
@@ -15759,35 +15761,13 @@ gameToggleManage:
 		
 		JSR	prmptClear2
 
-;		LDA	game + GAME::dirty
-;		ORA	#$08
-;		STA	game + GAME::dirty
+		LDA	game + GAME::sSelect
+		JSR	rulesFocusOnSquare
 		
 @exit:
 		LDA	game + GAME::dirty
-		ORA	#GAME_DRT_ALLD
+		ORA	#(GAME_DRT_SLCT | GAME_DRT_MENU)
 		STA	game + GAME::dirty
-
-		RTS
-
-
-;-------------------------------------------------------------------------------
-gameMoveSelect:
-;-------------------------------------------------------------------------------
-		PHA
-		LDA	game + GAME::sSelect
-		CMP	#$FF
-		BNE	@cont
-		PLA
-		RTS
-@cont:
-		JSR	gameDeselect
-		PLA
-		JSR	gameSelect
-		
-;		LDA	#$04
-;		ORA	game + GAME::dirty
-;		STA	game + GAME::dirty
 
 		RTS
 
@@ -16828,9 +16808,9 @@ dialogDisplay:
 		
 		JSR	uiProcessMarkStart
 		
-		LDA	#UI_ACT_DELY
+		LDA	#UI_ACT_SKEY
 		STA	$68
-		LDA	#$04
+		LDA	#' '
 		STA	$69
 		LDA	#$00
 		STA	$6A
@@ -16838,9 +16818,9 @@ dialogDisplay:
 		
 		JSR	uiEnqueueAction
 		
-		LDA	#UI_ACT_SKEY
+		LDA	#UI_ACT_DELY
 		STA	$68
-		LDA	#' '
+		LDA	#$00
 		STA	$69
 		LDA	#$00
 		STA	$6A
