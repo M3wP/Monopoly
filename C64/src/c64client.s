@@ -58,7 +58,7 @@
 ;	   3 house rules (one always enabled:  reshuffle CCCCards)
 ;	     strictly turn-based (with interrupts and flexible management)
 ;
-;	  an estimated 18.75KB data, 35.5KB code, 1.5KB heap, 5.25KB system
+;	  an estimated 18.75KB data, 34.75KB code, 1.5KB heap, 5.25KB system
 ;	 650 portrait A4 pages of source code with small font
 ;	1100 A4 pages to print the old landscape list style with normal font
 ;
@@ -67,7 +67,7 @@
 ;	* Most of the zero page is unused (still need break-down/rework) except 
 ;	  for possible reservation of Kernal data for compatibility (load/save?)
 ;	* Free in global state, 18 bytes (free for globals)
-;	* Between end of program and reserved, 3203 bytes (free for program)
+;	* Between end of program and reserved, 3808 bytes (free for program)
 ;	* Free in discard, 6 bytes (free for discard)
 ;	* Reserved area, 512 bytes (reserved for discard/display heap)
 ;	* Between rules data and action heap, 307 bytes (free for constant data)
@@ -82,10 +82,10 @@
 ;	0800 - 	08FF	Bootstrap/sprite data (256 bytes)
 ;	0900 -  7FFF	Program code and data (~30KB)
 ;	8000 -	9FFF	Program code and data (8KB)
-;	A000 -	BFFF	Program code and data (8KB)
-;	C000 -	C17C	Program code and data (380 bytes)
-;	C17D -	C37C	Discard/display heap (512 bytes, 6 discard free)
-;	C37D - 	CDFF	Free (~2.75KB)
+;	A000 -	BF1F	Program code and data (~8KB)
+;	BF20 -  BFFF	Discard/display heap (224 bytes)
+;	C000 -	C11F	Discard/display heap (288 bytes, 6 discard free)
+;	C120 -	CDFF	Free (~3.5KB)
 ;	CE00 - 	CFFF	Reserved (discard/display heap, 512 bytes)
 ;	D000 - 	DFFF	System I/O (4KB)
 ;	E000 -	F240	Strings const data (4673 bytes)
@@ -316,6 +316,14 @@ uiActnCache	=	$FB00
 		parmA	.byte
 		parmBLo	.byte
 		parmBHi	.byte
+	.endstruct
+	
+	
+	.struct	UIACTCTXT
+		aProc	.word
+		fTyp	.byte
+		fInt	.byte
+		aStart	.word
 	.endstruct
 
 
@@ -1160,13 +1168,8 @@ mainHandleUpdates:
 		LDA	game + GAME::fShwNxt
 		BEQ	@tststep
 		
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::fCPU
-		LDA	($FB), Y
+		LDA	($8B), Y
 		BNE	@tststep
 		
 		JSR	gameShowPlayerDlg
@@ -1329,18 +1332,12 @@ mainHandleUpdates:
 		LDA	keyQueueEnPos
 		BNE	@human
 		
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::fCPU
-		LDA	($FB), Y
+		LDA	($8B), Y
 		BEQ	@human
 		
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptThinking
 		
@@ -3411,14 +3408,8 @@ plyrIRQ:
 		LDA	ui + UI::fUsrInp
 		BNE	@doUserInput
 	
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::fCPU
-		LDA	($FB), Y
+		LDA	($8B), Y
 		BNE	@skipUserInput
 	.endif
 
@@ -6482,6 +6473,7 @@ uiProcessContext0:
 	.repeat	5,I
 		.word	$0000
 		.byte	$00, $00
+		.word	$0000
 	.endrep
 uiProcessCtxCurrPtr:
 		.word	$0000
@@ -6693,10 +6685,16 @@ uiProcessMarkStart:
 		INY
 		LDA	ui + UI::fActInt
 		STA	($A3), Y
+		INY
+		LDA	uiProcessEnqueuePtr
+		STA	($A3), Y
+		INY
+		LDA	uiProcessEnqueuePtr + 1
+		STA	($A3), Y
 		
 		CLC
 		LDA	$A3
-		ADC	#$04
+		ADC	#.sizeof(UIACTCTXT)
 		STA	uiProcessCtxNextPtr
 		LDA	$A4
 		ADC	#$00
@@ -6723,7 +6721,7 @@ uiProcessCancel:
 		
 		SEC
 		LDA	uiProcessCtxCurrPtr
-		SBC	#$04
+		SBC	#.sizeof(UIACTCTXT)
 		STA	uiProcessCtxCurrPtr
 		LDA	uiProcessCtxCurrPtr + 1
 		SBC	#$00
@@ -6739,6 +6737,18 @@ uiProcessEnd:
 		LDA	#$01
 		STA	uiProcessHaveEnd
 	.endif
+	
+		LDA	uiProcessCtxCurrPtr
+		STA	$A3
+		LDA	uiProcessCtxCurrPtr + 1
+		STA	$A4
+
+		LDY	#$04
+		LDA	($A3), Y
+		STA	uiProcessEnqueuePtr
+		INY
+		LDA	($A3), Y
+		STA	uiProcessEnqueuePtr + 1
 	
 		JSR	uiProcessCancel
 		
@@ -6831,11 +6841,6 @@ uiProcessSet:
 ;-------------------------------------------------------------------------------
 uiProcessInit:
 ;-------------------------------------------------------------------------------
-;		LDA	#<uiActnCache
-;		STA	$6D
-;		LDA	#>uiActnCache
-;		STA	$6E
-
 	.if	DEBUG_ACTIONS
 		LDA	#$01
 		STA	uiProcessHaveInit
@@ -6956,11 +6961,6 @@ uiProcessActionCache:
 ;-------------------------------------------------------------------------------
 uiProcessMPay:
 ;-------------------------------------------------------------------------------
-;		LDA	game + GAME::gMode
-;		STA	game + GAME::gMdMPyI	
-;		LDA	game + GAME::pActive
-;		STA	game + GAME::pMstPyI
-
 		JSR	gamePushState
 
 		LDA	game + GAME::pActive
@@ -7100,7 +7100,6 @@ uiProcessTerminate:
 		
 @alreadympay:
 		LDA	game + GAME::pActive	;Check them all again
-;		STA	game + GAME::pMstPyI
 		STA	game + GAME::pMPyLst
 
 @complete:
@@ -7191,6 +7190,8 @@ uiActionTrade:
 
 		STA	game + GAME::pLast
 		STA	game + GAME::pActive
+		
+		JSR	gamePlayerChanged
 
 		LDA	$6A			;byte 02 = square
 		
@@ -7211,6 +7212,8 @@ uiActionRepay:
 		STA	game + GAME::pLast
 		STA	game + GAME::pActive
 
+		JSR	gamePlayerChanged
+
 		LDA	$6A
 		JSR	uiActionFocusSquare
 
@@ -7227,6 +7230,8 @@ uiActionFee:
 
 		STA	game + GAME::pLast
 		STA	game + GAME::pActive
+		
+		JSR	gamePlayerChanged
 		
 		LDA	$6A
 		JSR	uiActionFocusSquare
@@ -7253,6 +7258,8 @@ uiActionAuction:
 		LDA	#$FF
 		STA	game + GAME::pLast
 
+		JSR	gamePlayerChanged
+
 		JSR	rulesDoNextPlyr
 
 		LDX	#$01
@@ -7268,6 +7275,8 @@ uiActionMrtg:
 
 		STA	game + GAME::pActive
 		STA	game + GAME::pLast
+		
+		JSR	gamePlayerChanged
 		
 		LDA	$6A
 		JSR	uiActionFocusSquare
@@ -7288,6 +7297,8 @@ uiActionSell:
 		STA	game + GAME::pActive
 		STA	game + GAME::pLast
 		
+		JSR	gamePlayerChanged
+		
 		LDA	$6A
 		JSR	uiActionFocusSquare
 		
@@ -7305,28 +7316,24 @@ uiActionBuy:
 		STA	game + GAME::pActive
 		STA	game + GAME::pLast
 		
-		TAX
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
+		JSR	gamePlayerChanged
+		
 		LDY	#PLAYER::money
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	game + GAME::varS
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	game + GAME::varT
 
 		LDA	$6A
 		JSR	uiActionFocusSquare
 
 ;		Need to load again, *ugh*
-		LDX	$69
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
+;		LDX	$69
+;		LDA	plrLo, X
+;		STA	$FB
+;		LDA	plrHi, X
+;		STA	$FC
 
 ;	IN:	.X	=	square * 2
 		LDA	$6A
@@ -7358,6 +7365,8 @@ uiActionImprv:
 		STA	game + GAME::pActive
 		STA	game + GAME::pLast
 		
+		JSR	gamePlayerChanged
+		
 		LDA	$6A
 		JSR	uiActionFocusSquare
 
@@ -7375,6 +7384,8 @@ uiActionGOFree:
 		STA	game + GAME::pActive
 		STA	game + GAME::pLast
 		
+		JSR	gamePlayerChanged
+		
 		JSR	gameCheckGaolFree
 
 		RTS
@@ -7387,6 +7398,8 @@ uiActionPost:
 
 		STA	game + GAME::pActive
 		STA	game + GAME::pLast
+		
+		JSR	gamePlayerChanged
 		
 		LDX	#$01
 		JSR	gameToggleGaol
@@ -7404,6 +7417,8 @@ uiActionRoll:
 
 		STA	game + GAME::pActive
 		STA	game + GAME::pLast
+		
+		JSR	gamePlayerChanged
 		
 		JSR	gameRollDice
 
@@ -7617,23 +7632,6 @@ cpuPerformIdle:
 ;-------------------------------------------------------------------------------
 cpuPerformPlay:
 ;-------------------------------------------------------------------------------
-;		LDA	game + GAME::fMBuy
-;		BEQ	@continue
-;		
-;		LDA	#UI_ACT_FALT
-;		STA	$68
-;		LDA	game + GAME::pActive
-;		STA	$69
-;		LDA	#<cpuPerformPlay
-;		STA	$6A
-;		LDA	#>cpuPerformPlay
-;		STA	$6B
-;		
-;		JSR	uiEnqueueAction
-;		
-;		RTS
-;		
-;@continue:
 		JSR	rulesAutoPlay
 		BNE	@exit
 		
@@ -7660,14 +7658,8 @@ cpuPerformPlay:
 ;-------------------------------------------------------------------------------
 cpuPerformBuy:
 ;-------------------------------------------------------------------------------
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::square
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 
 		JSR	rulesAutoBuy
@@ -7873,22 +7865,6 @@ menuDefWindow0:
 
 			.byte	$00
 			
-menuTemp0:
-			.byte	$00
-			.byte	$00
-menuTemp3:
-			.byte	$00, $00, $00, $00, $00, $00
-menuTemp9:
-			.byte	$00, $00, $00, $00, $00, $00
-menuTempF:
-			.byte	$00
-
-menuLastSelBtn:
-		.byte	$FF
-		
-menuLastDrawFunc:
-		.word	$0000
-
 
 menuActivePage0:
 		.word	menuPageBlank0Keys
@@ -7908,6 +7884,24 @@ menuActivePage2:
 		.byte	$00
 		.word	cpuPerformFault
 	
+
+menuTemp0:
+			.byte	$00
+			.byte	$00
+menuTemp3:
+			.byte	$00, $00, $00, $00, $00, $00
+menuTemp9:
+			.byte	$00, $00, $00, $00, $00, $00
+menuTempF:
+			.byte	$00
+
+menuLastSelBtn:
+		.byte	$FF
+		
+menuLastDrawFunc:
+		.word	$0000
+
+
 menuPageBlank0:
 		.word	menuPageBlank0Keys
 		.word	menuDefDraw
@@ -8139,14 +8133,8 @@ menuDisplay:
 		LDA	#$00
 		STA	screenRedirectNull
 
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::fCPU
-		LDA	($FB), Y
+		LDA	($8B), Y
 		BEQ	@disp
 		
 		LDA	#$01
@@ -8529,10 +8517,10 @@ menuPageSetup1Keys:
 		
 		LDX	menuTemp0
 		
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
+;		LDA	plrLo, X
+;		STA	$FB
+;		LDA	plrHi, X
+;		STA	$FC
 		
 		LDY	#PLAYER::colour
 		
@@ -8540,7 +8528,7 @@ menuPageSetup1Keys:
 		TAX
 		LDA	plrColours, X
 				
-		STA	($FB), Y		
+		STA	($8B), Y		
 
 		LDX	menuTemp0
 
@@ -8566,11 +8554,15 @@ menuPageSetup1Keys:
 		STX	menuTemp0
 		STX	game + GAME::pActive
 		
+		JSR	gamePlayerChanged
+		
 		CPX	game + GAME::pCount
 		BNE	@exit
 
 		LDX	#$00
 		STX	game + GAME::pActive
+
+		JSR	gamePlayerChanged
 		
 		LDA 	#<menuPageSetup2
 		LDY	#>menuPageSetup2
@@ -8664,6 +8656,8 @@ menuPageSetup2Keys:
 
 		LDX	#$00
 		STX	game + GAME::pActive
+		
+		JSR	gamePlayerChanged
 		
 		LDX	#$05
 		LDA	#$00
@@ -8814,15 +8808,15 @@ menuWindowSetup4:
 			.byte	$90, $0D, $0C
 			.word		strSetup4Roll2
 			.byte	$90, $02, $0D
-			.word	     plr3 + PLAYER::name
+			.word	     (plr3 + PLAYER::name)
 			.byte	$90, $0D, $0D
 			.word		strSetup4Roll3
 			.byte	$90, $02, $0E
-			.word	     plr4 + PLAYER::name
+			.word	     (plr4 + PLAYER::name)
 			.byte	$90, $0D, $0E
 			.word		strSetup4Roll4
 			.byte	$90, $02, $0F
-			.word	     plr5 + PLAYER::name
+			.word	     (plr5 + PLAYER::name)
 			.byte	$90, $0D, $0F
 			.word		strSetup4Roll5
 			
@@ -8865,6 +8859,8 @@ menuPageSetup4Keys:
 		
 		LDA	menuTemp0 + 1
 		STA	game + GAME::pActive
+		
+		JSR	gamePlayerChanged
 		
 		LDA	#$FF
 		STA	game + GAME::pLast
@@ -8921,11 +8917,15 @@ menuPageSetup4Keys:
 		STA	game + GAME::pActive
 		STA	game + GAME::pLast
 		
+		JSR	gamePlayerChanged
+		
 		JSR	menuDoSetup4Highest
 		RTS
 
 @cont:
 		INC	game + GAME::pActive
+		
+		JSR	gamePlayerChanged
 
 		LDA	game + GAME::dirty
 		ORA	#(GAME_DRT_STAT | GAME_DRT_MENU)
@@ -9673,14 +9673,8 @@ menuPagePlay0DefKeys:
 		JMP	@keysBuzz
 		
 @tstFunds:
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::money + 1
-		LDA	($FB), Y
+		LDA	($8B), Y
 		BPL	@trade
 		
 		JMP	@keysBuzz
@@ -9999,12 +9993,6 @@ menuPagePlay0Draw:
 		LDA	#>menuWindowPlay0
 		STA	$FE
 		
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
 		LDA	#$A0
 		STA	menuWindowPlay0RollB
 		STA	menuWindowPlay0NextB
@@ -10012,7 +10000,7 @@ menuPagePlay0Draw:
 		
 		LDY	#PLAYER::money + 1
 		
-		LDA	($FB), Y
+		LDA	($8B), Y
 		BPL	@cantrade
 		
 		JMP	@cont
@@ -10095,19 +10083,13 @@ menuPagePlay1Keys:
 		CMP	#'P'
 		BNE	@keysOther
 		
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDA	#<SFXDING
 		LDY	#>SFXDING
 		LDX	#$07
 		JSR	SNDBASE + 6
 		
 		LDY	#PLAYER::square		;store the square being auctioned
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	game + GAME::sAuctn
 
 		LDX	#$00
@@ -10143,16 +10125,11 @@ menuPagePlay1Draw:
 		LDA	#$A1
 		STA	menuWindowPlay1BuyB
 		
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
 		LDA	#$A0
 		STA	menuWindowPlay1Trd
 		
 		LDY	#PLAYER::money + 1
+		LDA	($8B), Y
 		BMI	@cont
 
 		LDA	#$A1
@@ -10160,7 +10137,7 @@ menuPagePlay1Draw:
 
 @cont:
 		LDY	#PLAYER::square
-		LDA	($FB), Y
+		LDA	($8B), Y
 		JSR	gameGetCardPtrForSquare
 
 		LDY	#DEED::mPurch
@@ -10172,10 +10149,10 @@ menuPagePlay1Draw:
 
 		SEC
 		LDY	#PLAYER::money
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	menuTemp0
 		INY	
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	menuTemp0 + 1
 		BPL	@skip		
 
@@ -10501,13 +10478,8 @@ menuPageAuctnDefKeys:
 		LDA	game + GAME::mACurr + 1
 		STA	game + GAME::varE
 
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
 		LDY 	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptBid
 
@@ -10520,13 +10492,8 @@ menuPageAuctnDefKeys:
 		CMP	#'P'
 		BNE	@keysF
 
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
 		LDY 	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptPass
 		
@@ -10542,13 +10509,8 @@ menuPageAuctnDefKeys:
 		JMP	@keysOther
 		
 @forfeit:
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
 		LDY 	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptForfeit
 		
@@ -10585,11 +10547,11 @@ menuPageAuctnDefKeys:
 		JSR	gamePlayerHasFunds
 		BCS	@keysUpdate
 		
-		LDY	#PLAYER::money		;This is safe since $FB was loaded
-		LDA	($FB), Y		;in gamePlayerHasFunds
+		LDY	#PLAYER::money		
+		LDA	($8B), Y		
 		STA	game + GAME::mACurr
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	game + GAME::mACurr + 1
 		
 		JMP	@keysBuzz
@@ -10770,16 +10732,11 @@ menuPageAuctn1Draw:
 		LDA	#$01
 		STA	menuPageAuctnPage0
 		
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
 		LDA	#$A0
 		STA	menuWindowAuctn1Trd
 		
 		LDY	#PLAYER::money + 1
+		LDA	($8B), Y
 		BMI	@cont
 
 		LDA	#$A1
@@ -11089,16 +11046,11 @@ menuPageGaol2Keys:
 		
 		
 menuPageGaol2Draw:
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
 		LDA	#$A0
 		STA	menuWindowGaol2Trd
 		
 		LDY	#PLAYER::money + 1
+		LDA	($8B), Y
 		BMI	@cont
 
 		LDA	#$A1
@@ -11139,17 +11091,11 @@ menuPageGaol3Keys:
 		LDX	#$01
 		JSR	gameToggleGaol
 		
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::status
-		LDA	($FB), Y
+		LDA	($8B), Y
 		AND	#$DF
 		ORA	#$10
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		JSR	gameUpdateMenu
 	
@@ -11228,14 +11174,8 @@ menuPageMustPay0Keys:
 		
 		
 menuPageMustPay0Draw:
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::money + 1
-		LDA	($FB), Y
+		LDA	($8B), Y
 		BPL	@havecash
 
 		LDA	#$A0
@@ -11297,12 +11237,6 @@ menuPageManage0Keys:
 		CMP	#'D'
 		BNE	@keysF
 		
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDA	game + GAME::cntHs
 		BMI	@warn
 		
@@ -11311,15 +11245,8 @@ menuPageManage0Keys:
 		
 		JSR	gameToggleManage
 
-;***FIXME:	Having to do this in inexplicable.
-		LDX	game + GAME::pActive	;I need to do this again or I
-		LDA	plrLo, X		;get the wrong colour.  Why???
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptClearOrRoll
 		JSR	prmptClear2
@@ -11332,7 +11259,7 @@ menuPageManage0Keys:
 		
 @warn:
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 
 		JSR	prmptMustSell
@@ -11536,18 +11463,12 @@ menuTrade0RemCash:
 
 
 menuTrade0RWealthRecalc:
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::money
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	menuTrade0RemWealth
 		STA	menuTrade0RemCash
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	menuTrade0RemWealth + 1
 		STA	menuTrade0RemCash + 1
 		LDA	#$00
@@ -12207,13 +12128,8 @@ menuPageTrade1Keys:
 		CMP	#'X'
 		BNE	@keysC
 
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
 		LDY 	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptTrdDecln
 
@@ -12330,18 +12246,12 @@ menuElimin0Recalc:
 
 
 menuElimin0RemWlthRecalc:
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::money
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	menuTrade0RemWealth
 		STA	menuTrade0RemCash
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	menuTrade0RemWealth + 1
 		STA	menuTrade0RemCash + 1
 		LDA	#$00
@@ -12584,13 +12494,13 @@ menuPageElimin0Keys:
 		CMP	#'C'
 		BNE	@keysExit
 		
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
+;		LDA	plrLo, X
+;		STA	$FB
+;		LDA	plrHi, X
+;		STA	$FC
 		
 		LDY	#PLAYER::fCPU
-		LDA	($FB), Y
+		LDA	($8B), Y
 		BNE	@proc
 		
 		LDA	menuElimin0HaveOffer
@@ -12914,19 +12824,13 @@ menuPageJump0Keys:
 		LDX	#$07
 		JSR	SNDBASE + 6
 		
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDA	game + GAME::fStpPsG
 		CMP	#$00
 		BEQ	@update
 		
 		LDY	#PLAYER::square
 		LDA	#$00
-		STA	($FB), Y
+		STA	($8B), Y
 		STA	game + GAME::fStpPsG
 		
 		JSR	rulesLandOnSquare
@@ -12934,7 +12838,7 @@ menuPageJump0Keys:
 @update:
 		LDY	#PLAYER::square
 		LDA	game + GAME::sStpDst
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		LDA	#$00
 		STA	game + GAME::fAmStep
@@ -13063,9 +12967,6 @@ menuPageQuit1Keys:
 @tstY:
 		CMP	#'Y'
 		
-;		LDA	game + GAME::gMode
-;		STA	game + GAME::gMdQuit
-
 		JSR	gamePushState
 		
 		LDA	game + GAME::pActive
@@ -13124,11 +13025,6 @@ menuPageQuit2Keys:
 		CMP	#'N'
 		BNE	@tstY
 		
-;		LDA	game + GAME::gMdQuit
-;		STA	game + GAME::gMode
-;		LDA	game + GAME::pQuitCP
-;		STA	game + GAME::pActive
-
 		JSR	gamePopState
 		
 		JMP	@update
@@ -13187,7 +13083,9 @@ gameStateIdx:
 		.byte	$00
 
 
+;-------------------------------------------------------------------------------
 gamePushState:
+;-------------------------------------------------------------------------------
 		LDA	gameStateIdx
 		ASL
 		TAX
@@ -13207,7 +13105,9 @@ gamePushState:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 gamePopState:
+;-------------------------------------------------------------------------------
 		DEC	gameStateIdx
 		
 	.if	DEBUG_GSTATE		
@@ -13224,6 +13124,8 @@ gamePopState:
 		LDA	gameStateStack + 1, X
 		STA	game + GAME::pActive
 
+		JSR	gamePlayerChanged
+
 		LDA	game + GAME::gMode
 		CMP	#GAME_MDE_ACTS
 		BNE	@exit
@@ -13234,14 +13136,23 @@ gamePopState:
 		RTS
 
 
+;-------------------------------------------------------------------------------
+gamePlayerChanged:
+;-------------------------------------------------------------------------------
+		LDX	game + GAME::pActive
+		LDA	plrLo, X
+		STA	$8B
+		LDA	plrHi, X
+		STA	$8C
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
 gameCheckCPUApprove:
-;		LDX	game + GAME::pActive
-;		LDA	plrLo, X
-;		STA	$FB
-;		LDA	plrHi, X
-;		STA	$FC
+;-------------------------------------------------------------------------------
 		LDY	#PLAYER::fCPU
-		LDA	($FB), Y
+		LDA	($8B), Y
 		BNE	@proc
 		
 		RTS
@@ -13258,14 +13169,11 @@ gameCheckCPUApprove:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 gameCheckCPUDecline:
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
+;-------------------------------------------------------------------------------
 		LDY	#PLAYER::fCPU
-		LDA	($FB), Y
+		LDA	($8B), Y
 		BNE	@proc
 		
 		RTS
@@ -13339,11 +13247,11 @@ gameClearTrdOffer:
 gameRemWlth0AddEquity:		
 		LDY	#PLAYER::equity
 		CLC
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ADC	menuTrade0RemWealth
 		STA	menuTrade0RemWealth
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ADC	menuTrade0RemWealth + 1
 		STA	menuTrade0RemWealth + 1
 		LDA	#$00
@@ -13486,6 +13394,8 @@ gamePerformQuit:
 		LDA	game + GAME::varF
 		STA	game + GAME::pActive
 		STA	game + GAME::pLast
+		
+		JSR	gamePlayerChanged
 		
 		LDA	#GAME_MDE_OVER
 		STA	game + GAME::gMode
@@ -13876,19 +13786,13 @@ gamePerfStepping:
 		LDX	#$07
 		JSR	SNDBASE + 6
 		
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::square
 		
-		LDA	($FB), Y
+		LDA	($8B), Y
 		LDX	#$01
 		JSR	rulesCalcNextSqr
 		
-		STA	($FB), Y
+		STA	($8B), Y
 		CMP	game + GAME::sStpDst
 		BEQ	@finish
 
@@ -13909,7 +13813,7 @@ gamePerfStepping:
 ;	Always need to do at least this
 		LDY	#PLAYER::dirty
 		LDA	#$01
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		RTS
 
@@ -14008,12 +13912,12 @@ gameGetCardPtrForSquareImmed:
 gameContinueAfterPost:
 ;-------------------------------------------------------------------------------
 		LDY	#PLAYER::status
-		LDA	($FB), Y
+		LDA	($8B), Y
 		AND	#$EF
-		STA	($FB), Y
+		STA	($8B), Y
 
 		LDY	#PLAYER::square
-		LDA	($FB), Y
+		LDA	($8B), Y
 
 		PHA
 		
@@ -14065,11 +13969,6 @@ gameContinueAfterPost:
 ;-------------------------------------------------------------------------------
 gameMustPayAfterPost:
 ;-------------------------------------------------------------------------------
-;		LDA	game + GAME::gMode
-;		STA	game + GAME::gMdMPyI	
-;		LDA	game + GAME::pActive
-;		STA	game + GAME::pMstPyI
-
 		JSR	gamePushState
 
 		LDA	game + GAME::pActive
@@ -14096,12 +13995,6 @@ gameMustPayAfterPost:
 ;-------------------------------------------------------------------------------
 gameSwitchMPayToElmin:
 ;-------------------------------------------------------------------------------
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		JSR	gamePerfLosing
 		
 ;***FIXME:	This should be done in NextPlayer which is called by the dialog
@@ -14138,6 +14031,9 @@ gameUpdateForMustPay:
 
 		STX	game + GAME::pMPyCur	;All yes then found player
 		STX	game + GAME::pActive
+		
+		JSR	gamePlayerChanged
+		
 		JMP	@update
 		
 @next:
@@ -14174,10 +14070,12 @@ gameUpdateForMustPay:
 		STX	game + GAME::pMPyCur
 		STX	game + GAME::pActive
 		
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
+		JSR	gamePlayerChanged
+		
+;		LDA	plrLo, X
+;		STA	$FB
+;		LDA	plrHi, X
+;		STA	$FC
 		
 		JSR	gameSwitchMPayToElmin
 		
@@ -14187,11 +14085,6 @@ gameUpdateForMustPay:
 ;-------------------------------------------------------------------------------
 gameRestoreFromMustPay:
 ;-------------------------------------------------------------------------------
-;		LDA	game + GAME::pMstPyI
-;		STA	game + GAME::pActive
-;		LDA	game + GAME::gMdMPyI	
-;		STA	game + GAME::gMode
-
 		JSR	gamePopState
 		
 		LDA	#$FF
@@ -14338,14 +14231,8 @@ gameUpdateMenu:
 		JMP	@update
 		
 @tstlosing:
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::status
-		LDA	($FB), Y
+		LDA	($8B), Y
 		AND	#$02
 		BEQ	@tstmbuy
 
@@ -14358,7 +14245,7 @@ gameUpdateMenu:
 		BNE	@normal
 		
 		LDY	#PLAYER::square
-		LDA	($FB), Y
+		LDA	($8B), Y
 		PHA
 	
 		JSR	gameSelect
@@ -14382,7 +14269,7 @@ gameUpdateMenu:
 
 @normal:
 		LDY	#PLAYER::status
-		LDA	($FB), Y
+		LDA	($8B), Y
 		AND	#$40		
 		BEQ	@test0
 		
@@ -14391,16 +14278,16 @@ gameUpdateMenu:
 		
 		JMP	@update
 @test0:
-		LDA	($FB), Y
+		LDA	($8B), Y
 		AND	#$10		
 		BEQ	@test1
 		
 		LDY	#PLAYER::status
-		LDA	($FB), Y
+		LDA	($8B), Y
 		AND	#$02
 		BNE	@switchelmin0
 		
-		LDA	($FB), Y
+		LDA	($8B), Y
 		AND	#$08
 		BEQ	@nomustpay
 
@@ -14416,7 +14303,7 @@ gameUpdateMenu:
 		RTS
 
 @test1:
-		LDA	($FB), Y
+		LDA	($8B), Y
 		AND	#$20		
 		BEQ	@test2
 		
@@ -14426,7 +14313,7 @@ gameUpdateMenu:
 		JMP	@update
 
 @test2:
-		LDA	($FB), Y
+		LDA	($8B), Y
 		AND	#$80		
 		BEQ	@play0
 
@@ -14494,55 +14381,43 @@ gameMoveSelectBck:
 ;-------------------------------------------------------------------------------
 gameMovePlyrFwd:
 ;-------------------------------------------------------------------------------
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::square
-		LDA	($FB), Y
+		LDA	($8B), Y
 		CLC
 		ADC	#$01
-		STA	($FB), Y
+		STA	($8B), Y
 
 		CMP	#$28
 		BMI 	@exit
 
 		LDA	#$00
-		STA	($FB), Y
+		STA	($8B), Y
 		
 @exit:
 		LDY	#PLAYER::dirty
 		LDA	#$01
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		RTS
 		
 ;-------------------------------------------------------------------------------
 gameMovePlyrBck:
 ;-------------------------------------------------------------------------------
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::square
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SEC
 		SBC	#$01
-		STA	($FB), Y
+		STA	($8B), Y
 
 		BPL	@exit
 		
 		LDA	#$27
-		STA	($FB), Y
+		STA	($8B), Y
 		
 @exit:
 		LDY	#PLAYER::dirty
 		LDA	#$01
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		RTS
 	.endif
@@ -14550,21 +14425,10 @@ gameMovePlyrBck:
 
 ;-------------------------------------------------------------------------------
 gameToggleGaol:
+;(IN)		.X
 ;-------------------------------------------------------------------------------
-		TXA
-		PHA
-
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
-		PLA
-		TAX
-		
 		LDY	#PLAYER::status
-		LDA	($FB), Y
+		LDA	($8B), Y
 		AND	#$80
 		BEQ	@cont
 
@@ -14580,23 +14444,23 @@ gameToggleGaol:
 		JSR	rulesSubCash		
 
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptPostBail
 		
 		JMP	@outsound0
 @cont:
 		LDY	#PLAYER::status
-		LDA	($FB), Y		;going into gaol
+		LDA	($8B), Y		;going into gaol
 		ORA	#$40
-		STA	($FB), Y
+		STA	($8B), Y
 
 		LDY	#PLAYER::square
 		LDA	#$0A
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptGoneGaol
 		
@@ -14633,17 +14497,17 @@ gameToggleGaol:
 
 @dotoggle:
 		LDY	#PLAYER::status
-		LDA	($FB), Y
+		LDA	($8B), Y
 		EOR	#$80
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		LDY	#PLAYER::dirty
 		LDA	#$01
-		STA	($FB), Y
+		STA	($8B), Y
 
 		LDY	#PLAYER::nGRls
 		LDA	#$00
-		STA	($FB), Y
+		STA	($8B), Y
 
 		JSR	gameUpdateMenu
 
@@ -14681,20 +14545,14 @@ gameCheckGaolFree:
 		STA	game + GAME::pGF0Crd
 		
 @cont:
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::status
-		LDA	($FB), Y
+		LDA	($8B), Y
 		AND	#$7F
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		LDA	#$00
 		LDY	#PLAYER::nGRls
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		LDA	#<SFXSLAM
 		LDY	#>SFXSLAM
@@ -14703,7 +14561,7 @@ gameCheckGaolFree:
 		
 		LDY	#PLAYER::dirty
 		LDA	#$01
-		STA	($FB), Y
+		STA	($8B), Y
 
 		LDA	game + GAME::dirty
 		ORA	#GAME_DRT_STAT
@@ -14766,6 +14624,8 @@ gameNextAuction:
 @cont:
 		STX	game + GAME::pActive
 
+		JSR	gamePlayerChanged
+
 		LDA	game + GAME::pWAuctn	;If no one bids, everyone has to 
 		CMP	#$FF			;pass or forfeit, explicitly
 		BEQ	@update
@@ -14786,10 +14646,8 @@ gameNextAuction:
 		
 		TAX
 		STX	game + GAME::pActive	;Temporarily set active player...
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
+
+		JSR	gamePlayerChanged
 		
 		LDY	#$01			;in order to buy deed but
 		LDX	game + GAME::sAuctn	;don't sub cash also set a specific 
@@ -14808,32 +14666,20 @@ gameNextAuction:
 		STA	prmptTemp3
 		
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptBought
 		
 @endauction:
-;		LDA	game + GAME::sAuctn
 		JSR	gameDeselect
-
-;		LDA	game + GAME::gMdActn	;go back to normal mode
-;		STA	game + GAME::gMode
-;		LDA	game + GAME::pRecall	;go back to initial player
-;		STA	game + GAME::pActive
 
 		JSR	gamePopState
 
 		LDA	#$FF
 		STA	game + GAME::pLast
 		
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptClearOrRoll
 
@@ -15150,20 +14996,10 @@ gameInitTrdIntrpt:
 		
 @initiate:
 gameInitTrdIntrptDirect:
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
 		LDY 	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptTrading
-
-;		LDA	game + GAME::pActive
-;		STA	game + GAME::pTrdICP
-;		LDA	game + GAME::gMode
-;		STA	game + GAME::gMdTrdI
 
 		JSR	gamePushState
 		
@@ -15193,14 +15029,8 @@ gameInitTrdIntrptDirect:
 ;-------------------------------------------------------------------------------
 gameApproveTrade:
 ;-------------------------------------------------------------------------------
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY 	#PLAYER::fCPU
-		LDA	($FB), Y
+		LDA	($8B), Y
 		
 		BNE	@approve
 
@@ -15234,7 +15064,7 @@ gameApproveTrade:
 		JSR	gameCheckCPUApprove
 
 		LDY 	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptTrdApprv
 		
@@ -15573,11 +15403,7 @@ gamePerfTradeMoney:
 		STA	game + GAME::pLast
 		STA	game + GAME::pActive
 		
-		TAX
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
+		JSR	gamePlayerChanged
 		
 		LDA	trade1, Y
 		TAX
@@ -15596,11 +15422,7 @@ gamePerfTradeMoney:
 		STA	game + GAME::pLast
 		STA	game + GAME::pActive
 		
-		TAX
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
+		JSR	gamePlayerChanged
 		
 		LDA	trade0, Y
 		TAX
@@ -15608,24 +15430,6 @@ gamePerfTradeMoney:
 		JSR	rulesSubCash
 
 		RTS
-
-
-;gamePerfTradePopMode:
-;		LDA	game + GAME::fTrdTyp
-;		BNE	@endelimin
-;
-;		Pop player and mode from trade 
-;		LDA	game + GAME::pTrdICP
-;		STA	game + GAME::pActive
-;		LDA	game + GAME::gMdTrdI
-;		STA	game + GAME::gMode
-;		RTS
-;@endelimin:
-;		LDA	game + GAME::pElimin
-;		STA	game + GAME::pActive
-;		LDA	game + GAME::gMdElim
-;		STA	game + GAME::gMode
-;		RTS
 
 
 ;-------------------------------------------------------------------------------
@@ -15744,14 +15548,8 @@ gameToggleManage:
 		LDA	game + GAME::varA
 		STA	game + GAME::sMngBak
 
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::square
-		LDA	($FB), Y
+		LDA	($8B), Y
 		
 		JSR	gameSelect
 
@@ -15864,17 +15662,11 @@ gamePlayerHasFunds:
 		TYA
 		PHA
 		
-		LDY	game + GAME::pActive
-		LDA	plrLo, Y
-		STA	$FB
-		LDA	plrHi, Y
-		STA	$FC
-		
 		LDY	#PLAYER::money
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	game + GAME::varD
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	game + GAME::varE
 		
 		PLA
@@ -15898,28 +15690,22 @@ gamePlayerHasWealth:
 		STA	game + GAME::varM
 		STY	game + GAME::varN
 		
-		LDY	game + GAME::pActive
-		LDA	plrLo, Y
-		STA	$FB
-		LDA	plrHi, Y
-		STA	$FC
-		
 		LDY	#PLAYER::money
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	game + GAME::varD
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	game + GAME::varE
 		LDA	#$00
 		STA	game + GAME::varF
 
 		LDY	#PLAYER::equity
 		CLC
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ADC	game + GAME::varD
 		STA	game + GAME::varD
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ADC	game + GAME::varE
 		STA	game + GAME::varE
 		LDA	#$00
@@ -15960,22 +15746,16 @@ gamePlayerHasWealth:
 ;-------------------------------------------------------------------------------
 gameDecMoney1:
 ;------------------------------------------------------------------------------- 
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::money
 		
 		SEC
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	#1
-		STA	($FB), Y
+		STA	($8B), Y
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	#0
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		LDA	game + GAME::dirty
 		ORA	#GAME_DRT_STAT
@@ -15987,22 +15767,16 @@ gameDecMoney1:
 ;-------------------------------------------------------------------------------
 gameIncMoney1:
 ;-------------------------------------------------------------------------------
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::money
 		
 		CLC
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ADC	#1
-		STA	($FB), Y
+		STA	($8B), Y
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ADC	#0
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		LDA	game + GAME::dirty
 		ORA	#GAME_DRT_STAT
@@ -16013,22 +15787,16 @@ gameIncMoney1:
 ;-------------------------------------------------------------------------------
 gameDecMoney10:
 ;-------------------------------------------------------------------------------
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::money
 		
 		SEC
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	#10
-		STA	($FB), Y
+		STA	($8B), Y
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	#0
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		LDA	game + GAME::dirty
 		ORA	#GAME_DRT_STAT
@@ -16039,22 +15807,16 @@ gameDecMoney10:
 ;-------------------------------------------------------------------------------
 gameIncMoney10:
 ;-------------------------------------------------------------------------------
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::money
 		
 		CLC
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ADC	#10
-		STA	($FB), Y
+		STA	($8B), Y
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ADC	#0
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		LDA	game + GAME::dirty
 		ORA	#GAME_DRT_STAT
@@ -16065,12 +15827,6 @@ gameIncMoney10:
 ;-------------------------------------------------------------------------------
 gameDecMoney100:
 ;-------------------------------------------------------------------------------
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDA	#<100
 		STA	game + GAME::varD
 		LDA	#>100
@@ -16091,12 +15847,6 @@ gameDecMoney100:
 ;-------------------------------------------------------------------------------
 gameIncMoney100:
 ;-------------------------------------------------------------------------------
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDA	#100
 		STA	game + GAME::varD
 		LDA	#$00
@@ -16170,15 +15920,8 @@ gameRollDice:
 		JMP	@buzz
 
 @test0:
-		LDX	game + GAME::pActive
-		
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
 		LDY	#PLAYER::money + 1
-		LDA	($FB), Y
+		LDA	($8B), Y
 		BPL	@test1
 		
 		JMP	@buzz
@@ -16204,7 +15947,7 @@ gameRollDice:
 		
 	.if	DEBUG_CPUCCCC
 		LDY	#PLAYER::status
-		LDA	($FB), Y
+		LDA	($8B), Y
 		AND	#$80
 		BNE	@cont_cccc
 		
@@ -16217,7 +15960,7 @@ gameRollDice:
 		STA	game + GAME::dieRld
 
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptRolled
 ;		JSR	prmptClear2
@@ -16260,7 +16003,7 @@ gameRollDice:
 		JSR	SNDBASE + 0	
 
 		LDY	#PLAYER::status		;they don't move if in gaol
-		LDA	($FB), Y
+		LDA	($8B), Y
 		AND	#$80
 		BEQ	@cont
 		
@@ -16280,18 +16023,18 @@ gameRollDice:
 		
 @test:
 		LDY	#PLAYER::nGRls
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		INX
 		TXA
-		STA	($FB), Y
+		STA	($8B), Y
 		CMP	#$03
 		BNE	@exit
 
 		LDY	#PLAYER::status		;must post bail
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ORA	#$20
-		STA	($FB), Y
+		STA	($8B), Y
 
 		JMP	@exit
 		
@@ -16316,7 +16059,7 @@ gameRollDice:
 		
 @move:
 		LDY	#PLAYER::square
-		LDA	($FB), Y
+		LDA	($8B), Y
 
 		PHA
 		
@@ -16429,11 +16172,6 @@ gameStartAuction:
 		STA	game + GAME::fAPass	;All active players in auction
 		STA	game + GAME::fAForf
 
-;		LDA	game + GAME::gMode	;Back up current mode
-;		STA	game + GAME::gMdActn
-;		LDA	game + GAME::pActive	;Back up current player
-;		STA	game + GAME::pRecall
-		
 		JSR	gamePushState
 		
 		LDA	#GAME_MDE_AUCN		;Go to auction mode
@@ -17310,17 +17048,11 @@ dialogDlgWaitFor0Keys:
 
 
 dialogDlgWaitFor0Draw:
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::name + $08
 		
 		LDX	#$07
 @loop:
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ORA	#$80
 		STA	strText0WaitFor0 + 1, X
 		DEY
@@ -17650,17 +17382,11 @@ dialogDlgGameOver0Keys:
 		RTS
 		
 dialogDlgGameOver0Draw:
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::name + $08
 		
 		LDX	#$07
 @loop:
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ORA	#$80
 		STA	strText0GameOver0 + 1, X
 		DEY
@@ -23236,14 +22962,8 @@ rulesCalcQForSquare:
 ;-------------------------------------------------------------------------------
 rulesFocusOnActive:
 ;-------------------------------------------------------------------------------
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::square
-		LDA	($FB), Y
+		LDA	($8B), Y
 		
 rulesFocusOnSquare:
 		LDX	#$00
@@ -23363,12 +23083,6 @@ rulesMoveToSquare:
 		STX	game + GAME::varK	;if passed go
 		STY	game + GAME::varG	;if we do something special
 
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::square
 
 		LDA	game + GAME::varK
@@ -23380,18 +23094,18 @@ rulesMoveToSquare:
 		BEQ	@cont
 		
 		LDA	#$00			;"Pass" Go
-		STA	($FB), Y
+		STA	($8B), Y
 		JSR	rulesLandOnSquare
 
 @cont:
 		LDA	game + GAME::varJ
 		LDY	#PLAYER::square
-		STA	($FB), Y
+		STA	($8B), Y
 		JSR	rulesLandOnSquare
 		
 		LDY	#PLAYER::dirty
 		LDA	#$01
-		STA	($FB), Y
+		STA	($8B), Y
 				
 		JSR	rulesFocusOnActive
 		RTS
@@ -23400,14 +23114,8 @@ rulesMoveToSquare:
 ;-------------------------------------------------------------------------------
 rulesLandOnSquare:
 ;-------------------------------------------------------------------------------
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::square		;***fixme change this so its 
-		LDA	($FB), Y		;passed  in and stored instead?
+		LDA	($8B), Y		;passed  in and stored instead?
 		STA	game + GAME::varA	;square
 		
 		ASL
@@ -23487,18 +23195,18 @@ rulesLandOnSquare:
 rulesAddCash:
 ;-------------------------------------------------------------------------------
 		LDY	#PLAYER::money + 1	;Remember high byte of curr cash
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		
 		DEY				;Calculate new cash value
 		CLC
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ADC	game + GAME::varD	;From value passed in D, E
-		STA	($FB), Y
+		STA	($8B), Y
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ADC	game + GAME::varE
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		TXA				;Was the value positive initially?
 		BPL	@tstcap	
@@ -23506,14 +23214,14 @@ rulesAddCash:
 		JMP	@procdebts		;No - process debts from pool
 		
 @tstcap:
-		LDA	($FB), Y		;Yes - is the value still positive?
+		LDA	($8B), Y		;Yes - is the value still positive?
 		BPL	@procdebts
 		
 		LDA	#$7F			;No - Cap the value at max
-		STA	($FB), Y
+		STA	($8B), Y
 		DEY
 		LDA	#$FF
-		STA	($FB), Y
+		STA	($8B), Y
 		
 @procdebts:
 		LDA	game + GAME::varD	;Put total cash added in pool M, N
@@ -23531,10 +23239,10 @@ rulesAddCash:
 		STA	$AE
 		
 		CLC				;Get base ptr for accs 
-		LDA	$FB			;Do this outside loop?
+		LDA	$8B			;Do this outside loop?
 		ADC	#<PLAYER::mDAcc0
 		STA	$AB
-		LDA	$FC
+		LDA	$8C
 		ADC	#>PLAYER::mDAcc0
 		STA	$AC		
 
@@ -23638,10 +23346,10 @@ rulesAddCash:
 		LDX	game + GAME::pActive
 
 		CLC				;Get base ptr for accs
-		LDA	$FB
+		LDA	$8B
 		ADC	#<PLAYER::mDAcc0
 		STA	$AB
-		LDA	$FC
+		LDA	$8C
 		ADC	#>PLAYER::mDAcc0
 		STA	$AC		
 
@@ -23785,13 +23493,13 @@ rulesAddCash:
 
 @done0:
 		LDY	#PLAYER::money + 1	;See if the player is still 
-		LDA	($FB), Y		;in debt
+		LDA	($8B), Y		;in debt
 		BMI	@done1
 	
 		LDY	#PLAYER::status		;No - unset debt flag
-		LDA	($FB), Y
+		LDA	($8B), Y
 		AND	#$F7	
-		STA	($FB), Y
+		STA	($8B), Y
 		
 @done1:		
 		LDA	game + GAME::dirty
@@ -23807,13 +23515,13 @@ rulesAddEquity:
 		LDY	#PLAYER::equity
 		
 		CLC
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ADC	game + GAME::varD
-		STA	($FB), Y
+		STA	($8B), Y
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ADC	game + GAME::varE
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		RTS
 
@@ -23873,13 +23581,13 @@ rulesDoSubCash:
 		LDY	#PLAYER::money
 		
 		SEC
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	game + GAME::varM
-		STA	($FB), Y
+		STA	($8B), Y
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	game + GAME::varN
-		STA	($FB), Y
+		STA	($8B), Y
 
 		RTS
 
@@ -23888,9 +23596,9 @@ rulesDoSubCash:
 rulesDoOweAcc:
 ;-------------------------------------------------------------------------------
 		LDY	#PLAYER::status
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ORA	#$08
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		LDA	#<SFXBELL
 		LDY	#>SFXBELL
@@ -23902,10 +23610,10 @@ rulesDoOweAcc:
 		TAY
 		
 		CLC
-		LDA	$FB
+		LDA	$8B
 		ADC	#<PLAYER::mDAcc0
 		STA	$AB
-		LDA	$FC
+		LDA	$8C
 		ADC	#>PLAYER::mDAcc0
 		STA	$AC
 		
@@ -23926,27 +23634,27 @@ rulesDoCheckPayDebt:
 ;-------------------------------------------------------------------------------
 		LDY	#PLAYER::money
 
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	game + GAME::varO
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	game + GAME::varP
 		
 		LDY	#PLAYER::equity
 
 		CLC
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ADC	game + GAME::varO
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ADC	game + GAME::varP
 
 		BPL	@exit
 	
 		LDY	#PLAYER::status
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ORA	#$02
-		STA	($FB), Y
+		STA	($8B), Y
 
 @exit:
 		RTS
@@ -23960,11 +23668,11 @@ rulesSubCash:
 		LDY	#PLAYER::money
 
 		SEC
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	game + GAME::varD
 		STA	game + GAME::varM
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	game + GAME::varE
 		STA	game + GAME::varN
 		
@@ -24022,13 +23730,13 @@ rulesSubEquity:
 		LDY	#PLAYER::equity
 		
 		SEC
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	game + GAME::varD
-		STA	($FB), Y
+		STA	($8B), Y
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	game + GAME::varE
-		STA	($FB), Y
+		STA	($8B), Y
 
 		RTS
 
@@ -24039,7 +23747,7 @@ rulesPayRent:
 		PHA
 		
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptRent
 		
@@ -24075,25 +23783,25 @@ rulesPayRent:
 rulesGoGaol:
 ;-------------------------------------------------------------------------------
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptGoneGaol
 		
 		LDY	#PLAYER::square
 		LDA	#$0A
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		LDY	#PLAYER::status
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ORA	#$C0			;in and gone to
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		LDA	#musTuneGaol
 		JSR	SNDBASE + 0
 		
 		LDY	#PLAYER::dirty
 		LDA	#$01
-		STA	($FB), Y
+		STA	($8B), Y
 
 		LDA	#$01			;prevent further movement 
 		STA	game + GAME::dieRld
@@ -24122,7 +23830,7 @@ rulesLandCrnr:
 		JSR	rulesAddCash
 
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptSalary
 
@@ -24152,7 +23860,7 @@ rulesLandCrnr:
 		STA	game + GAME::mFPTax + 1
 		
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptFParking
 
@@ -24459,12 +24167,6 @@ rulesCCCrdProcDummy:				;none
 
 
 rulesCCCrdProcInc:				;get cash
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
 		LDA	dialogCCCCardTemp0 + 1
 		STA	game + GAME::varD
 		LDA	#$00
@@ -24473,7 +24175,7 @@ rulesCCCrdProcInc:				;get cash
 		JSR	rulesAddCash
 		
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		LDA	dialogCCCCardTemp9
 		CMP	#$00
@@ -24497,20 +24199,14 @@ rulesCCCrdProcInc:				;get cash
 
 
 rulesCCCrdProcAdv:				;adv to
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptClearOrRoll
 		JSR	prmptClear2
 		
 		LDY	#PLAYER::square
-		LDA	($FB), Y
+		LDA	($8B), Y
 
 		LDX	dialogCCCCardTemp0 + 1
 		
@@ -24540,14 +24236,6 @@ rulesCCCrdProcAdv:				;adv to
 		
 
 rulesCCCrdProcRep:				;street/gen repairs
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
-
-
 						;    3: Hotel flag
 						;  0-2: Houses count
 		LDX	#$00
@@ -24646,7 +24334,7 @@ rulesCCCrdProcRep:				;street/gen repairs
 		JSR	rulesSubCash
 		
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		LDA	dialogCCCCardTemp9
 		CMP	#$00
@@ -24672,11 +24360,6 @@ rulesCCCrdProcRep:				;street/gen repairs
 
 
 rulesCCCrdProcColMPay:
-;		LDA	game + GAME::gMode
-;		STA	game + GAME::gMdMPyI	
-;		LDA	game + GAME::pActive
-;		STA	game + GAME::pMstPyI
-
 		JSR	gamePushState
 
 		LDA	game + GAME::pActive
@@ -24709,16 +24392,14 @@ rulesCCCrdProcCol:				;collect from all players
 @loop:
 		STX	game + GAME::pActive
 
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
+		JSR	gamePlayerChanged
 
+		LDX	game + GAME::pActive
 		CPX	game + GAME::varA
 		BEQ	@next
 		
 		LDY	#PLAYER::status
-		LDA	($FB), Y
+		LDA	($8B), Y
 		AND	#$01
 		BEQ	@next
 		
@@ -24756,10 +24437,7 @@ rulesCCCrdProcCol:				;collect from all players
 		LDX	game + GAME::varA
 		STX	game + GAME::pActive
 		
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
+		JSR	gamePlayerChanged
 		
 		LDA	game + GAME::varO
 		STA	game + GAME::varD
@@ -24767,7 +24445,7 @@ rulesCCCrdProcCol:				;collect from all players
 		STA	game + GAME::varE
 		
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		LDA	dialogCCCCardTemp9
 		CMP	#$00
@@ -24820,15 +24498,10 @@ rulesCCCrdProcCol:				;collect from all players
 @exit1:
 		RTS
 
+
 rulesCCCrdProcGGL:				;go gaol
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptGoneGaol
 		
@@ -24840,12 +24513,6 @@ rulesCCCrdProcGGL:				;go gaol
 		
 
 rulesCCCrdProcPay:				;pay cash
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
 		LDA	dialogCCCCardTemp0 + 1
 		STA	game + GAME::varD
 		LDA	#$00
@@ -24855,7 +24522,7 @@ rulesCCCrdProcPay:				;pay cash
 		JSR	rulesSubCash
 
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		LDA	dialogCCCCardTemp9
 		CMP	#$00
@@ -24899,14 +24566,8 @@ rulesCCCrdProcGGF:				;get out free
 		STA	game + GAME::fGF1Out
 		
 @done:
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptClearOrRoll
 		JSR	prmptClear2
@@ -24926,14 +24587,8 @@ rulesCCCrdProcGGF:				;get out free
 
 
 rulesCCCrdProcAST:				;adv to station pay dbl
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptClearOrRoll
 		JSR	prmptClear2
@@ -24944,7 +24599,7 @@ rulesCCCrdProcAST:				;adv to station pay dbl
 		JSR	SNDBASE + 6
 
 		LDY	#PLAYER::square
-		LDA	($FB), Y
+		LDA	($8B), Y
 
 		CMP	#$05
 		BPL	@test3
@@ -24993,15 +24648,10 @@ rulesCCCrdProcAST:				;adv to station pay dbl
 
 		RTS
 
-rulesCCCrdProcGBk:				;go back spaces
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
 
+rulesCCCrdProcGBk:				;go back spaces
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptClearOrRoll
 		JSR	prmptClear2
@@ -25012,7 +24662,7 @@ rulesCCCrdProcGBk:				;go back spaces
 		JSR	SNDBASE + 6
 		
 		LDY	#PLAYER::square
-		LDA	($FB), Y
+		LDA	($8B), Y
 
 		PHA
 
@@ -25064,15 +24714,7 @@ rulesCCCrdProcBrb:				;pay all players
 		BEQ	@next
 		
 		TXA
-		PHA
-
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
-		PLA
+	
 		PHA
 		TAX
 
@@ -25104,19 +24746,13 @@ rulesCCCrdProcBrb:				;pay all players
 		CPX	game + GAME::pActive
 		BNE	@loop
 		
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
 		LDA	game + GAME::varO
 		STA	game + GAME::varD
 		LDA	game + GAME::varP
 		STA	game + GAME::varE
 
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		LDA	dialogCCCCardTemp9
 		CMP	#$00
@@ -25143,14 +24779,8 @@ rulesCCCrdProcBrb:				;pay all players
 ;-------------------------------------------------------------------------------
 rulesCCCrdProcAUT:				;adv to util pay 10x
 ;-------------------------------------------------------------------------------
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptClearOrRoll
 		JSR	prmptClear2
@@ -25161,7 +24791,7 @@ rulesCCCrdProcAUT:				;adv to util pay 10x
 		JSR	SNDBASE + 6
 		
 		LDY	#PLAYER::square
-		LDA	($FB), Y
+		LDA	($8B), Y
 
 		CMP	#$0C
 		BPL	@test
@@ -25374,7 +25004,7 @@ rulesLandTax:
 		JSR	rulesSubCash
 
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptTax
 
@@ -25484,10 +25114,10 @@ rulesDoPurchDeed:
 
 		SEC
 		LDY	#PLAYER::money
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	game + GAME::varD
 		INY	
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	game + GAME::varE
 		BMI	@skip			;Can afford?
 
@@ -25495,7 +25125,7 @@ rulesDoPurchDeed:
 		JSR	rulesSubCash
 
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptBought
 	
@@ -25524,11 +25154,11 @@ rulesDoPurchDeed:
 		CLC
 		ADC	#PLAYER::oGrp01
 		TAY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		INX
 		TXA
-		STA	($FB), Y
+		STA	($8B), Y
 			
 		CMP	game + GAME::varG
 		BNE	@done
@@ -25774,18 +25404,12 @@ rulesNextImprv:
 		LDA	#$00
 		STA	game + GAME::varE
 		
-		LDY	game + GAME::pActive	;Get player
-		LDA	plrLo, Y
-		STA	$FB
-		LDA	plrHi, Y
-		STA	$FC
-
 		LDY	#PLAYER::money
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SEC
 		SBC	game + GAME::varD
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	game + GAME::varE
 		
 		BPL	@update
@@ -25825,7 +25449,7 @@ rulesNextImprv:
 		JSR	rulesSubCash		;Charge player
 
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptConstruct
 		
@@ -25942,14 +25566,8 @@ rulesPriorImprv:
 		LDA	#$00
 		STA	game + GAME::varE
 		
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptSold
 		
@@ -25983,12 +25601,6 @@ rulesUnmortgageImmed:
 		STA	$FD
 		LDA	rulesGrpHi, X
 		STA	$FE
-		
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
 		
 		LDX	game + GAME::varG
 		
@@ -26048,7 +25660,7 @@ rulesUnmortgageImmed:
 		JSR	rulesSubCash		
 
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptRepay
 		
@@ -26099,12 +25711,6 @@ rulesMortgageFeeImmed:
 		LDA	rulesGrpHi, X
 		STA	$FE
 		
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDX	game + GAME::varG
 		
 		LDA	sqr00, X
@@ -26150,7 +25756,7 @@ rulesMortgageFeeImmed:
 		JSR	rulesSubCash		
 
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptFee
 		
@@ -26248,15 +25854,6 @@ rulesToggleMrtg:
 		JMP	@buzz
 		
 @cont1:
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
-;		LDY	#PLAYER::square
-;		LDA	($FB), Y
-
 		LDA	game + GAME::sSelect
 		CMP	#$FF
 		BNE	@test
@@ -26344,7 +25941,7 @@ rulesToggleMrtg:
 		JSR	rulesSubCash		
 
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptRepay
 		
@@ -26382,7 +25979,7 @@ rulesToggleMrtg:
 		JSR	SNDBASE + 6
 		
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptMortgage
 		
@@ -26424,11 +26021,11 @@ rulesDoXferDeed:
 		CLC
 		ADC	#PLAYER::oGrp01
 		TAY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		INX
 		TXA
-		STA	($FB), Y
+		STA	($8B), Y
 
 		CMP	game + GAME::varG
 		BNE	@unset
@@ -26474,10 +26071,10 @@ rulesDoXferDeed:
 		PLA
 		TAX
 
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
+		STX	game + GAME::varX
+		STX	game + GAME::pActive
+		
+		JSR	gamePlayerChanged
 
 		LDX	game + GAME::varB
 		DEX
@@ -26485,13 +26082,18 @@ rulesDoXferDeed:
 		CLC
 		ADC	#PLAYER::oGrp01
 		TAY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		DEX
 		TXA
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		JSR	rulesSubEquity
+		
+		LDX	game + GAME::varX
+		STX	game + GAME::pActive
+		
+		JSR	gamePlayerChanged
 		
 @exit:
 
@@ -26503,13 +26105,6 @@ rulesDoXferDeed:
 rulesTradeTitleDeed:
 ;-------------------------------------------------------------------------------
 		STX	game + GAME::varA	;square
-		
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDA	game + GAME::varA
 
 		ASL
@@ -26545,15 +26140,8 @@ rulesTradeTitleDeed:
 		LDX	game + GAME::varF
 		JSR	rulesDoXferDeed
 
-;***FIXME:	Need to fetch this back
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
 		LDY	#PLAYER::colour
-		LDA	($FB), Y
+		LDA	($8B), Y
 		TAX
 		JSR	prmptAcquired
 		
@@ -26572,12 +26160,6 @@ rulesBuyTitleDeed:
 		TXA
 		PHA
 
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDA	#$01			;Do we also get the square or 
 		CMP	game + GAME::varH	;use the one passed in?
 		BNE	@getsqr
@@ -26588,7 +26170,7 @@ rulesBuyTitleDeed:
 @getsqr:
 		PLA				;Use the one the player is on
 		LDY	#PLAYER::square
-		LDA	($FB), Y
+		LDA	($8B), Y
 		
 @havesqr:		
 		STA	game + GAME::varA	;square
@@ -26628,9 +26210,9 @@ rulesBuyTitleDeed:
 ;-------------------------------------------------------------------------------
 rulesDoPlayerElimin:		
 ;-------------------------------------------------------------------------------
-		LDA	($FB), Y		;Set player not alive
+		LDA	($8B), Y		;Set player not alive
 		AND	#$FC
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		DEC	game + GAME::pCount	;Decrement player count
 		LDA	game + GAME::pCount
@@ -26642,10 +26224,10 @@ rulesDoPlayerElimin:
 
 @begin:
 		LDY	#PLAYER::equity		;Payout whatever we can
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	game + GAME::varD
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	game + GAME::varE
 		
 		LDA	game + GAME::pActive	;Find who we lost to
@@ -26657,11 +26239,11 @@ rulesDoPlayerElimin:
 		JMP	@next0
 		
 @loop0:
-		LDA	($FB), Y
+		LDA	($8B), Y
 		BNE	@lostplyr
 		
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		BNE	@lostplyr
 
 		INY
@@ -26696,23 +26278,15 @@ rulesDoPlayerElimin:
 		PLA
 		STA	game + GAME::pActive
 
-		TAY
-		LDA	plrLo, Y
-		STA	$FB
-		LDA	plrHi, Y
-		STA	$FC
+		JSR	gamePlayerChanged
 
 		JSR	rulesAddCash
 
 		LDX	game + GAME::pActive
 		LDA	game + GAME::varU
 		STA	game + GAME::pActive
-		
-		TAY
-		LDA	plrLo, Y
-		STA	$FB
-		LDA	plrHi, Y
-		STA	$FC
+
+		JSR	gamePlayerChanged
 
 @skipcash:
 		JSR	rulesDoPlyrLostPlyr	;Player lost to other player
@@ -26771,11 +26345,6 @@ rulesInitTradeData:
 rulesInitEliminToPlyr:
 ;-------------------------------------------------------------------------------
 		PHA
-;		LDX	game + GAME::pActive
-;		STX	game + GAME::pElimin
-;		LDX	game + GAME::gMode
-;		STX	game + GAME::gMdElim
-		
 		JSR	gamePushState
 		
 		LDA	game + GAME::pActive
@@ -26783,7 +26352,9 @@ rulesInitEliminToPlyr:
 		
 		PLA
 		STA	game + GAME::pActive
-		
+
+		JSR	gamePlayerChanged
+
 		JSR	menuElimin0RemWlthRecalc
 		
 		LDA	#$00
@@ -26822,7 +26393,6 @@ rulesInitEliminToPlyr:
 rulesInitEliminToBank:
 ;-------------------------------------------------------------------------------
 		LDX	game + GAME::pActive
-;		STX	game + GAME::pElimin
 		STX	game + GAME::varA
 
 		JSR	menuElimin0RemWlthRecalc
@@ -26832,9 +26402,6 @@ rulesInitEliminToBank:
 		STA	trade1, X
 		LDA	game + GAME::pActive
 		STA	trade0, X
-
-;		LDA	game + GAME::pElimin
-;		STA	game + GAME::pActive
 
 		JSR	gamePushState
 
@@ -26972,9 +26539,9 @@ rulesDoNextPlyr:
 		JSR	prmptClear
 
 		LDY	#PLAYER::status		;switch off gone to gaol
-		LDA	($FB), Y
+		LDA	($8B), Y
 		AND	#$BF
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		LDA	#$00
 		STA	game + GAME::nDbls
@@ -27010,7 +26577,9 @@ rulesDoNextPlyr:
 
 @exit:
 		STX	game + GAME::pActive
-		
+	
+		JSR	gamePlayerChanged
+
 		RTS
 
 
@@ -27037,15 +26606,9 @@ rulesNextTurn:
 		RTS
 
 @normal:
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::status
 		
-		LDA	($FB), Y
+		LDA	($8B), Y
 		AND	#$02
 		BEQ	@tstdice
 		
@@ -27061,7 +26624,7 @@ rulesNextTurn:
 		
 @begin:
 		LDY	#PLAYER::money + 1
-		LDA	($FB), Y
+		LDA	($8B), Y
 		BPL	@cont0
 		
 		RTS
@@ -27723,21 +27286,15 @@ rulesAutoRecover:
 
 
 rulesAutoPay:
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::money + 1
-		LDA	($FB), Y
+		LDA	($8B), Y
 		BPL	@incomplete
 		
 		DEY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	game + GAME::varD
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	game + GAME::varE
 		
 		SEC
@@ -27749,6 +27306,7 @@ rulesAutoPay:
 		
 		TAY
 		LDA	game + GAME::varD
+		LDX	game + GAME::pActive
 		
 		JSR	rulesAutoRecover
 		BEQ	@incomplete
@@ -27892,17 +27450,11 @@ rulesAutoBuy:
 		STA	game + GAME::varN
 	
 ;	Get cash for player
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-	
 		LDY	#PLAYER::money
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	game + GAME::varS
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	game + GAME::varT
 		
 ;	Can afford to snap up?  299 < cash - cost
@@ -27932,11 +27484,11 @@ rulesAutoBuy:
 ;	Have wealth at all?
 		LDY	#PLAYER::equity
 		CLC
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ADC	game + GAME::varS
 		STA	game + GAME::varV
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		ADC	game + GAME::varT
 		STA	game + GAME::varW
 		LDA	#$00
@@ -28968,10 +28520,10 @@ rulesAutoImprove:
 		LDX	game + GAME::pActive
 		STX	game + GAME::varK		;varK = player
 
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
+;		LDA	plrLo, X
+;		STA	$FB
+;		LDA	plrHi, X
+;		STA	$FC
 
 		JSR	rulesDoCopyImprv
 
@@ -28981,11 +28533,11 @@ rulesAutoImprove:
 ;	Subtract value from money store as value
 		LDY	#PLAYER::money
 		SEC
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	game + GAME::varD
 		STA	game + GAME::varD
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	game + GAME::varE
 		STA	game + GAME::varE
 		
@@ -29173,17 +28725,11 @@ rulesAutoGaol:
 		LDY	#$02
 		JSR	rulesDoNudgeValue
 		
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-	
 		LDY	#PLAYER::money
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	game + GAME::varO
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		STA	game + GAME::varP
 		
 ;		D, E < (O, P) -> CLC | SEC
@@ -29203,7 +28749,7 @@ rulesAutoGaol:
 
 		LDY	#PLAYER::fCPUHvI
 		LDA	#$00
-		STA	($FB), Y
+		STA	($8B), Y
 
 		LDA	#UI_ACT_ROLL
 		STA	$68
@@ -29215,11 +28761,11 @@ rulesAutoGaol:
 		
 @tstimprove:
 		LDY	#PLAYER::fCPUHvI
-		LDA	($FB), Y
+		LDA	($8B), Y
 		BNE	@next
 		
 		LDA	#$01
-		STA	($FB), Y
+		STA	($8B), Y
 
 		JSR	rulesAutoImprove
 		BNE	@complete
@@ -29550,10 +29096,10 @@ rulesAutoAuction:
 		LDX	game + GAME::pActive
 		STX	game + GAME::varK		;varK = player
 
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
+;		LDA	plrLo, X
+;		STA	$FB
+;		LDA	plrHi, X
+;		STA	$FC
 
 		JSR	rulesDoCopyImprv
 
@@ -29563,11 +29109,11 @@ rulesAutoAuction:
 ;	Subtract value from money store as value
 		LDY	#PLAYER::money
 		SEC
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	game + GAME::varD
 		STA	game + GAME::varD
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	game + GAME::varE
 		STA	game + GAME::varE
 		
@@ -30451,7 +29997,7 @@ rulesTestLoseGroup:
 		TAY
 
 ;	If own group::count, yes
-		LDA	($FB), Y
+		LDA	($8B), Y
 		CMP	game + GAME::varH
 		BEQ	@arelosing
 
@@ -30741,23 +30287,17 @@ rulesTrdApprvTstRepay:
 
 
 rulesTradeApprvRepay:
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 ;	Find base rent value needed
 		JSR	rulesSuggestBaseReserve
 		
 ;	Subtract value from money store as value
 		LDY	#PLAYER::money
 		SEC
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	game + GAME::varD
 		STA	game + GAME::varO
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	game + GAME::varE
 		STA	game + GAME::varP
 		
@@ -31020,12 +30560,6 @@ rulesAutoTradeApprove:
 
 
 rulesAutoPlay:
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		JSR	rulesAutoPay
 		BNE	@complete
 
@@ -31034,7 +30568,7 @@ rulesAutoPlay:
 
 		LDY	#PLAYER::fCPUHvI
 		LDA	#$00
-		STA	($FB), Y
+		STA	($8B), Y
 
 ;		LDA	game + GAME::dieDbl
 ;		BEQ	@doroll
@@ -31058,11 +30592,11 @@ rulesAutoPlay:
 
 @tstimprove:
 		LDY	#PLAYER::fCPUHvI
-		LDA	($FB), Y
+		LDA	($8B), Y
 		BNE	@incomplete
 		
 		LDA	#$01
-		STA	($FB), Y
+		STA	($8B), Y
 
 		JSR	rulesAutoImprove
 		BNE	@complete
@@ -31070,15 +30604,9 @@ rulesAutoPlay:
 		JSR	rulesAutoTradeInitiate
 		BEQ	@incomplete
 		
-		LDX	game + GAME::pActive	;**FIXME:  *ugh*
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
 		LDY	#PLAYER::fCPUHvI
 		LDA	#$00
-		STA	($FB), Y
+		STA	($8B), Y
 		
 		JMP	@complete
 
@@ -31282,12 +30810,6 @@ rulesAutoEliminSelect:
 rulesAutoEliminate:
 		STX	game + GAME::varK		;varK = player
 
-		LDX	game + GAME::pActive
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-
 		JSR	rulesDoCopyImprv
 
 ;	Find base rent value needed
@@ -31300,11 +30822,11 @@ rulesAutoEliminate:
 ;	Subtract value from money store as value
 		LDY	#PLAYER::money
 		SEC
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	game + GAME::varD
 		STA	game + GAME::varD
 		INY
-		LDA	($FB), Y
+		LDA	($8B), Y
 		SBC	game + GAME::varE
 		STA	game + GAME::varE
 		
@@ -32261,6 +31783,8 @@ initNew:
 		STA	game + GAME::fFPTax
 		STA	game + GAME::mFPTax
 		STA	game + GAME::mFPTax + 1
+		
+		JSR	gamePlayerChanged
 		
 		LDA	#$FF
 		STA	game + GAME::sSelect

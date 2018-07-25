@@ -24,6 +24,7 @@ this.  *\*ugh\**
 
 ## TODO
 
+* AutoEliminate seems a little naff in the way it electing to pass on deeds.
 * AutoAuction should commit equity like AutoBuy does and not bail so early (push 
   value upwards if its less than what they and other players currently have -- calc 
   minimum as well as max and cover when required with AutoRecover).
@@ -70,7 +71,7 @@ this.  *\*ugh\**
 * The board displaying is not that great (fix all that INC varH).
 * The trdsel0 dialog currently uses some 3KB of memory on top of the overview 
   dialog's nearly 1.5KB.  This is massive.  It should be optimised somehow.
-* Zero page utilisation (get rid of all those reloads for current player!  IRQ!)
+* Zero page utilisation (IRQ!)
 
 
 ## For Testing (Needs Confirmation):
@@ -104,6 +105,12 @@ this.  *\*ugh\**
 ### Since Version 0.02.56B
 
 * 25JUL2018
+	* Fix action context end issue causing an overflow of the action queue.
+	* Remove all extraneous loading of active player pointers saving almost 1KB!
+	* Convert all use of active player fetching/stashing to specific ZP.
+	* Allocate specific zero page locations for active player pointer and 
+	  update when changed.
+	* Fix copy-paste bugs enabling/disabling trade buttons.
 	* Change dialog delay in demo version.
 	* Clear prompts when leaving setup1 menu.
 	* Fix selection and not board update regression.
