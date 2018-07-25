@@ -120,7 +120,7 @@
 	.define	DEBUG_GSTATE	1
 	.define	DEBUG_ACTIONS	1
 	
-	.define DEBUG_DEMO	1
+	.define DEBUG_DEMO	0
 	
 	.define	LIST_GLBINF	0
 
