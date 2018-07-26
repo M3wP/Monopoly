@@ -24,9 +24,9 @@ strDesc3Titles0:	;ECCLESTIAL
 strDesc4Titles0:	;SOLUTIONS
 			.byte $09, $93, $8F, $8C, $95, $94, $89, $8F
 			.byte $8E, $93	
-strDesc8Titles0:	;VERSION 0.02.56B
+strDesc8Titles0:	;VERSION 0.02.68B
 			.byte $10, $96, $85, $92, $93, $89, $8F, $8E
-			.byte $A0, $B0, $AE, $B0, $B2, $AE, $B5, $B6
+			.byte $A0, $B0, $AE, $B0, $B2, $AE, $B6, $B8
 			.byte $82			
 strDesc5Titles0:	;(C) 1935, 2016
 			.byte $0E, $A8, $83, $A9, $A0, $B1, $B9, $B3
@@ -502,18 +502,6 @@ strText2Trade5:		;PAY FEES FOR.
 			.byte $0D, $90, $81, $99, $A0, $86, $85, $85
 			.byte $93, $A0, $86, $8F, $92, $AE
 			
-			
-strHeaderTrade6:	;GAME UPDATING
-			.byte $0D, $87, $81, $8D, $85, $A0, $95, $90
-			.byte $84, $81, $94, $89, $8E, $87
-
-strText0Trade6:		;YOU MAY FINISH
-			.byte $0E, $99, $8F, $95, $A0, $8D, $81, $99
-			.byte $A0, $86, $89, $8E, $89, $93, $88
-strText1Trade6:		;IMMEDIATELY.
-			.byte $0C, $89, $8D, $8D, $85, $84, $89, $81
-			.byte $94, $85, $8C, $99, $AE
-
 
 strHeaderTrade7:	;TRADE PLAYER
 			.byte $0C, $94, $92, $81, $84, $85, $A0, $90
@@ -586,6 +574,18 @@ strText1Jump0:		;THE DESTINATION
 			.byte $94, $89, $8E, $81, $94, $89, $8F, $8E
 
 
+strHeaderJump1:		;GAME UPDATING
+			.byte $0D, $87, $81, $8D, $85, $A0, $95, $90
+			.byte $84, $81, $94, $89, $8E, $87
+
+strText0Jump1:		;YOU MAY FINISH
+			.byte $0E, $99, $8F, $95, $A0, $8D, $81, $99
+			.byte $A0, $86, $89, $8E, $89, $93, $88
+strText1Jump1:		;IMMEDIATELY.
+			.byte $0C, $89, $8D, $8D, $85, $84, $89, $81
+			.byte $94, $85, $8C, $99, $AE
+			
+			
 strText0PStats0:	;MONEY......$
 			.byte $0C, $8D, $8F, $8E, $85, $99, $AE, $AE
 			.byte $AE, $AE, $AE, $AE, $A4

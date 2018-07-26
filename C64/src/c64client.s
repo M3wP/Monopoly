@@ -3186,10 +3186,14 @@ screenFillRowVExit:
 ;
 ;==============================================================================
 
-;irqglob:	.tag	IRQGLOBS
+
 irqBlinkSeq0:
 		.byte	$00, $00, $0C, $0C, $0F, $0F, $01, $01, $0F, $0F, $0C, $0C
 
+
+plyrIRQHandler:
+		.word	$0000
+		
 
 ;-------------------------------------------------------------------------------
 ;Input driver variables
@@ -3289,8 +3293,14 @@ installPlyr:
 ;		the mouse from tearing.  Need to change IRQ handler, too.  Don't
 ;		want it too high to allow for as much time in lowest IRQ phase 
 ;		as possible.  Some experimentation may be required.
-		LDA	#$32			;Initial raster interrupt pos
+;		LDA	#$32			;Initial raster interrupt pos
+		LDA	#$19
 		STA	vicRstrVal
+		
+		LDA	#<plyrIRQSystem
+		STA	plyrIRQHandler
+		LDA	#>plyrIRQSystem
+		STA	plyrIRQHandler + 1
 		
 		LDA	#$01			;Enable raster irqs
 		STA	vicIRQMask
@@ -3311,11 +3321,6 @@ plyrNOP:
 ;-------------------------------------------------------------------------------
 plyrIRQ:
 ;-------------------------------------------------------------------------------
-;***TODO:	Should use self-patching in IRQ routine.  Use RAM!
-;***FIXME:	Perhaps way it does so much testing is reason for occassional 
-;		failure?
-;***FIXME:	Don't do last interrupt?  Process its code after the middle?
-
 		PHP				;save the initial state
 		PHA
 		TXA				
@@ -3340,9 +3345,9 @@ plyrIRQ:
 ;	Is the VIC-II needing service?
 		LDA	vicIRQFlgs
 		AND	#$01
-		BNE	@1
+		BNE	@proc
 		
-;	Some other interrupt source??  Peculiar...  And possibly a problem!  How
+;	Some other interrupt source??  Peculiar...  And a real problem!  How
 ;	do I acknowledge it if its not a BRK when I don't know what it would be?
 @debug_trap0:
 		LDA	#$02
@@ -3350,9 +3355,7 @@ plyrIRQ:
 
 		JMP 	@done
 		
-@1:
-;	Clear the VIC-II interrupt here, instead of later to make sure it always
-;	happens.
+@proc:
 		ASL	vicIRQFlgs
 		
 		LDA	$FB
@@ -3364,11 +3367,47 @@ plyrIRQ:
 		LDA	$FE
 		STA	irqglob + IRQGLOBS::saveD
 		
-		LDA	vicRstrVal
-		
-		CMP	#$D7
-		BCS	@2
+		LDA	#>(@finish - 1)
+		PHA
+		LDA	#<(@finish - 1)
+		PHA
 
+		JMP	(plyrIRQHandler)
+
+@finish:
+	.if	DEBUG_IRQ
+		LDA	#$06
+		STA	vicBrdrClr
+	.endif
+	
+		LDA	irqglob + IRQGLOBS::saveA
+		STA	$FB
+		LDA	irqglob + IRQGLOBS::saveB
+		STA	$FC
+		LDA	irqglob + IRQGLOBS::saveC
+		STA	$FD
+		LDA	irqglob + IRQGLOBS::saveD
+		STA	$FE
+
+	.if	DEBUG_IRQ			;Restore colour
+		LDA  	irqglob + IRQGLOBS::saveE	
+		STA	vicBrdrClr
+	.endif
+
+@done:
+		PLA             
+		TAY             
+		PLA             
+		TAX             
+		PLA             
+		PLP
+
+		RTI
+
+
+;-------------------------------------------------------------------------------
+plyrIRQSystem:
+;-------------------------------------------------------------------------------
 		JSR	plyrCheckStepping	;Do these early.  Should be
 		LDA	ui + UI::fMseEnb	;fairly consistent.
 		BEQ	@tstjoystick
@@ -3449,37 +3488,49 @@ plyrIRQ:
 		STA	game + GAME::lock	;last phase
 							
 		LDA	#$D7
-		STA	irqglob + IRQGLOBS::varA
+		STA	vicRstrVal
 		
-		JMP	@finish
-				
-@2:
+		LDA	#<plyrIRQGame
+		STA	plyrIRQHandler
+		LDA	#>plyrIRQGame
+		STA	plyrIRQHandler + 1
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
+plyrIRQGame:
+;-------------------------------------------------------------------------------
+		LDA	vicRstrVal
 		CMP	#$FA
 		BCC	@miniPrep
 		
 		LDA	#$01			;IRQ becomes busy for a few 
 		STA	game + GAME::lock	;passes...
 		
-		
 ;dengland
 ;***FIXME:	It just becomes a hacked mess from here on.
-
 		
 		LDA	#$21
 		STA	irqglob + IRQGLOBS::varA
+		
 	.if	DEBUG_IRQ
 		LDA	#$01
 	.endif
-		LDY	#$00
+	
+		LDY	#$00			;We're doing pass 2
+		
 		JMP	@begin
 				
 @miniPrep:
 		LDA	#$22
 		STA	irqglob + IRQGLOBS::varA
+		
 	.if	DEBUG_IRQ
 		LDA	#$0A
 	.endif
-		LDY	#$01
+	
+		LDY	#$01			;We're doing pass 1
 		
 @begin:
 	.if	DEBUG_IRQ
@@ -3496,7 +3547,7 @@ plyrIRQ:
 		CPX	#$06
 		BNE	@loop0
 
-		CPY	#$01
+		CPY	#$01			;Check which pass
 		BEQ	@miniMap
  	
 		JSR	plyrDisplay
@@ -3518,11 +3569,17 @@ plyrIRQ:
 		ORA	irqglob + IRQGLOBS::savMX
 		STA	vicSprPosM
 		
-		LDA	#$32
-		STA	irqglob + IRQGLOBS::varA
-
-		JMP	@finish
+;		LDA	#$32
+		LDA	#$19
+		STA	vicRstrVal
 		
+		LDA	#<plyrIRQSystem
+		STA	plyrIRQHandler
+		LDA	#>plyrIRQSystem
+		STA	plyrIRQHandler + 1
+
+		RTS
+
 @miniMap:
 		LDX	#$0B
 @loop2:
@@ -3538,41 +3595,14 @@ plyrIRQ:
 		STA	vicSprPosM
 
 		LDA	#$FA
-		STA	irqglob + IRQGLOBS::varA
-
-@finish:
-	.if	DEBUG_IRQ
-		LDA	#$06
-		STA	vicBrdrClr
-	.endif
-	
-		LDA	irqglob + IRQGLOBS::saveA
-		STA	$FB
-		LDA	irqglob + IRQGLOBS::saveB
-		STA	$FC
-		LDA	irqglob + IRQGLOBS::saveC
-		STA	$FD
-		LDA	irqglob + IRQGLOBS::saveD
-		STA	$FE
-
-		LDA	irqglob + IRQGLOBS::varA
 		STA	vicRstrVal
+		
+		LDA	#<plyrIRQGame
+		STA	plyrIRQHandler
+		LDA	#>plyrIRQGame
+		STA	plyrIRQHandler + 1
 
-	.if	DEBUG_IRQ
-						;Restore colour
-		LDA  	irqglob + IRQGLOBS::saveE	
-		STA	vicBrdrClr
-	.endif
-
-@done:
-		PLA             
-		TAY             
-		PLA             
-		TAX             
-		PLA             
-		PLP
-
-		RTI
+		RTS
 
 
 ;-------------------------------------------------------------------------------
@@ -7963,18 +7993,29 @@ menuPageTrade1:
 		.byte	$01
 		.word	cpuPerformTrade
 		
-;***TODO:	Rename this menu to jump1
 menuPageTrade6:
 		.word	menuPageTrade6Keys
 		.word	menuPageTrade6Draw
 		.byte	$01
-		.word	cpuPerformIdle
+		.word	cpuPerformFault
+		
+menuPageTrade8:
+		.word	menuPageTrade8Keys
+		.word	menuPageTrade8Draw
+		.byte	$01
+		.word	cpuPerformFault
 		
 menuPageElimin0:
 		.word	menuPageElimin0Keys
 		.word	menuPageElimin0Draw
 		.byte	$01
 		.word	cpuPerformElimin
+		
+menuPageElimin1:
+		.word	menuPageElimin1Keys
+		.word	menuPageElimin1Draw
+		.byte	$01
+		.word	cpuPerformFault
 		
 menuPagePlyrSel0:
 		.word	menuPagePlyrSel0Keys
@@ -8078,6 +8119,12 @@ menuPageJump0:
 		.byte	$01
 		.word	cpuPerformIdle
 
+menuPageJump1:
+		.word	menuPageJump1Keys
+		.word	menuPageJump1Draw
+		.byte	$01
+		.word	cpuPerformIdle
+		
 menuPageQuit0:
 		.word	menuPageQuit0Keys
 		.word	menuPageQuit0Draw
@@ -9675,7 +9722,7 @@ menuPagePlay0DefKeys:
 
 		LDA	game + GAME::gMode
 		CMP	#GAME_MDE_MSTP
-		BMI	@tstFunds
+		BCC	@tstFunds
 		
 		JMP	@keysBuzz
 		
@@ -9702,8 +9749,8 @@ menuPagePlay0DefKeys:
 		BNE	@keysExit
 		
 		LDA	game + GAME::gMode
-		CMP	#GAME_MDE_MSTP
-		BPL	@keysExit
+		CMP	#GAME_MDE_OVER
+		BCS	@keysExit
 		
 		LDA	#<gameInitiatePStats
 		STA	menuPlyrSelCallProc
@@ -11040,10 +11087,6 @@ menuPageGaol2Keys:
 		LDX	#$07
 		JSR	SNDBASE + 6
 		
-;		LDA	game + GAME::dirty
-;		ORA	#$01
-;		STA	game + GAME::dirty
-
 		RTS
 		
 @keysOther:
@@ -11646,6 +11689,8 @@ menuTrade0Recalc:
 menuWindowTrade0:
 			.byte	$90, $01, $07
 			.word	     	strHeaderTrade0
+			.byte	$90, $0C, $08
+			.word        	strDescGaol1
 
 			.byte	$A1, $0A, $01, $12, $50, $02, $0A
 			.word	     	strOptn0Trade0
@@ -11657,16 +11702,16 @@ menuWindowTradeWB:
 menuWindowTradeCB:
 			.byte	$A1, $10, $01, $12, $43, $02, $10
 			.word	     	strOptn3Trade0
-			.byte	$A1, $12, $01, $12, $4D, $02, $12
-			.word		strOptn2Play0
-			.byte	$A1, $14, $01, $12, $58, $02, $14
+			.byte	$A1, $12, $01, $12, $58, $02, $12
 			.word	     	strOptn4Trade0
+			.byte	$A1, $14, $01, $12, $2E, $02, $14
+			.word		strOptn2Gaol1
 
 			.byte	$00
-			
+		
 
 ;-------------------------------------------------------------------------------
-menuPageTrade0Keys:
+menuPageTrade0DefKeys:
 ;-------------------------------------------------------------------------------
 		CMP	#'M'
 		BNE	@keysP
@@ -11745,7 +11790,7 @@ menuPageTrade0Keys:
 		
 @keysC:
 		CMP	#'C'
-		BNE	@keysExit
+		BNE	@keysOther
 		
 		JSR	gameInitTrdIntrpt
 		
@@ -11755,8 +11800,32 @@ menuPageTrade0Keys:
 		LDX	#$07
 		JSR	SNDBASE + 6
 		
-@keysExit:
 		RTS
+		
+@keysOther:
+		JMP	menuPageTrade6DefKeys
+
+
+;-------------------------------------------------------------------------------
+menuPageTrade0Keys:
+;-------------------------------------------------------------------------------
+		CMP	#'.'
+		BNE	@keysOther
+		
+		LDA	#<menuPageTrade6
+		LDY	#>menuPageTrade6
+		
+		JSR	menuSetPage		
+		
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
+		RTS
+		
+@keysOther:
+		JMP	menuPageTrade0DefKeys
 		
 
 ;-------------------------------------------------------------------------------
@@ -12056,6 +12125,8 @@ menuTrade1Recalc:
 menuWindowTrade1:
 			.byte	$90, $01, $07
 			.word	     strHeaderTrade1
+			.byte	$90, $0C, $08
+			.word        	strDescGaol1
 
 			.byte	$A1, $0A, $01, $12, $50, $02, $0A
 			.word	     strOptn0Trade0
@@ -12065,14 +12136,17 @@ menuWindowTrade1:
 			.word	     strOptn2Trade0
 			.byte	$A1, $10, $01, $12, $43, $02, $10
 			.word	     strOptn3Trade0
-			.byte	$A1, $12, $01, $12, $4D, $02, $12
-			.word		strOptn2Play0
-			.byte	$A1, $14, $01, $12, $58, $02, $14
+			.byte	$A1, $12, $01, $12, $58, $02, $12
 			.word	     strOptn4Trade0
+			.byte	$A1, $14, $01, $12, $2E, $02, $14
+			.word		strOptn2Gaol1
 
 			.byte	$00
-			
-menuPageTrade1Keys:
+
+
+;-------------------------------------------------------------------------------
+menuPageTrade1DefKeys:
+;-------------------------------------------------------------------------------
 		CMP	#'M'
 		BNE	@keysP
 		
@@ -12166,7 +12240,7 @@ menuPageTrade1Keys:
 		
 @keysC:
 		CMP	#'C'
-		BNE	@keysExit
+		BNE	@keysOther
 		
 		JSR	gameApproveTrade
 
@@ -12175,12 +12249,37 @@ menuPageTrade1Keys:
 		LDY	#>SFXDING
 		LDX	#$07
 		JSR	SNDBASE + 6
-		
-@keysExit:
 		RTS
 		
+@keysOther:
+		JMP	menuPageTrade6DefKeys
+
+
+;-------------------------------------------------------------------------------
+menuPageTrade1Keys:
+;-------------------------------------------------------------------------------
+		CMP	#'.'
+		BNE	@keysOther
+		
+		LDA	#<menuPageTrade8
+		LDY	#>menuPageTrade8
+		
+		JSR	menuSetPage		
+		
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
+		RTS
+		
+@keysOther:
+		JMP	menuPageTrade1DefKeys
+		
 	
+;-------------------------------------------------------------------------------
 menuPageTrade1Draw:
+;-------------------------------------------------------------------------------
 		LDA	menuTrade1Recalc
 		BEQ	@disp
 		
@@ -12200,52 +12299,206 @@ menuPageTrade1Draw:
 		RTS
 
 
-menuWindowTrade6:
+menuWindowTrade6:	
 			.byte	$90, $01, $07
-			.word	     	strHeaderTrade6
-
-			.byte	$90, $02, $0A
-			.word		strText0Trade6
-			.byte	$90, $02, $0B
-			.word		strText1Trade6
-
-			.byte	$AF, $0D, $01, $12, $20, $02, $0D
-			.word	     	strDesc7Titles0
-
+menuWindowTrade6Hdr:
+			.word	     	strDummyDummy0
+			.byte	$90, $0C, $08
+			.word        	strDescGaol2
+			.byte	$A1, $0A, $01, $12, $4D, $02, $0A
+			.word	     	strOptn2Play0
+			.byte	$A1, $0C, $01, $12, $56, $02, $0C
+			.word		strOptn4Play0
+			.byte	$A1, $0E, $01, $12, $53, $02, $0E
+			.word		strOptn5Play0
+			.byte	$A1, $14, $01, $12, $2E, $02, $14
+			.word		strOptn2Gaol1
+			
 			.byte	$00
 
 
-menuPageTrade6Keys:
-		LDA	game + GAME::fTrdTyp
-		BEQ	@proc
+;-------------------------------------------------------------------------------
+menuPageTrade6DefKeys:
+;-------------------------------------------------------------------------------
+@keys1:
+		CMP	#keyF1
+		BNE	@keys2
 		
-		LDA	game + GAME::fTrdStg
-		CMP	#$02
-		BEQ	@exit
+		LDA	#$00
+		JMP	@keysTstQuad
+		
+@keys2:
+		CMP	#keyF3
+		BNE	@keys3
+		
+		LDA	#$01
+		JMP	@keysTstQuad
+		
+@keys3:
+		CMP	#keyF5
+		BNE	@keys4
+		
+		LDA	#$02
+		JMP	@keysTstQuad
+		
+@keys4:
+		CMP	#keyF7
+		BNE	@keysV
+		
+		LDA	#$03
+		JMP	@keysTstQuad
+		
+@keysV:
+		CMP	#'V'
+		BNE	@keysS
+		
+		JSR	gameToggleDialog
+		JMP	@keysDing
+		
+@keysS:
+		CMP	#'S'
+		BNE	@keysExit
+		
+		LDA	game + GAME::gMode
+		CMP	#GAME_MDE_OVER
+		BCS	@keysExit
+		
+		LDA	#<gameInitiatePStats
+		STA	menuPlyrSelCallProc
+		LDA	#>gameInitiatePStats
+		STA	menuPlyrSelCallProc + 1
 
-@proc:
+		LDA	#$01
+		STA	menuPlyrSelAllowCur
+		
+		LDA	#<menuPagePlyrSel0
+		LDY	#>menuPagePlyrSel0
+		
+		JSR	menuPushPage
+		
+		LDA	game + GAME::dirty
+		ORA	#GAME_DRT_MENU
+		STA	game + GAME::dirty
+		
+		JMP	@keysDing
+		
+@keysTstQuad:
+		CMP	game + GAME::qVis
+		BEQ	@keysExit
+		
+		STA	game + GAME::qVis
+
+		JSR	gamePlayersDirty
+		
+@keysDirty:
+		LDA	game + GAME::dirty
+		ORA	#GAME_DRT_BRDQ
+		STA	game + GAME::dirty
+		
+@keysDing:
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+
+@keysExit:
+		RTS
+		
+		
+;-------------------------------------------------------------------------------
+menuPageTrade6Keys:
+;-------------------------------------------------------------------------------
+		CMP	#'.'
+		BNE	@keysOther
+		
+		LDA	#<menuPageTrade0
+		LDY	#>menuPageTrade0
+		
+		JSR	menuSetPage		
+		
 		LDA	#<SFXDING
 		LDY	#>SFXDING
 		LDX	#$07
 		JSR	SNDBASE + 6
 		
-		LDA	#$00
-		STA	ui + UI::fActInt
-
-@exit:
 		RTS
 		
+@keysOther:
+		JMP	menuPageTrade0DefKeys
 
+
+;-------------------------------------------------------------------------------
 menuPageTrade6Draw:
+;-------------------------------------------------------------------------------
+		LDA	#<strHeaderTrade0
+		STA	menuWindowTrade6Hdr
+		LDA	#>strHeaderTrade0
+		STA	menuWindowTrade6Hdr + 1
+
 		LDA	#<menuWindowTrade6
 		STA	$FD
 		LDA	#>menuWindowTrade6
 		STA	$FE
 		
 		JSR	screenPerformList
+		
+		LDA	#<menuFooterGame0
+		STA	$FD
+		LDA	#>menuFooterGame0
+		STA	$FE
+		
+		JSR	screenPerformList
+		
 		RTS
 
 
+;-------------------------------------------------------------------------------
+menuPageTrade8Keys:
+;-------------------------------------------------------------------------------
+		CMP	#'.'
+		BNE	@keysOther
+		
+		LDA	#<menuPageTrade1
+		LDY	#>menuPageTrade1
+		
+		JSR	menuSetPage		
+		
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
+		RTS
+		
+@keysOther:
+		JMP	menuPageTrade1DefKeys
+
+
+;-------------------------------------------------------------------------------
+menuPageTrade8Draw:
+;-------------------------------------------------------------------------------
+		LDA	#<strHeaderTrade1
+		STA	menuWindowTrade6Hdr
+		LDA	#>strHeaderTrade1
+		STA	menuWindowTrade6Hdr + 1
+
+		LDA	#<menuWindowTrade6
+		STA	$FD
+		LDA	#>menuWindowTrade6
+		STA	$FE
+		
+		JSR	screenPerformList
+		
+		LDA	#<menuFooterGame0
+		STA	$FD
+		LDA	#>menuFooterGame0
+		STA	$FE
+		
+		JSR	screenPerformList
+		
+		RTS
+		
+		
 menuElimin0HaveOffer:
 		.byte	$00
 menuElimin0Recalc:
@@ -12332,13 +12585,13 @@ menuWindowElimin0:
 			.word	     strHeaderElimin0
 
 			.byte	$A1, $0A, $01, $12, $50, $02, $0A
-			.word	     strOptn0Trade0
+			.word	     	strOptn0Trade0
 			.byte	$A1, $0E, $01, $12, $4F, $02, $0E
-			.word	     strOptn2Trade0
+			.word	     	strOptn2Trade0
 			.byte	$A1, $10, $01, $12, $43, $02, $10
-			.word	     strOptn3Trade0
-			.byte	$A1, $12, $01, $12, $4D, $02, $12
-			.word		strOptn2Play0
+			.word	     	strOptn3Trade0
+			.byte	$A1, $14, $01, $12, $2E, $02, $14
+			.word		strOptn2Gaol1
 
 			.byte	$00
 		
@@ -12406,8 +12659,8 @@ menuPageElimin0SetAuctn:
 		
 		RTS
 			
-			
-menuPageElimin0Keys:
+		
+menuPageElimin0DefKeys:
 	.if	DEBUG_EXTRAS
 		CMP	#'A'
 		BNE	@keysM
@@ -12499,12 +12752,7 @@ menuPageElimin0Keys:
 		
 @keysC:
 		CMP	#'C'
-		BNE	@keysExit
-		
-;		LDA	plrLo, X
-;		STA	$FB
-;		LDA	plrHi, X
-;		STA	$FC
+		BNE	@keysOther
 		
 		LDY	#PLAYER::fCPU
 		LDA	($8B), Y
@@ -12565,8 +12813,11 @@ menuPageElimin0Keys:
 		LDX	#$07
 		JSR	SNDBASE + 6
 		
-@keysExit:
 		RTS
+		
+		
+@keysOther:
+		JMP	menuPageTrade6DefKeys
 		
 @keysBuzz:
 		LDA	#<SFXBUZZ
@@ -12574,6 +12825,25 @@ menuPageElimin0Keys:
 		LDX	#$07
 		JSR	SNDBASE + 6
 		RTS
+
+
+menuPageElimin0Keys:
+		CMP	#'.'
+		BNE	@keysOther
+		
+		LDA 	#<menuPageElimin1
+		LDY	#>menuPageElimin1
+		JSR	menuSetPage
+
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
+		RTS
+		
+@keysOther:
+		JMP	menuPageElimin0DefKeys
 
 
 menuPageElimin0Draw:
@@ -12589,6 +12859,53 @@ menuPageElimin0Draw:
 		LDA	#<menuWindowElimin0
 		STA	$FD
 		LDA	#>menuWindowElimin0
+		STA	$FE
+		
+		JSR	screenPerformList
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
+menuPageElimin1Keys:
+;-------------------------------------------------------------------------------
+		CMP	#'.'
+		BNE	@keysOther
+		
+		LDA	#<menuPageElimin0
+		LDY	#>menuPageElimin0
+		
+		JSR	menuSetPage		
+		
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
+		RTS
+		
+@keysOther:
+		JMP	menuPageElimin0DefKeys
+
+
+;-------------------------------------------------------------------------------
+menuPageElimin1Draw:
+;-------------------------------------------------------------------------------
+		LDA	#<strHeaderElimin0
+		STA	menuWindowTrade6Hdr
+		LDA	#>strHeaderElimin0
+		STA	menuWindowTrade6Hdr + 1
+
+		LDA	#<menuWindowTrade6
+		STA	$FD
+		LDA	#>menuWindowTrade6
+		STA	$FE
+		
+		JSR	screenPerformList
+		
+		LDA	#<menuFooterGame0
+		STA	$FD
+		LDA	#>menuFooterGame0
 		STA	$FE
 		
 		JSR	screenPerformList
@@ -12884,6 +13201,52 @@ menuPageJump0Draw:
 		LDA	#<menuWindowJump0
 		STA	$FD
 		LDA	#>menuWindowJump0
+		STA	$FE
+		
+		JSR	screenPerformList
+		RTS
+
+
+menuWindowJump1:
+			.byte	$90, $01, $07
+			.word	     	strHeaderJump1
+
+			.byte	$90, $02, $0A
+			.word		strText0Jump1
+			.byte	$90, $02, $0B
+			.word		strText1Jump1
+
+			.byte	$AF, $0D, $01, $12, $20, $02, $0D
+			.word	     	strDesc7Titles0
+
+			.byte	$00
+
+
+menuPageJump1Keys:
+		LDA	game + GAME::fTrdTyp
+		BEQ	@proc
+		
+		LDA	game + GAME::fTrdStg
+		CMP	#$02
+		BEQ	@exit
+
+@proc:
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
+		LDA	#$00
+		STA	ui + UI::fActInt
+
+@exit:
+		RTS
+		
+
+menuPageJump1Draw:
+		LDA	#<menuWindowJump1
+		STA	$FD
+		LDA	#>menuWindowJump1
 		STA	$FE
 		
 		JSR	screenPerformList
@@ -14165,8 +14528,8 @@ gameUpdateMenu:
 		CMP	#GAME_MDE_ACTS
 		BNE	@tstStepping
 		
-		LDA	#<menuPageTrade6			;game mode 8
-		LDY	#>menuPageTrade6
+		LDA	#<menuPageJump1			;game mode 8
+		LDY	#>menuPageJump1
 		
 		JMP	@update
 

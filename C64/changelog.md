@@ -35,10 +35,7 @@ this.  *\*ugh\**
 * Is checking must pay after normal (non-elimination) action processing required 
   now?
 
-* Statistics/Overview from trade approval, must pay.  They should work now.
 * Make dialog elimin0 more informative about the elimination (to player/bank)?
-* Change trade6 menu naming to jump1 menu.
-* Could also do other mode chain integrity checks?  
 
 * Could now instead of copy name on elimin and gameover dialogs, just refer.
 * Optimise trade calculations -- too large!
@@ -50,6 +47,7 @@ this.  *\*ugh\**
 * Should be able to do release state after above and all testing items passed.
 
 * Change "all" dirty to be just board dirty and req. individual flags?
+* Mode chain integrity checks?  
 * Put code into separate files as indicated.
 * Is rent3 SFX still a little lame?  Does it matter?  Are the sounds okay on 
   Android (where the emulation is terrible)?
@@ -70,6 +68,8 @@ this.  *\*ugh\**
 * The trdsel0 dialog currently uses some 3KB of memory on top of the overview 
   dialog's nearly 1.5KB.  This is massive.  It should be optimised somehow.
 * Zero page utilisation (IRQ!)
+* I have used BPL/BMI for unsigned values.  This should be fixed to use BCS/BCC
+  where appropriate.
 
 
 ## For Testing (Needs Confirmation):
@@ -103,6 +103,13 @@ this.  *\*ugh\**
 ### Since Version 0.02.56B
 
 * 27JUL2018
+	* Bump version.
+	* Begin rework of IRQ handler.
+	* Add overview and statistics to elimin0 menu as below.
+	* Add overview and statistics to trade0 and trade1 menus (via other page,
+	  putting manage on the next page also).
+	* Enable statistics for must pay menu (already had the others).
+	* Change trade6 menu naming to jump1.
 	* Set stats dirty when get key on setup0 menu.
 	* Fix elimination processing incorrect player regression.
 	* Reduce the priority of the utility group (so that houses on the others
