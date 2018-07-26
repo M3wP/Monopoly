@@ -14,7 +14,7 @@
 RULES_BEGIN	=	*
 
 rulesGrpPriority:
-		.byte	$01, $02, $03, $0A, $04, $05, $06, $07, $09, $08
+		.byte	$0A, $01, $02, $03, $04, $05, $06, $07, $09, $08
 
 
 rulesScore0:	

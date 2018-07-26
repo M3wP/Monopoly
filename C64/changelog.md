@@ -24,18 +24,16 @@ this.  *\*ugh\**
 
 ## TODO
 
-* AutoEliminate seems a little naff in the way it electing to pass on deeds.
 * AutoAuction should commit equity like AutoBuy does and not bail so early (push 
-  value upwards if its less than what they and other players currently have -- calc 
-  minimum as well as max and cover when required with AutoRecover).
-* AutoImprove is too "scared" by lots of other player improvements.  Should feel
-  "pressure" to improve when behind.
+  value upwards if its less than what they and other players currently have -- 
+  calc minimum as well as max and cover when required with AutoRecover).
 * rulesSuggestDeedValue should tap values based on group significance.
 * AutoTradeApprove could tally "half points" for prime targets, getting almost and
   all of a group and require that they be accounted for in other deeds or money 
   (convert extra points too?).
 
-* Is checking must pay after normal (non-elimination) action processing required now?
+* Is checking must pay after normal (non-elimination) action processing required 
+  now?
 
 * Statistics/Overview from trade approval, must pay.  They should work now.
 * Make dialog elimin0 more informative about the elimination (to player/bank)?
@@ -104,6 +102,18 @@ this.  *\*ugh\**
 
 ### Since Version 0.02.56B
 
+* 27JUL2018
+	* Set stats dirty when get key on setup0 menu.
+	* Fix elimination processing incorrect player regression.
+	* Reduce the priority of the utility group (so that houses on the others
+	  aren't sold before mortgaging them).
+	* Make "Victor" want to spend more in eliminations.
+* 26JUL2018
+	* Add dice debugging to store statistics about the dice rolled.
+	* "Victor" should be "pressured" into improving when behind other players.
+	* Fix trade player update regression.
+	* Keys queue debugging and don't allow inject if buffer full.
+	* Change "DEBUG_KEYS" define to "DEBUG_EXTRAS".
 * 25JUL2018
 	* Fix action context end issue causing an overflow of the action queue.
 	* Remove all extraneous loading of active player pointers saving almost 1KB!

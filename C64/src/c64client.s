@@ -112,15 +112,17 @@
 ;Compile switch definitions
 ;-------------------------------------------------------------------------------
 	.define DEBUG_IRQ 	0
-	.define DEBUG_KEYS	0
 	.define DEBUG_CPU 	0
 	.define DEBUG_CPUCCCC	0
-	
+
 	.define	DEBUG_HEAP	1
 	.define	DEBUG_GSTATE	1
 	.define	DEBUG_ACTIONS	1
+	.define DEBUG_KEYS	1
+	.define	DEBUG_DICE	1
 	
 	.define DEBUG_DEMO	0
+	.define DEBUG_EXTRAS	0
 	
 	.define	LIST_GLBINF	0
 
@@ -1129,7 +1131,7 @@ TRADE_END	=	trdauto0 + (.sizeof(TRADEAUTO) * 6) ;$FFE9
 
 
 ;-------------------------------------------------------------------------------
-;"Main thread" game loop
+;"Main thread" update loop
 ;-------------------------------------------------------------------------------
 main:
 		CLI				
@@ -1471,13 +1473,14 @@ keyQueueEnPos:
 
 
 keyEnqueueKey:
-;***FIXME:	Don't allow more keys than will fit in the queue.
-
 		LDX	keyQueueEnPos
 		STA	keyQueue0, X
 		
 		INC	keyQueueEnPos
-		
+
+	.if	DEBUG_KEYS
+		JSR	debugCheckKeyEnqueue
+	.endif
 		RTS
 
 
@@ -1491,14 +1494,15 @@ keyDequeueKeys:
 		LDA	ui + UI::fInjKey
 		BEQ	@exit
 
-;***FIXME:	Don't permit this routine to inject more keys than will fit in
-;	the buffer!
-
 @loop:
 		LDX	keyQueueDePos
 		CPX	keyQueueEnPos
 		BEQ	@normalise
-		
+
+		LDA	keyZPKeyCount
+		CMP	#$0A
+		BCS	@exit
+
 		LDA	keyQueue0, X
 		JSR	keyInjectKey
 		
@@ -1518,12 +1522,14 @@ keyDequeueKeys:
 ;-------------------------------------------------------------------------------
 keyInjectKey:	
 ;-------------------------------------------------------------------------------
-;***FIXME:	Don't allow more keys than will fit in the buffer.
-
 		LDX	keyZPKeyCount		;Put a key into the buffer
+		CPX	#$0A
+		BCS	@exit
+		
 		STA	keyBuffer0, X
 		INC	keyZPKeyCount
 		
+@exit:
 		RTS
 
 
@@ -8351,6 +8357,7 @@ menuPageSetup0Keys:
 		
 		SEC
 		SBC	#'0'
+		
 		PHA
 			
 		LDA	#$00
@@ -8360,10 +8367,6 @@ menuPageSetup0Keys:
 		LDY	#>menuPageSetup9
 		
 		JSR	menuSetPage
-
-;		LDA	#$01
-;		ORA	game + GAME::dirty
-;		STA	game + GAME::dirty
 
 		PLA
 
@@ -8397,6 +8400,10 @@ menuPageSetup0Keys:
 		BNE 	@loop
 		
 @done:
+		LDA	game + GAME::dirty
+		ORA	#GAME_DRT_STAT
+		STA	game + GAME::dirty
+		
 		LDA	#<SFXDING
 		LDY	#>SFXDING
 		LDX	#$07
@@ -9845,7 +9852,7 @@ menuPagePlay0StdKeys:
 
 @keysC:
 		CMP	#'C'
-	.if	DEBUG_KEYS
+	.if	DEBUG_EXTRAS
 		BNE	@keysL
 	.else
 		BNE	@keysOther
@@ -9866,7 +9873,7 @@ menuPagePlay0StdKeys:
 		JMP	@keysDing
 
 
-	.if	DEBUG_KEYS
+	.if	DEBUG_EXTRAS
 @keysL:
 		CMP	#'L'
 		BNE	@keysI
@@ -11251,7 +11258,7 @@ menuPageManage0Keys:
 		JSR	prmptClearOrRoll
 		JSR	prmptClear2
 		
-	.if	DEBUG_KEYS
+	.if	DEBUG_EXTRAS
 		JSR	gameUpdateMenu
 	.endif
 		
@@ -11321,7 +11328,7 @@ menuPageManage0Keys:
 
 @keysI:
 		CMP	#'I'
-	.if	DEBUG_KEYS
+	.if	DEBUG_EXTRAS
 		BNE	@keysT
 	.else
 		BNE	@exit
@@ -11331,7 +11338,7 @@ menuPageManage0Keys:
 		JMP	@ding
 
 
-	.if	DEBUG_KEYS
+	.if	DEBUG_EXTRAS
 @keysT:
 		CMP	#'T'
 		BNE	@keysY
@@ -12401,7 +12408,7 @@ menuPageElimin0SetAuctn:
 			
 			
 menuPageElimin0Keys:
-	.if	DEBUG_KEYS
+	.if	DEBUG_EXTRAS
 		CMP	#'A'
 		BNE	@keysM
 
@@ -14377,7 +14384,7 @@ gameMoveSelectBck:
 		RTS
 		
 		
-	.if	DEBUG_KEYS
+	.if	DEBUG_EXTRAS
 ;-------------------------------------------------------------------------------
 gameMovePlyrFwd:
 ;-------------------------------------------------------------------------------
@@ -15742,7 +15749,7 @@ gamePlayerHasWealth:
 	.endif
 	
 
-	.if	DEBUG_KEYS
+	.if	DEBUG_EXTRAS
 ;-------------------------------------------------------------------------------
 gameDecMoney1:
 ;------------------------------------------------------------------------------- 
@@ -16002,6 +16009,10 @@ gameRollDice:
 		ADC	#musTuneRoll0
 		JSR	SNDBASE + 0	
 
+	.if	DEBUG_DICE
+		JSR	debugTallyDice
+	.endif
+
 		LDY	#PLAYER::status		;they don't move if in gaol
 		LDA	($8B), Y
 		AND	#$80
@@ -16095,7 +16106,7 @@ gameRollDice:
 		LDA	game + GAME::dirty
 		ORA	#GAME_DRT_ALLD
 		STA	game + GAME::dirty
-		
+
 @exit:
 		JSR	gameUpdateMenu
 		
@@ -16286,6 +16297,14 @@ gameCheckChanceShuffle:
 ;FOR DIALOG.S
 ;===============================================================================
 
+dialogKeyHandler:
+			.word	dialogDefKeys
+dialogDrawHandler:
+			.word	dialogDefDraw
+dialogDrawDefDraw:
+			.byte	$00
+			
+			
 ;***	60 bytes
 dialogDefWindow0:		
 			.byte	$13, $08, $05, $18, $0C
@@ -16309,14 +16328,7 @@ dialogDefWindow0:
 			
 			.byte	$00
 
-dialogKeyHandler:
-			.word	dialogDefKeys
-dialogDrawHandler:
-			.word	dialogDefDraw
-dialogDrawDefDraw:
-			.byte	$00
-			
-			
+
 dialogDlgTitles0:
 		.word	dialogDlgTitles0Keys
 		.word	dialogDlgTitles0Draw
@@ -26071,7 +26083,8 @@ rulesDoXferDeed:
 		PLA
 		TAX
 
-		STX	game + GAME::varX
+		LDA	game + GAME::pActive
+		STA	game + GAME::varX
 		STX	game + GAME::pActive
 		
 		JSR	gamePlayerChanged
@@ -26266,8 +26279,7 @@ rulesDoPlayerElimin:
 		RTS
 
 @lostplyr:
-		TXA
-		PHA
+		STX	game + GAME::varW
 
 		LDA	game + GAME::varE
 		BMI	@skipcash		;This can't happen but
@@ -26275,20 +26287,20 @@ rulesDoPlayerElimin:
 		
 		LDA	game + GAME::pActive
 		STA	game + GAME::varU
-		PLA
+		LDA	game + GAME::varW
 		STA	game + GAME::pActive
 
 		JSR	gamePlayerChanged
 
 		JSR	rulesAddCash
 
-		LDX	game + GAME::pActive
 		LDA	game + GAME::varU
 		STA	game + GAME::pActive
 
 		JSR	gamePlayerChanged
 
 @skipcash:
+		LDX	game + GAME::varW
 		JSR	rulesDoPlyrLostPlyr	;Player lost to other player
 		RTS
 
@@ -26455,6 +26467,7 @@ rulesInitEliminToBank:
 
 ;-------------------------------------------------------------------------------
 rulesDoPlyrLostPlyr:
+;(IN)		.X	=	player lost to
 ;-------------------------------------------------------------------------------
 		TXA
 
@@ -27426,8 +27439,9 @@ rulesDoGetLastOwn:
 		RTS
 		
 		
-		
+;-------------------------------------------------------------------------------
 rulesAutoBuy:
+;
 ;	IN:	.X	=	square
 ;
 ;	USED:	varU	=	square
@@ -27436,6 +27450,7 @@ rulesAutoBuy:
 ;		varO-P 	=	temp calc
 ;		varM-N	=	cost
 ;		varS-T	=	player money
+;-------------------------------------------------------------------------------
 
 ;	Get cost for square
 		STX	game + GAME::varU
@@ -27629,7 +27644,9 @@ rulesAutoBuy:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 rulesUpdateValueIfLess:
+;-------------------------------------------------------------------------------
 ;		D, E < (O, P) -> CLC | SEC
 		JSR	gameAmountIsLessDirect
 		BCS	@exit
@@ -27643,7 +27660,9 @@ rulesUpdateValueIfLess:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 rulesSuggestBaseReserve:
+;
 ;		game + GAME::varD,E = value
 ;
 ;		game + GAME::varJ = group
@@ -27651,7 +27670,7 @@ rulesSuggestBaseReserve:
 ;		game + GAME::varH = improvements
 ;		game + GAME::varO,P = temp value
 ;		game + GAME::varM,N = temp value
-;
+;-------------------------------------------------------------------------------
 		LDA	#$00
 		STA	game + GAME::varD
 		STA	game + GAME::varE
@@ -28051,7 +28070,9 @@ rulesSuggestBaseReserve:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 rulesCountOwnedDeeds:
+;-------------------------------------------------------------------------------
 ;	Tally owned deeds
 		LDA	#$00
 		STA	game + GAME::varA
@@ -28084,12 +28105,14 @@ rulesCountOwnedDeeds:
 		RTS
 	
 
+;-------------------------------------------------------------------------------
 rulesDoConstructAtLevel:
+;
 ;		For each square in group, backwards, buy improvements at level 
 ;		until out of money or zero houses/hotels?
-
+;
 ;		Update level when all done at level
-
+;
 ;		game + GAME::varJ = group
 ;		game + GAME::varB = level
 ;		game + GAME::varH = house count
@@ -28099,6 +28122,7 @@ rulesDoConstructAtLevel:
 ;
 ;		game + GAME::varA = group square idx
 ;		game + GAME::varF = square 
+;-------------------------------------------------------------------------------
 		
 		LDX	game + GAME::varJ
 		
@@ -28251,7 +28275,9 @@ rulesDoConstructAtLevel:
 		RTS		
 	
 	
+;-------------------------------------------------------------------------------
 rulesAutoConstruct:
+;
 ;		For each group in the priority lists backwards do
 ;
 ;				Is group 09/0A?  goto next
@@ -28259,7 +28285,7 @@ rulesAutoConstruct:
 ;			for each level until run out of money
 ;				
 ;				construct at level
-;				
+;-------------------------------------------------------------------------------
 
 		LDA	game + GAME::cntHs
 		STA	game + GAME::varH
@@ -28326,7 +28352,9 @@ rulesAutoConstruct:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 rulesAutoRepayGroup:
+;-------------------------------------------------------------------------------
 		LDA	#$03
 		STA	game + GAME::varA
 		
@@ -28464,7 +28492,9 @@ rulesAutoRepayGroup:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 rulesAutoRepay:
+;-------------------------------------------------------------------------------
 		LDA	ui + UI::cLstAct
 		STA	rulesLastActnIdx
 
@@ -28511,37 +28541,183 @@ rulesAutoRepay:
 		RTS
 
 
-rulesAutoImprove:
-;	USES:	varD,E	=	amount surplus and available
+;-------------------------------------------------------------------------------
+rulesFindHighestImprove:
+;-------------------------------------------------------------------------------
+		LDA	#$00
+		STA	game + GAME::varA
+		
+		LDX	#$09
+		
+@loop:
+		LDY	rulesGrpPriority, X
+		LDA	rulesGrpSqrs1, Y
+		CMP	#$FF
+		BEQ	@next
+		
+		ASL
+		TAY
+		
+		LDA	game + GAME::varK
+		CMP	#$FF
+		BEQ	@skipown
+		
+		LDA	sqr00, Y
+		CMP	game + GAME::varK
+		BNE	@next
+		
+@skipown:
+		LDA	sqr00 + 1, Y
+		AND	#$08
+		BNE	@haveht
+		
+		LDA	sqr00 + 1, Y
+		AND	#$07
+		BNE	@tstmax
+		
+@next:
+		DEX
+		BPL	@loop
+		
+		RTS
+		
+@haveht:
+		LDA	#$05
 
+@tstmax:
+		CMP	game + GAME::varA
+		BCC	@next
+		
+		STA	game + GAME::varA
+;		JMP	@next
+		RTS
+
+
+;-------------------------------------------------------------------------------
+rulesAutoImprove:
+;
+;	USES:	varD,E	=	amount surplus and available
+;-------------------------------------------------------------------------------
 		LDA	ui + UI::cLstAct
 		STA	rulesLastActnIdx
 
+		LDA	#$00
+		STA	game + GAME::varX
+
 		LDX	game + GAME::pActive
 		STX	game + GAME::varK		;varK = player
-
-;		LDA	plrLo, X
-;		STA	$FB
-;		LDA	plrHi, X
-;		STA	$FC
 
 		JSR	rulesDoCopyImprv
 
 ;	Find base rent value needed
 		JSR	rulesSuggestBaseReserve
 		
-;	Subtract value from money store as value
+;	Subtract value from money store as value D,E and S,T
 		LDY	#PLAYER::money
 		SEC
 		LDA	($8B), Y
 		SBC	game + GAME::varD
 		STA	game + GAME::varD
+		STA	game + GAME::varS
 		INY
 		LDA	($8B), Y
 		SBC	game + GAME::varE
 		STA	game + GAME::varE
+		STA	game + GAME::varT
 		
+		LDA	#$FF
+		STA	game + GAME::varK
+		JSR	rulesFindHighestImprove
+		
+		LDA	game + GAME::varA
+		STA	game + GAME::varB
+		
+		LDA	game + GAME::pActive
+		STA	game + GAME::varK
+		JSR	rulesFindHighestImprove
+		
+		SEC
+		LDA	game + GAME::varB
+		SBC	game + GAME::varA
+		BCS	@tstpressure
+		
+		JMP	@perfcons
+		
+@tstpressure:
+		STA	game + GAME::varA
+		BEQ	@perfcons
+		BMI	@perfcons
+		
+		LSR
+		TAX
+		DEX
+		BMI	@skipmult
+		
+		LDA	#150
+		STA	game + GAME::varO
+		LDA	#$00
+		STA	game + GAME::varP
+@loopmult:
+		ASL	game + GAME::varO
+		ROL	game + GAME::varP
+		
+		DEX
+		BPL	@loopmult
+		
+		JMP	@calcodd
+		
+@skipmult:
+		LDA	#$00
+		STA	game + GAME::varO
+		LDA	#$00
+		STA	game + GAME::varP
+		
+@calcodd:
+		LDA	game + GAME::varA
+		AND	#$01
+		BEQ	@pressure
+		
+		CLC
+		LDA	game + GAME::varO
+		ADC	#150
+		STA	game + GAME::varO
+		LDA	game + GAME::varP
+		ADC	#$00
+		STA	game + GAME::varP
+		
+@pressure:
+		LDY	#PLAYER::money
+		SEC
+		LDA	($8B), Y
+		SBC	#<300
+		STA	game + GAME::varD
+		INY
+		LDA	($8B), Y
+		SBC	#>300
+		STA	game + GAME::varE
+
+		JSR	gameAmountIsLessDirect
+		BCC	@perfcons
+		
+		LDA	game + GAME::varS
+		STA	game + GAME::varD
+		LDA	game + GAME::varT
+		STA	game + GAME::varE
+		
+		JSR	gameAmountIsLessDirect
+		BCS	@perfcons
+		
+		LDA	game + GAME::varO
+		STA	game + GAME::varD
+		LDA	game + GAME::varP
+		STA	game + GAME::varE
+		
+		LDA	#$01
+		STA	game + GAME::varX
+	
+@perfcons:
 ;	Have positive value, AutoConstruct
+		LDA	game + GAME::varE
 		BMI	@incomplete
 
 		JSR	rulesAutoConstruct
@@ -28555,6 +28731,9 @@ rulesAutoImprove:
 		BEQ	@tstcomp
 		
 @repay:
+		LDA	game + GAME::varX
+		BNE	@tstcomp
+
 		JSR	rulesAutoRepay
 		BNE	@finish
 
@@ -30195,7 +30374,9 @@ rulesCalcTradePts:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 rulesTallySuggested:
+;-------------------------------------------------------------------------------
 		LDA	#$00
 		STA	game + GAME::varO
 		STA	game + GAME::varP
@@ -30230,7 +30411,9 @@ rulesTallySuggested:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 rulesTrdApprvTstRepay:
+;-------------------------------------------------------------------------------
 ;	Get repay cost for deed in varL
 		LDX	game + GAME::varL
 		JSR	gameGetCardPtrForSquareImmed
@@ -30286,7 +30469,9 @@ rulesTrdApprvTstRepay:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 rulesTradeApprvRepay:
+;-------------------------------------------------------------------------------
 ;	Find base rent value needed
 		JSR	rulesSuggestBaseReserve
 		
@@ -30337,7 +30522,9 @@ rulesTradeApprvRepay:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 rulesCalcTrdWantCash:
+;-------------------------------------------------------------------------------
 		LDY	#TRADE::money
 		LDA	trade0, Y
 		STA	game + GAME::varD
@@ -30376,7 +30563,9 @@ rulesCalcTrdGoFree:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 rulesCalcTrdOffrCash:
+;-------------------------------------------------------------------------------
 		LDY	#TRADE::money
 		LDA	trade1, Y
 		STA	game + GAME::varD
@@ -30390,7 +30579,9 @@ rulesCalcTrdOffrCash:
 		JMP	rulesCalcTrdGoFree
 
 
+;-------------------------------------------------------------------------------
 rulesAutoTradeApprove:
+;-------------------------------------------------------------------------------
 ;	If losing a full group then no
 		LDA	game + GAME::pActive
 		STA	game + GAME::varK
@@ -30559,7 +30750,9 @@ rulesAutoTradeApprove:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 rulesAutoPlay:
+;-------------------------------------------------------------------------------
 		JSR	rulesAutoPay
 		BNE	@complete
 
@@ -30619,7 +30812,9 @@ rulesAutoPlay:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 rulesStnSqrForIndex:
+;-------------------------------------------------------------------------------
 		CPX	#$00
 		BNE	@1
 		LDA	#$23
@@ -30639,7 +30834,9 @@ rulesStnSqrForIndex:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 rulesUtilSqrForIndex:
+;-------------------------------------------------------------------------------
 		CPX	#$00
 		BNE	@1
 		LDA	#$0C
@@ -30649,7 +30846,9 @@ rulesUtilSqrForIndex:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 rulesAutoEliminGroup:
+;-------------------------------------------------------------------------------
 		LDA	#$03
 		STA	game + GAME::varA
 		
@@ -30782,7 +30981,9 @@ rulesAutoEliminGroup:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 rulesAutoEliminSelect:
+;-------------------------------------------------------------------------------
 		LDA	game + GAME::varD
 		STA	game + GAME::varO
 		LDA	game + GAME::varE
@@ -30807,14 +31008,21 @@ rulesAutoEliminSelect:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 rulesAutoEliminate:
+;-------------------------------------------------------------------------------
 		STX	game + GAME::varK		;varK = player
 
 		JSR	rulesDoCopyImprv
 
 ;	Find base rent value needed
-		JSR	rulesSuggestBaseReserve
-		
+;		JSR	rulesSuggestBaseReserve
+
+		LDA	#<300
+		STA	game + GAME::varD
+		LDA	#>300
+		STA	game + GAME::varE
+
 		LDY	#$02
 		LDX	#$05
 		JSR	rulesDoNudgeValue
@@ -30903,14 +31111,54 @@ numConvMULT10:
 		RTS
 
 
-numConvDieRoll:
+;-------------------------------------------------------------------------------
+numConvGetDieBase:
+;-------------------------------------------------------------------------------
+		NOP
+		NOP
+		NOP
+		NOP
+		NOP
+		NOP
+		
 		LDA 	sidV2EnvOu
+;		LSR
+;		LSR
+;		LSR
+;		LSR
+;		LSR
+;		TAX
+		
+		NOP
+		NOP
+		NOP
+		NOP
+		NOP
+		NOP
+		
+;		LDA 	sidV2EnvOu
+;@loop:
+;		CPX	#$00
+;		BEQ	@done
+;		
+;		CMP	#$80
+;		ROL
+;		
+;		DEX
+;		JMP	@loop
+;		
+;@done:
+		RTS
+
+
+;-------------------------------------------------------------------------------
+numConvDieRoll:
+;-------------------------------------------------------------------------------
+		JSR	numConvGetDieBase
 		AND	#$7F
 		STA	Z:numConvM1
-		NOP
-		NOP
-		NOP
-		LDA 	sidV2EnvOu
+
+		JSR	numConvGetDieBase
 		STA	Z:numConvM1 + 1
 
 		JSR	numConvFLOAT
@@ -30932,8 +31180,15 @@ numConvDieRoll:
 		INX
 		
 		CPX	#$07	
-		BNE	@done
+		BCC	@done
 		
+		LDA 	sidV2EnvOu
+		BMI	@over1
+	
+		LDX	#$01
+		JMP	@done
+
+@over1:
 		LDX	#$06
 		
 @done:
@@ -31758,6 +32013,10 @@ initPlayers:
 ;-------------------------------------------------------------------------------
 initNew:
 ;-------------------------------------------------------------------------------
+	.if	DEBUG_DICE
+		JSR	debugInitDice
+	.endif
+
 		LDA	#$20
 		STA	game + GAME::cntHs
 		LDA	#$0C
@@ -32016,6 +32275,107 @@ debugCheckActCtxCurrMax:
 		RTS
 	.endif
 
+
+	.if	DEBUG_KEYS
+;-------------------------------------------------------------------------------
+debugCheckKeyEnqueue:
+;-------------------------------------------------------------------------------
+		LDA	keyQueueEnPos
+		CMP	#$0A
+		BCC	@exit
+
+		LDA	game + GAME::pActive
+		STA	cpuFaultPlayer
+		
+		LDA	#<debugCheckKeyEnqueue
+		STA	cpuFaultAddr
+		LDA	#>debugCheckKeyEnqueue
+		STA	cpuFaultAddr + 1
+
+		LDA 	#<dialogDlgNull0
+		LDY	#>dialogDlgNull0
+		
+		JSR	dialogSetDialog
+		JSR	dialogDispDefDialog
+
+@exit:
+		RTS
+	.endif
+
+	.if	DEBUG_DICE
+debugDiceTotal:
+	.word	$0000
+debugDiceDoubles:
+	.word	$0000
+debugDice0:
+	.repeat	6, I
+	.word	$0000
+	.endrep
+	
+;-------------------------------------------------------------------------------
+debugInitDice:	
+;-------------------------------------------------------------------------------
+		LDA	#$00	
+		LDX	#$0F
+@loop:
+		STA	debugDiceTotal, X
+		DEX
+		BPL	@loop
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
+debugTallyDice:	
+;-------------------------------------------------------------------------------
+		CLC
+		LDA	debugDiceTotal
+		ADC	#$02
+		STA	debugDiceTotal
+		LDA	debugDiceTotal + 1
+		ADC	#$00
+		STA	debugDiceTotal + 1
+		
+		LDA	game + GAME::dieDbl
+		BEQ	@skipdbl
+		
+		CLC
+		LDA	debugDiceDoubles
+		ADC	#$01
+		STA	debugDiceDoubles
+		LDA	debugDiceDoubles + 1
+		ADC	#$00
+		STA	debugDiceDoubles + 1
+		
+@skipdbl:
+		LDA	game + GAME::dieA
+		JSR	debugTallyDie
+
+		LDA	game + GAME::dieB
+		JSR	debugTallyDie
+		
+		RTS
+	
+	
+;-------------------------------------------------------------------------------
+debugTallyDie:	
+;-------------------------------------------------------------------------------
+		TAX
+		DEX
+		TXA
+		ASL
+		TAX
+		
+		CLC
+		LDA	debugDice0, X
+		ADC	#$01
+		STA	debugDice0, X
+		LDA	debugDice0 + 1, X
+		ADC	#$00
+		STA	debugDice0 + 1, X
+		
+		RTS
+	.endif
 
 ;===============================================================================
 ;HEAP
