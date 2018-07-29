@@ -1,6 +1,6 @@
 # MONOPOLY 
 
-VERSION 0.02.56 BETA
+VERSION 0.02.68 BETA
 
 
 FOR THE COMMODORE 64
@@ -24,16 +24,13 @@ this.  *\*ugh\**
 
 ## TODO
 
-* AutoAuction should commit equity like AutoBuy does and not bail so early (push 
-  value upwards if its less than what they and other players currently have -- 
-  calc minimum as well as max and cover when required with AutoRecover).
+* There is a bug managing improvements causing house count to go negative and
+  not be corrected?
+
 * rulesSuggestDeedValue should tap values based on group significance.
 * AutoTradeApprove could tally "half points" for prime targets, getting almost and
   all of a group and require that they be accounted for in other deeds or money 
   (convert extra points too?).
-
-* Is checking must pay after normal (non-elimination) action processing required 
-  now?
 
 * Make dialog elimin0 more informative about the elimination (to player/bank)?
 
@@ -48,6 +45,8 @@ this.  *\*ugh\**
 
 * Change "all" dirty to be just board dirty and req. individual flags?
 * Mode chain integrity checks?  
+* Is checking must pay after normal (non-elimination) action processing required 
+  now?
 * Put code into separate files as indicated.
 * Is rent3 SFX still a little lame?  Does it matter?  Are the sounds okay on 
   Android (where the emulation is terrible)?
@@ -99,6 +98,22 @@ this.  *\*ugh\**
 
 
 ## Change History 
+
+### Since Version 0.02.68B
+
+* 29JUL2018
+	* Increase "Victor's" delay time after improving.
+	* Handle nothing to trade/auction when processing elimination.
+	* Return improvements when processing elimination.
+* 28JUL2018
+	* Fix rulesNextImprv to check validity of improvement correctly.
+	* Fix bug in rulesDoXferDeed incorrectly handling equity when the
+	  deed is mortgaged.
+	* Add equity debugging.
+	* Correct problem in rulesFindHighestImprove testing other players.
+	* "Victor" should now commit equity when appropriate in auctions.
+	* Refactor rulesAutoBuy to allow reuse of wanted logic.
+
 
 ### Since Version 0.02.56B
 

@@ -1,6 +1,6 @@
 # MONOPOLY 
 
-VERSION 0.02.56 BETA
+VERSION 0.02.68 BETA
 
 
 FOR THE COMMODORE 64
@@ -28,7 +28,7 @@ I feel this is how the game **should** be played in this format...
 ## Contents
 
 *  40 game board squares
-*   4 board quadrants
+*   4 board quadrants or overview and with mini-map
 *  10 player colours
 *  28 title deed cards (plus title cards for all other squares)
 *  16 chance cards
@@ -388,12 +388,8 @@ binary module).  I modified the driver to not touch the third voice (it is used
 for random number generation in a unique way, instead of for producing sound) 
 and in order to compile it with ca65.  Decent psudeo-random number generation 
 is expensive for a MOS6502 so generating them with another "processor" is very 
-convenient.  I should do tests to see how "natural" and "random" the values
-generated are and if they match real dice closely enough but I am yet to do so.
-From play-testing, I haven't noticed any peculiarities.  Theoretically, they
-should be equal to anything I could reasonably do in a great deal more memory 
-and time or perhaps better.  Also, I like that it potentially has a type of
-rhythm.
+convenient.  From my tests, the values generated are quite "natural" and "random"
+and match real dice closely enough.
 
 
 ## Compilation

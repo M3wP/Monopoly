@@ -2,7 +2,7 @@
 ;M O N O P O L Y 
 ;-------------------------------------------------------------------------------
 ;
-;VERSION 0.02.56 BETA
+;VERSION 0.02.68 BETA
 ;
 ;
 ;FOR THE COMMODORE 64
@@ -114,12 +114,14 @@
 	.define DEBUG_IRQ 	0
 	.define DEBUG_CPU 	0
 	.define DEBUG_CPUCCCC	0
+	.define	DEBUG_AUCTIONS	0
 
 	.define	DEBUG_HEAP	1
 	.define	DEBUG_GSTATE	1
 	.define	DEBUG_ACTIONS	1
 	.define DEBUG_KEYS	1
 	.define	DEBUG_DICE	1
+	.define	DEBUG_EQUITY	1
 	
 	.define DEBUG_DEMO	0
 	.define DEBUG_EXTRAS	0
@@ -511,9 +513,6 @@ GAME_DRT_SHF0	=	$80
 		fFPTax	.byte
 		mFPTax	.word
 
-;		gMdActn .byte			;Remove for game state stack
-;		pRecall	.byte			;Remove for game state stack
-		
 		pWAuctn	.byte
 		pAFirst .byte
 		mAuctn	.word
@@ -536,32 +535,20 @@ GAME_DRT_SHF0	=	$80
 		sStpDst .byte
 		fStpPsG .byte
 		fPayDbl .byte
-;		gMdStep .byte			;Remove for game state stack
 		
-;		fTrdSlM .byte			;Remove for game state stack
 		fTrdSlL .byte
 		sTrdSel .byte
 		aTrdSlH .word
 		cTrdSlB .byte
 		
-;		gMdMPyI	.byte			;Remove for game state stack
-;		pMstPyI	.byte			;Remove for game state stack
-
 		pMPyLst	.byte			;Last player to check in mpay
 		pMPyCur	.byte			;Current player checked in mpay
 		
-;		gMdElim	.byte			;Remove for game state stack 
-;		pElimin .byte			;Remove for game state stack
-		
-;		gMdTrdI .byte			;Remove for game state stack
-;		pTrdICP	.byte			;Remove for game state stack
-	
 		fTrdStg .byte			;stage
 		iTrdStp .byte			;step
 		fTrdPhs .byte			;phase
 		fTrdTyp .byte			;type (regular, elimin)
 		
-;		gMdQuit .byte			;Remove for game state stack
 		pQuitCP	.byte			
 		
 		gMode	.byte			;0:  Normal (Play)
@@ -3349,7 +3336,6 @@ plyrIRQ:
 		
 ;	Some other interrupt source??  Peculiar...  And a real problem!  How
 ;	do I acknowledge it if its not a BRK when I don't know what it would be?
-@debug_trap0:
 		LDA	#$02
 		STA	vicBrdrClr
 
@@ -6486,23 +6472,23 @@ uiActionDelayCnt0:
 	.byte	$08, $11, $22, $44, $66
 
 uiActionCallsLo:
-		.byte	<(uiActionFault - 1), <(uiActionTrade - 1)
-		.byte	<(uiActionRepay - 1), <(uiActionFee - 1)
-		.byte	<(uiActionAuction - 1), <(uiActionMrtg - 1)
-		.byte	<(uiActionSell - 1), <(uiActionBuy - 1)
-		.byte	<(uiActionImprv - 1), <(uiActionGOFree - 1)
-		.byte	<(uiActionPost - 1), <(uiActionRoll - 1)
-		.byte	<(uiActionSendKey - 1), <(uiActionDelay - 1)
-		.byte	<(uiActionEndProc - 1)
+	.byte	<(uiActionFault - 1), <(uiActionTrade - 1)
+	.byte	<(uiActionRepay - 1), <(uiActionFee - 1)
+	.byte	<(uiActionAuction - 1), <(uiActionMrtg - 1)
+	.byte	<(uiActionSell - 1), <(uiActionBuy - 1)
+	.byte	<(uiActionImprv - 1), <(uiActionGOFree - 1)
+	.byte	<(uiActionPost - 1), <(uiActionRoll - 1)
+	.byte	<(uiActionSendKey - 1), <(uiActionDelay - 1)
+	.byte	<(uiActionEndProc - 1)
 uiActionCallsHi:
-		.byte	>(uiActionFault - 1), >(uiActionTrade - 1)
-		.byte	>(uiActionRepay - 1), >(uiActionFee - 1)
-		.byte	>(uiActionAuction - 1), >(uiActionMrtg - 1)
-		.byte	>(uiActionSell - 1), >(uiActionBuy - 1)
-		.byte	>(uiActionImprv - 1), >(uiActionGOFree - 1)
-		.byte	>(uiActionPost - 1), >(uiActionRoll - 1)
-		.byte	>(uiActionSendKey - 1), >(uiActionDelay - 1)
-		.byte	>(uiActionEndProc - 1)
+	.byte	>(uiActionFault - 1), >(uiActionTrade - 1)
+	.byte	>(uiActionRepay - 1), >(uiActionFee - 1)
+	.byte	>(uiActionAuction - 1), >(uiActionMrtg - 1)
+	.byte	>(uiActionSell - 1), >(uiActionBuy - 1)
+	.byte	>(uiActionImprv - 1), >(uiActionGOFree - 1)
+	.byte	>(uiActionPost - 1), >(uiActionRoll - 1)
+	.byte	>(uiActionSendKey - 1), >(uiActionDelay - 1)
+	.byte	>(uiActionEndProc - 1)
 		
 
 uiProcessContext0:
@@ -6512,11 +6498,11 @@ uiProcessContext0:
 		.word	$0000
 	.endrep
 uiProcessCtxCurrPtr:
-		.word	$0000
+	.word	$0000
 uiProcessCtxNextPtr:
-		.word	uiProcessContext0
+	.word	uiProcessContext0
 uiProcessEnqueuePtr:
-		.word	uiActnCache
+	.word	uiActnCache
 		
 	.if	DEBUG_ACTIONS
 uiProcessHaveMS:
@@ -7354,22 +7340,15 @@ uiActionBuy:
 		
 		JSR	gamePlayerChanged
 		
-		LDY	#PLAYER::money
-		LDA	($8B), Y
-		STA	game + GAME::varS
-		INY
-		LDA	($8B), Y
-		STA	game + GAME::varT
+;		LDY	#PLAYER::money
+;		LDA	($8B), Y
+;		STA	game + GAME::varS
+;		INY
+;		LDA	($8B), Y
+;		STA	game + GAME::varT
 
 		LDA	$6A
 		JSR	uiActionFocusSquare
-
-;		Need to load again, *ugh*
-;		LDX	$69
-;		LDA	plrLo, X
-;		STA	$FB
-;		LDA	plrHi, X
-;		STA	$FC
 
 ;	IN:	.X	=	square * 2
 		LDA	$6A
@@ -7694,6 +7673,8 @@ cpuPerformPlay:
 ;-------------------------------------------------------------------------------
 cpuPerformBuy:
 ;-------------------------------------------------------------------------------
+	.if	DEBUG_AUCTIONS
+	.else
 		LDY	#PLAYER::square
 		LDA	($8B), Y
 		TAX
@@ -7704,6 +7685,7 @@ cpuPerformBuy:
 		RTS
 		
 @passed:
+	.endif
 		LDA	#UI_ACT_SKEY
 		STA	$68
 		LDA	#'P'
@@ -10127,7 +10109,8 @@ menuPagePlay1Keys:
 		CMP	#$A1
 		BNE	@keysBuzz
 		
-		JSR	gameBuyTitleDeed
+		LDY	#$00
+		JSR	rulesBuyTitleDeed
 		
 		JSR	gameDeselect
 		
@@ -15014,14 +14997,12 @@ gameNextAuction:
 		CMP	#$FF
 		BEQ	@endauction
 		
-		TAX
-		STX	game + GAME::pActive	;Temporarily set active player...
-
+		STA	game + GAME::pActive	;Temporarily set active player...
 		JSR	gamePlayerChanged
 		
 		LDY	#$01			;in order to buy deed but
-		LDX	game + GAME::sAuctn	;don't sub cash also set a specific 
-		JSR	rulesBuyTitleDeed	;square
+		LDX	game + GAME::sAuctn	;don't sub cash also set a 
+		JSR	rulesBuyTitleDeed	;specific square
 		
 		LDA	game + GAME::mAuctn
 		STA	game + GAME::varD
@@ -15039,6 +15020,12 @@ gameNextAuction:
 		LDA	($8B), Y
 		TAX
 		JSR	prmptBought
+		
+	.if	DEBUG_EQUITY
+		LDA	#$01
+		STA	debugEquityEntry
+		JSR	debugCheckEquity
+	.endif
 		
 @endauction:
 		JSR	gameDeselect
@@ -15063,21 +15050,12 @@ gameNextAuction:
 		
 		JSR	gameUpdateMenu
 
-;		LDA	game + GAME::dirty
-;		ORA	#GAME_DRT_ALLD
-;		STA	game + GAME::dirty
+		LDA	game + GAME::dirty
+		ORA	#GAME_DRT_STAT
+		STA	game + GAME::dirty
 
 		RTS
 		
-
-;-------------------------------------------------------------------------------
-gameBuyTitleDeed:
-;-------------------------------------------------------------------------------
-		LDY	#$00
-		JSR	rulesBuyTitleDeed
-		
-		RTS
-
 
 ;-------------------------------------------------------------------------------
 gameInitiatePStats:
@@ -21629,7 +21607,8 @@ dialogDlgNull0Draw:
 		JSR	screenPerformList
 
 		JSR	screenResetSelBtn
-		RTS
+		
+		JMP	hang
 
 
 ;===============================================================================
@@ -25443,12 +25422,11 @@ rulesDoUnsetAllOwned:
 
 ;-------------------------------------------------------------------------------
 rulesDoPurchDeed:
+;
 ;	IN:	.X	=	square * 2
 ;		varB 	=	group
 ;		varC	=	group index for deed
 ;		varH	=	flag sub cash (0 = do it)
-;	REQS	Z:FB,FC	=	player ptr
-;
 ;-------------------------------------------------------------------------------
 		TXA
 		PHA
@@ -25477,16 +25455,16 @@ rulesDoPurchDeed:
 		PLA
 		STA	$FD
 		
+		LDA	game + GAME::varH	;Do we sub cash?
+		BNE	@begin
+
 		LDY	#DEED::mPurch
 		LDA	($FD), Y
 		STA	game + GAME::varD
 		INY
 		LDA	($FD), Y
 		STA	game + GAME::varE
-
-		LDA	game + GAME::varH	;Do we sub cash?
-		BNE	@begin
-
+		
 		SEC
 		LDY	#PLAYER::money
 		LDA	($8B), Y
@@ -25665,6 +25643,7 @@ rulesNextImprv:
 		PLA
 		
 @buzz:
+@debug_trap0:
 		LDA	#<SFXBUZZ
 		LDY	#>SFXBUZZ
 		LDX	#$07
@@ -25682,7 +25661,7 @@ rulesNextImprv:
 		
 @tstupper:
 		CPX	#$09
-		BMI	@collate
+		BCC	@collate
 
 		JMP	@buzzbreak
 		
@@ -25715,23 +25694,21 @@ rulesNextImprv:
 		TAX
 
 		LDA	sqr00 + 1, X		;Check for already at hotels
-		AND	#$0F
-		CMP	#$08
-		BNE	@checkhouse
+		AND	#$08
+		BEQ	@checkhouse
 		
 		JMP	@buzz
 		
 @checkhouse:
+		LDA	sqr00 + 1, X
+		AND	#$07
+		
 		CMP	#$04
 		BEQ	@checkhotel
 	
 		LDY	game + GAME::cntHs
-		BPL	@availhouse
-		
-		JMP	@buzz
-		
-@availhouse:
-		BNE	@sethouse
+		CPY	#$01
+		BCS	@sethouse
 		
 		JMP	@buzz
 		
@@ -25748,15 +25725,11 @@ rulesNextImprv:
 		
 @checkhotel:
 		LDY	game + GAME::cntHt
-		BPL	@availhotel
+		CPY	#$01
+		BCS	@sethotel
 		
 		JMP	@buzz
 		
-@availhotel:
-		BNE	@sethotel
-		
-		JMP	@buzz
-
 @sethotel:
 		LDA	#musTuneHotel
 		PHA
@@ -25780,8 +25753,8 @@ rulesNextImprv:
 		STA	game + GAME::varE
 		
 		LDY	#PLAYER::money
-		LDA	($8B), Y
 		SEC
+		LDA	($8B), Y
 		SBC	game + GAME::varD
 		INY
 		LDA	($8B), Y
@@ -25797,9 +25770,8 @@ rulesNextImprv:
 		ORA	game + GAME::varA
 		STA	sqr00 + 1, X
 		
-		AND	#$0F
-		CMP	#$08
-		BEQ	@updht
+		AND	#$08
+		BNE	@updht
 		
 		SEC				;Update house count
 		LDA	game + GAME::cntHs
@@ -25890,14 +25862,16 @@ rulesPriorImprv:
 		
 		LDA	sqr00 + 1, X
 		AND	#$0F
-		CMP	#$00
 		BNE	@begin
 		
 		JMP	@buzz
 
 @begin:
-		CMP	#$08
-		BEQ	@sethouse
+		AND	#$08
+		BNE	@sethouse
+		
+		LDA	sqr00 + 1, X
+		AND	#$07
 		
 		TAY
 		DEY
@@ -26197,6 +26171,8 @@ rulesToggleMrtg:
 		
 @start:
 		LDA	game + GAME::sSelect
+		CMP	#$FF
+		BEQ	@buzz
 		
 		TAY
 		ASL
@@ -26230,12 +26206,6 @@ rulesToggleMrtg:
 		
 @cont1:
 		LDA	game + GAME::sSelect
-		CMP	#$FF
-		BNE	@test
-		
-		JMP	@buzz
-	
-@test:
 		ASL
 		TAX
 		
@@ -26254,13 +26224,12 @@ rulesToggleMrtg:
 		EOR	#$80
 		STA	game + GAME::varA	;imprv
 		
+		LDA	rulesSqr0, X		
+		STA	game + GAME::varB	;group
+		
 		LDA	rulesSqr0 + 1, X
 		STA	game + GAME::varC	;index
 		
-		LDA	rulesSqr0, X		
-		STA	game + GAME::varB	;group
-
-		LDA	game + GAME::varC	;group index
 		ASL
 		CLC
 		ADC	#GROUP::aCard0
@@ -26367,6 +26336,12 @@ rulesToggleMrtg:
 		ORA	#GAME_DRT_ALLD
 		STA	game + GAME::dirty
 		
+	.if	DEBUG_EQUITY
+		LDA	#$02
+		STA	debugEquityEntry
+		JSR	debugCheckEquity
+	.endif
+		
 @exit:
 		RTS
 		
@@ -26376,6 +26351,9 @@ rulesDoXferDeed:
 ;-------------------------------------------------------------------------------
 		LDA	sqr00, X
 		PHA
+
+		LDA	sqr00 + 1, X
+		STA	game + GAME::varW
 
 		LDA	game + GAME::pActive
 		STA	sqr00, X
@@ -26441,8 +26419,19 @@ rulesDoXferDeed:
 		LDA	($FD), Y
 		STA	game + GAME::varE
 		
+		LDA	game + GAME::varW
+		AND	#$80
+		BNE	@skipeq0
+		
 		JSR	rulesAddEquity
 		
+	.if	DEBUG_EQUITY
+		LDA	#$03
+		STA	debugEquityEntry
+		JSR	debugCheckEquity
+	.endif
+	
+@skipeq0:
 		PLA
 		TAX
 
@@ -26463,9 +26452,20 @@ rulesDoXferDeed:
 		DEX
 		TXA
 		STA	($8B), Y
-		
+	
+		LDA	game + GAME::varW
+		AND	#$80
+		BNE	@skipeq1
+
 		JSR	rulesSubEquity
 		
+	.if	DEBUG_EQUITY
+		LDA	#$04
+		STA	debugEquityEntry
+		JSR	debugCheckEquity
+	.endif
+
+@skipeq1:
 		LDX	game + GAME::varX
 		STX	game + GAME::pActive
 		
@@ -26481,8 +26481,7 @@ rulesDoXferDeed:
 rulesTradeTitleDeed:
 ;-------------------------------------------------------------------------------
 		STX	game + GAME::varA	;square
-		LDA	game + GAME::varA
-
+		TXA
 		ASL
 		TAX
 
@@ -26508,10 +26507,10 @@ rulesTradeTitleDeed:
 		STA	game + GAME::varB	;group
 		
 		CMP	#$01
-		BMI	@exit
+		BCC	@exit
 		
 		CMP	#$0B
-		BPL	@exit
+		BCS	@exit
 		
 		LDX	game + GAME::varF
 		JSR	rulesDoXferDeed
@@ -26531,6 +26530,9 @@ rulesTradeTitleDeed:
 		
 ;-------------------------------------------------------------------------------
 rulesBuyTitleDeed:
+;
+;(IN)		.Y	=	sub cash/specify square flag
+;(IN)		.X	=	square (if .Y = 1)
 ;-------------------------------------------------------------------------------
 		STY 	game + GAME::varH	;store whether or not to sub cash
 		TXA
@@ -26569,10 +26571,10 @@ rulesBuyTitleDeed:
 		STA	game + GAME::varB	;group
 		
 		CMP	#$01
-		BMI	@exit
+		BCC	@exit
 		
 		CMP	#$0B
-		BPL	@exit
+		BCS	@exit
 		
 		LDX	game + GAME::varF
 		LDA	sqr00, X
@@ -26681,8 +26683,6 @@ rulesDoGameOver:
 		JSR	rulesFocusOnActive
 		BCC	@juststats
 
-;		LDA	#$01
-;		STA	game + GAME::dirty
 		RTS
 
 @juststats:		
@@ -26693,7 +26693,9 @@ rulesDoGameOver:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 rulesInitTradeData:
+;-------------------------------------------------------------------------------
 		LDX	#.sizeof(TRADE) - 1	
 		LDA	#$00
 @loop0:
@@ -26717,6 +26719,46 @@ rulesInitTradeData:
 		
 
 ;-------------------------------------------------------------------------------
+rulesDoEliminRetImprv:
+;-------------------------------------------------------------------------------
+		LDA	sqr00 + 1, X
+		AND	#$08
+		BEQ	@tsthouses
+		
+		INC	game + GAME::cntHt
+		RTS
+		
+@tsthouses:
+		LDA	sqr00 + 1, X
+		AND	#$07
+		BNE	@houses
+		
+		RTS
+		
+@houses:
+		CLC
+		ADC	game + GAME::cntHs
+		STA	game + GAME::cntHs
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
+rulesDoEliminSkip:
+;-------------------------------------------------------------------------------
+		JSR	gamePopState
+	
+		LDA	#$FF
+		STA	game + GAME::pLast
+		
+		JSR	rulesDoNextPlyr
+		
+		JSR	gameUpdateMenu
+		
+		RTS
+		
+
+;-------------------------------------------------------------------------------
 rulesInitEliminToPlyr:
 ;-------------------------------------------------------------------------------
 		PHA
@@ -26734,6 +26776,7 @@ rulesInitEliminToPlyr:
 		
 		LDA	#$00
 		STA	menuElimin0HaveOffer
+		STA	game + GAME::varW
 		
 		JSR	rulesInitTradeData
 
@@ -26741,17 +26784,23 @@ rulesInitEliminToPlyr:
 @loop:
 		LDA	sqr00, X
 		CMP	game + GAME::varX
-		
 		BNE	@next
+		
+		JSR	rulesDoEliminRetImprv
 		
 		LDA	#$80
 		STA	sqr00 + 1, X
+		
+		INC	game + GAME::varW
 		
 @next:
 		INX
 		INX
 		CPX	#$50
 		BNE	@loop
+
+		LDA	game + GAME::varW
+		BEQ	@skip
 
 		LDX	#TRADE::player
 		LDA	game + GAME::varX
@@ -26761,6 +26810,12 @@ rulesInitEliminToPlyr:
 
 		LDA	#GAME_MDE_ELIM
 		STA	game + GAME::gMode
+		
+		RTS
+		
+@skip:
+		JSR	rulesDoEliminSkip
+		
 		RTS
 		
 
@@ -26782,6 +26837,7 @@ rulesInitEliminToBank:
 
 		LDA	#$00
 		STA	menuElimin0HaveOffer
+		STA	game + GAME::varW
 
 		JSR	rulesInitTradeData
 
@@ -26790,9 +26846,12 @@ rulesInitEliminToBank:
 @loop:
 		LDA	sqr00, X
 		CMP	game + GAME::varA
-		
 		BNE	@next
 		
+		JSR	rulesDoEliminRetImprv		
+
+		INC	game + GAME::varW
+
 		LDA	#$00
 		STA	sqr00 + 1, X
 		
@@ -26811,10 +26870,14 @@ rulesInitEliminToBank:
 		
 @next:
 		INC	game + GAME::varB
+		
 		INX
 		INX
 		CPX	#$50
 		BNE	@loop
+		
+		LDA	game + GAME::varW
+		BEQ	@skip
 
 		JSR	rulesDoNextPlyr
 		
@@ -26825,6 +26888,12 @@ rulesInitEliminToBank:
 		STA	ui + UI::fActInt		
 		
 		JSR	gamePerfTradeFull
+		
+		RTS
+		
+@skip:
+		JSR	rulesDoEliminSkip
+		
 		RTS
 		
 
@@ -26855,13 +26924,6 @@ rulesDoPlyrLostPlyr:
 @cont:
 		JSR	gameUpdateMenu
 		
-		BCC	@juststats
-
-;		LDA	#$01
-;		STA	game + GAME::dirty
-		RTS
-
-@juststats:		
 		LDA	game + GAME::dirty
 		ORA	#GAME_DRT_STAT
 		STA	game + GAME::dirty
@@ -27043,7 +27105,9 @@ rulesNextTurn:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 rulesDoTestAllOwned:
+;-------------------------------------------------------------------------------
 ;***FIXME:	I'm doing this group lookup a lot now.  I should optimise it
 ;		by indexing the squares for the groups.
 
@@ -27616,11 +27680,20 @@ rulesDoProcRecoverAll:
 @complete:		
 		RTS
 	
-	
+
+;-------------------------------------------------------------------------------
 rulesAutoRecover:
+;
+;(IN)		.A	=	amount.Lo
+;(IN)		.Y	=	amount.Hi
+;(IN)		.X	=	player
+;		O	
+;		P
+;		K
+;-------------------------------------------------------------------------------
 		STA	game + GAME::varO		;varO,P = amount
 		STY	game + GAME::varP
-		STX	game + GAME::varK		;varF = player
+		STX	game + GAME::varK		;varK = player
 		
 		LDA	ui + UI::cLstAct
 		STA	rulesLastActnIdx
@@ -27661,7 +27734,9 @@ rulesAutoRecover:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 rulesAutoPay:
+;-------------------------------------------------------------------------------
 		LDY	#PLAYER::money + 1
 		LDA	($8B), Y
 		BPL	@incomplete
@@ -27696,7 +27771,9 @@ rulesAutoPay:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 rulesDoGetOwnCount:
+;-------------------------------------------------------------------------------
 ;	IN:	varU	=	square
 ;	OUT:	varA	=	own count
 ;	USES:	varB	=	player group own index
@@ -27749,7 +27826,9 @@ rulesDoGetOwnCount:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 rulesDoGetLastOwn:
+;-------------------------------------------------------------------------------
 ;	IN:	varU	=	square
 ;	OUT:	varA	=	last player owns
 ;	USES:	varB	=	player group own index
@@ -27801,64 +27880,16 @@ rulesDoGetLastOwn:
 		
 		RTS
 		
-		
+
 ;-------------------------------------------------------------------------------
-rulesAutoBuy:
-;
-;	IN:	.X	=	square
-;
-;	USED:	varU	=	square
-;		varV-X  =	wealth
-;		varD-E	=	temp calc
-;		varO-P 	=	temp calc
-;		varM-N	=	cost
-;		varS-T	=	player money
+rulesCheckDeedWanted:
+;(IN)		U	square
+;(IN)		M,N	purchase price
+;(IN)		S,T	player money
+;		D,E	temp value
+;		O,P	temp value
+;		V,W,X	temp value
 ;-------------------------------------------------------------------------------
-
-;	Get cost for square
-		STX	game + GAME::varU
-		TXA
-		JSR	gameGetCardPtrForSquare
-	
-		LDY	#DEED::mPurch
-		LDA	($FD), Y
-		STA	game + GAME::varM
-		INY
-		LDA	($FD), Y
-		STA	game + GAME::varN
-	
-;	Get cash for player
-		LDY	#PLAYER::money
-		LDA	($8B), Y
-		STA	game + GAME::varS
-		INY
-		LDA	($8B), Y
-		STA	game + GAME::varT
-		
-;	Can afford to snap up?  299 < cash - cost
-		LDA	#<299
-		STA	game + GAME::varD
-		LDA	#>299
-		STA	game + GAME::varE
-		
-		SEC
-		LDA	game + GAME::varS
-		SBC	game + GAME::varM
-		STA	game + GAME::varO
-		LDA	game + GAME::varT
-		SBC	game + GAME::varN
-		STA	game + GAME::varP
-
-;		D, E < (O, P) -> SEC | CLC
-		JSR	gameAmountIsLessDirect
-		BCS	@tstwant
-		
-		JMP	@purchase
-
-@tstwant:
-		
-;	***TODO:  Check gambling on auction here?
-
 ;	Have wealth at all?
 		LDY	#PLAYER::equity
 		CLC
@@ -27942,11 +27973,78 @@ rulesAutoBuy:
 		BNE	@pass
 		
 		CMP	#$02
-		BPL	@pass
+		BCS	@pass
 		
 ;		JSR	rulesDoGetLastOwn
 ;		CMP	game + GAME::pActive
 ;		BNE	@pass
+@purchase:
+		LDA	#$01
+		RTS
+		
+@pass:
+		LDA	#$00
+		RTS
+
+
+;-------------------------------------------------------------------------------
+rulesAutoBuy:
+;
+;	IN:	.X	=	square
+;
+;	USED:	varU	=	square
+;		varV-X  =	wealth
+;		varD-E	=	temp calc
+;		varO-P 	=	temp calc
+;		varM-N	=	cost
+;		varS-T	=	player money
+;-------------------------------------------------------------------------------
+;	Get cost for square
+		STX	game + GAME::varU
+		TXA
+		JSR	gameGetCardPtrForSquare
+	
+		LDY	#DEED::mPurch
+		LDA	($FD), Y
+		STA	game + GAME::varM
+		INY
+		LDA	($FD), Y
+		STA	game + GAME::varN
+	
+;	Get cash for player
+		LDY	#PLAYER::money
+		LDA	($8B), Y
+		STA	game + GAME::varS
+		INY
+		LDA	($8B), Y
+		STA	game + GAME::varT
+		
+;	Can afford to snap up?  299 < cash - cost
+		LDA	#<299
+		STA	game + GAME::varD
+		LDA	#>299
+		STA	game + GAME::varE
+		
+		SEC
+		LDA	game + GAME::varS
+		SBC	game + GAME::varM
+		STA	game + GAME::varO
+		LDA	game + GAME::varT
+		SBC	game + GAME::varN
+		STA	game + GAME::varP
+
+;		D, E < (O, P) -> CLC | SEC
+		JSR	gameAmountIsLessDirect
+		BCS	@tstwant
+		
+		JMP	@purchase
+
+@tstwant:
+		
+;	***TODO:  Check gambling on auction here?
+
+		JSR	rulesCheckDeedWanted
+		BEQ	@pass
 
 @purchase:
 ;	On purchase wanted
@@ -28026,13 +28124,12 @@ rulesUpdateValueIfLess:
 ;-------------------------------------------------------------------------------
 rulesSuggestBaseReserve:
 ;
-;		game + GAME::varD,E = value
-;
-;		game + GAME::varJ = group
-;		game + GAME::varU = square
-;		game + GAME::varH = improvements
-;		game + GAME::varO,P = temp value
-;		game + GAME::varM,N = temp value
+;(OUT)		D,E 	= value
+;		J 	= group
+;		U 	= square
+;		H 	= improvements
+;		O,P	= temp value
+;		M,N 	= temp value
 ;-------------------------------------------------------------------------------
 		LDA	#$00
 		STA	game + GAME::varD
@@ -28952,7 +29049,11 @@ rulesFindHighestImprove:
 		BCC	@next
 		
 		STA	game + GAME::varA
-;		JMP	@next
+
+		LDA	game + GAME::varK
+		CMP	#$FF
+		BEQ	@next
+		
 		RTS
 
 
@@ -29109,8 +29210,9 @@ rulesAutoImprove:
 @complete:
 		LDA	#UI_ACT_DELY
 		STA	$68
-		LDA	#$00
+		LDA	#$03
 		STA	$69
+		LDA	#$00
 		STA	$6A
 		STA	$6B
 		
@@ -29466,23 +29568,24 @@ rulesGetGroupOwnInfo:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 rulesSuggestDeedValue:
+;
 ;(IN)		.A	= 	square
 ;		varA	=	square
 ;		varB	=	group
 ;		varC	=	group index
-;		varD,E  = 	value
-;		varM,N	=	temp value
-;		varS,T	=	temp value
-;(IN)		varK 	=	player
-;		varL	= 	square * 2
-;
-;Destroyed:
+;(OUT)		varD,E  = 	value
+;		varF	
+;		varG	
 ;		varH	
 ;		varI	
 ;		varJ	
-;		varF	
-;		varG	
+;(IN)		varK 	=	player
+;		varL	= 	square * 2
+;		varM,N	=	temp value
+;		varS,T	=	temp value
+;-------------------------------------------------------------------------------
 
 		STA	game + GAME::varA
 		
@@ -29631,18 +29734,52 @@ rulesSuggestDeedValue:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 rulesAutoAuction:
+;-------------------------------------------------------------------------------
 ;	Current bid amount in game + GAME::mACurr
 ;	Auctioned square in game + GAME::sAuctn	
 
 		LDX	game + GAME::pActive
-		STX	game + GAME::varK		;varK = player
+		STX	game + GAME::varK	;varK = player
 
-;		LDA	plrLo, X
-;		STA	$FB
-;		LDA	plrHi, X
-;		STA	$FC
+		LDA	#$00
+		STA	game + GAME::varR	;Set to not recover
+		
+;	Get a suggested value
+		LDA	game + GAME::sAuctn
+		JSR	rulesSuggestDeedValue
 
+		LDA	game + GAME::sAuctn
+		STA	game + GAME::varU
+
+		LDA	game + GAME::varD
+		STA	game + GAME::varM
+		LDA	game + GAME::varE
+		STA	game + GAME::varN
+
+		LDY	#PLAYER::money
+		LDA	($8B), Y
+		STA	game + GAME::varS
+		INY
+		LDA	($8B), Y
+		STA	game + GAME::varT
+		
+		JSR	rulesCheckDeedWanted
+		BEQ	@tstnorm
+
+		LDA	#$01
+		STA	game + GAME::varR	;Set to recover
+		
+;	Copy our suggested value to maximum
+		LDA	game + GAME::varM
+		STA	game + GAME::varO
+		LDA	game + GAME::varN
+		STA	game + GAME::varP		
+
+		JMP	@cont0
+
+@tstnorm:
 		JSR	rulesDoCopyImprv
 
 ;	Find base rent value needed
@@ -29660,10 +29797,10 @@ rulesAutoAuction:
 		STA	game + GAME::varE
 		
 ;	Have negative aboslute maximum value, forfeit
-		BPL	@begin
+		BPL	@begin0
 		JMP	@forfeit
 
-@begin:
+@begin0:
 ;	Copy our value to absolute maximum for compare
 		LDA	game + GAME::varD
 		STA	game + GAME::varO
@@ -29686,7 +29823,6 @@ rulesAutoAuction:
 		STA	game + GAME::varP
 		
 @cont0:
-
 ;***TODO	
 ;	If have sufficient money (still within max after sub value from money?)
 ;	Get more interested in buying it?
@@ -29699,15 +29835,11 @@ rulesAutoAuction:
 ;	Test our suggested value, if current is >= then forfeit
 ;		D, E < (O, P) -> CLC | SEC
 		JSR	gameAmountIsLessDirect
-		BCS	@forfeit
+		BCC	@testtap0
 
-;***TODO	
-;	Calc min?  Boot bid?
-;	Test have 75% of money
-;	Test have 50% of money?
-;	Recover equity 
+		JMP	@forfeit
 
-
+@testtap0:
 ;	Do we nudge or tap towards our value?
 		LDA	sidV2EnvOu
 		CMP	#$C0
@@ -29736,12 +29868,51 @@ rulesAutoAuction:
 		STA	game + GAME::varE
 		
 @cont2:
-;	Make our bid
+		LDA	game + GAME::varR
+		BEQ	@bid
+
+;	Subtract value from money store as O,P
+		LDY	#PLAYER::money
+		SEC
+		LDA	($8B), Y
+		SBC	game + GAME::varD
+		STA	game + GAME::varO
+		INY
+		LDA	($8B), Y
+		SBC	game + GAME::varE
+		STA	game + GAME::varP
+	
+		BPL	@bid
+		
+		LDA	game + GAME::varD
+		STA	game + GAME::varQ
+		LDA	game + GAME::varE
+		STA	game + GAME::varR
+		
+		SEC
+		LDA	#$00
+		SBC	game + GAME::varO
+		PHA
+		LDA	#$00
+		SBC	game + GAME::varP
+		TAY
+		PLA
+		LDX	game + GAME::pActive
+		
+		JSR	rulesAutoRecover
+
+		LDA	game + GAME::varQ
+		STA	game + GAME::varD
+		LDA	game + GAME::varR
+		STA	game + GAME::varE
+
+@bid:
 		LDA	game + GAME::varD
 		STA	game + GAME::mACurr
 		LDA	game + GAME::varE
 		STA	game + GAME::mACurr + 1
 		
+;	Make our bid
 		LDA	#UI_ACT_SKEY
 		STA	$68
 		LDA	#'B'
@@ -32739,6 +32910,193 @@ debugTallyDie:
 		
 		RTS
 	.endif
+
+	.if	DEBUG_EQUITY
+debugEquityEntry:
+	.byte	$00
+debugEquityTally:
+	.word	$0000
+debugEquityWork:
+	.word	$0000
+debugEquityValue:
+	.word	$0000
+
+	
+;-------------------------------------------------------------------------------
+debugEquityMult:
+;-------------------------------------------------------------------------------
+		PHA
+		
+		LSR
+		TAY
+		DEY
+		BMI	@skipmult
+		
+		LDA	debugEquityValue
+		STA	debugEquityWork
+		LDA	debugEquityValue + 1
+		STA	debugEquityWork + 1
+@loopmult:
+		ASL	debugEquityWork
+		ROL	debugEquityWork + 1
+		
+		DEY
+		BPL	@loopmult
+		
+		JMP	@calcodd
+		
+@skipmult:
+		LDA	#$00
+		STA	debugEquityWork
+		LDA	#$00
+		STA	debugEquityWork + 1
+		
+@calcodd:
+		PLA
+		AND	#$01
+		BEQ	@exit
+		
+		CLC
+		LDA	debugEquityWork
+		ADC	debugEquityValue
+		STA	debugEquityWork 
+		LDA	debugEquityWork + 1
+		ADC	debugEquityValue + 1
+		STA	debugEquityWork + 1
+@exit:
+		RTS
+
+
+;-------------------------------------------------------------------------------
+debugEquityImprv:
+;-------------------------------------------------------------------------------
+		LDY	#GROUP::vImprv
+		LDA	($8D), Y
+		LSR
+		STA	debugEquityValue
+		LDA	#$00
+		STA	debugEquityValue + 1
+		
+		LDA	sqr00 + 1, X
+		AND	#$0F
+		BEQ	@exit
+		
+		AND	#$08
+		BEQ	@houses
+		
+		LDA	#$05
+		JMP	@proc
+		
+@houses:
+		LDA	sqr00 + 1, X
+		AND	#$07
+
+@proc:
+		JSR	debugEquityMult
+		
+		CLC
+		LDA	debugEquityTally 
+		ADC	debugEquityWork
+		STA	debugEquityTally 
+		LDA	debugEquityTally + 1
+		ADC	debugEquityWork + 1
+		STA	debugEquityTally + 1
+		
+@exit:
+		RTS
+
+
+;-------------------------------------------------------------------------------
+debugEquityMrtg:
+;-------------------------------------------------------------------------------
+		LDY	#DEED::mMrtg
+		CLC
+		LDA	($8D), Y
+		ADC	debugEquityTally
+		STA	debugEquityTally
+		INY
+		LDA	($8D), Y
+		ADC	debugEquityTally + 1
+		STA	debugEquityTally + 1
+		
+		RTS
+		
+
+;-------------------------------------------------------------------------------
+debugCheckEquity:
+;-------------------------------------------------------------------------------
+		LDX	#$00
+		STX	debugEquityTally
+		STX	debugEquityTally + 1
+@loop:
+		LDA	sqr00, X
+		CMP	game + GAME::pActive
+		BNE	@next
+		
+		LDA	sqr00 + 1, X
+		AND	#$80
+		BNE	@next
+		
+		LDY	rulesSqr0, X
+		LDA	rulesGrpLo, Y
+		STA	$8D
+		LDA	rulesGrpHi, Y
+		STA	$8E
+		
+		JSR	debugEquityImprv
+		
+		LDA	rulesSqr0 + 1, X
+		ASL
+		CLC
+		ADC	#GROUP::aCard0
+		TAY
+		LDA	($8D), Y
+		PHA
+		INY
+		LDA	($8D), Y
+		STA	$8E
+		PLA
+		STA	$8D
+		
+		JSR	debugEquityMrtg
+		
+@next:
+		INX
+		INX
+		
+		CPX	#$50
+		BNE	@loop
+		
+		LDY	#PLAYER::equity
+		LDA	($8B), Y
+		CMP	debugEquityTally
+		BNE	@error
+		
+		INY
+		LDA	($8B), Y
+		CMP	debugEquityTally + 1
+		BNE	@error
+		
+		RTS
+		
+@error:
+		LDA	game + GAME::pActive
+		STA	cpuFaultPlayer
+		
+		LDA	#<debugCheckEquity
+		STA	cpuFaultAddr
+		LDA	#>debugCheckEquity
+		STA	cpuFaultAddr + 1
+
+		LDA 	#<dialogDlgNull0
+		LDY	#>dialogDlgNull0
+		
+		JSR	dialogSetDialog
+		JSR	dialogDispDefDialog
+		
+		RTS
+	.endif
+
 
 ;===============================================================================
 ;HEAP
