@@ -32,18 +32,17 @@ this.  *\*ugh\**
   all of a group and require that they be accounted for in other deeds or money 
   (convert extra points too?).
 
-* Make dialog elimin0 more informative about the elimination (to player/bank)?
-
-* Could now instead of copy name on elimin and gameover dialogs, just refer.
 * Optimise trade calculations -- too large!
 
+* Change "all" dirty to be just board dirty and req. individual flags.
 * Player sprites on overview dialog?  Would look pretty.  IRQ is a mess.
 * Get exomiser working.
 * Allow construct from manage menu in trade if not doing so for group in trade?
+* Make dialog elimin0 more informative about the elimination (to player/bank)?
+* Could now instead of copy name on elimin and gameover dialogs, just refer.
 
 * Should be able to do release state after above and all testing items passed.
 
-* Change "all" dirty to be just board dirty and req. individual flags?
 * Mode chain integrity checks?  
 * Is checking must pay after normal (non-elimination) action processing required 
   now?
@@ -81,14 +80,6 @@ this.  *\*ugh\**
 * Elimination works from must pay?
 * Multiple eliminations in one turn works?
 * In elimination auctions, auctioned square keeps selection?
-* Does trading during auctions work?
-* Stress test:  CPU from trade from auction from elimination...
-* Don't overflow game state stack!  Debug?
-  What about CPU from trade from auction from elimination?  I think this requires
-  only 7/8 and I have allocated 10.
-* Check not overflowing action cache contexts.  Debug?
-  What about CPU from trade from auction from elimination?  Is this 3/4 and I have
-  5?
 * Check not overflowing action cache???  Debug?  256 actions should be enough??
   What about CPU from trade from auction from elimination?  Still have same maximum
   number of deeds...
@@ -101,6 +92,18 @@ this.  *\*ugh\**
 
 ### Since Version 0.02.68B
 
+* 01AUG2018
+	* Keep/restore current selection with game state stack push/pop.
+	* Recolour stats with dialog rebuilds after they are displayed.
+	* Fix colouring trdsel0 frame.
+	* Call menuElimin0RemWlthRecalc _after_ rulesInitTradeData!
+* 31JUL2018
+	* I suspect that AutoRecover in AutoAuction is messing with bid - 
+	  work-around?
+	* Cleanup all the game[Dec|Inc]Money<N> routines.
+	* Call gamePlayerChanged in gameInitTrdIntrpt!
+	* Remove unrequired stats dirty flag setting.
+	* Make stats dirty in gamePlayerChanged.
 * 29JUL2018
 	* Increase "Victor's" delay time after improving.
 	* Handle nothing to trade/auction when processing elimination.

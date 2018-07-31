@@ -475,6 +475,8 @@ GAME_DRT_SHF0	=	$80
 	.struct GAMESTATE
 		mode	.byte
 		player	.byte
+		select	.byte
+		reserv	.byte
 	.endstruct
 
 	.struct GAME
@@ -1229,9 +1231,6 @@ mainHandleUpdates:
 		
 		JSR	mainRebuildScreen
 		
-;		JMP	updatesExit
-;		RTS
-
 @updTstCont0:
 		LDA	game + GAME::dirty
 		AND	#GAME_DRT_ALLD
@@ -1284,9 +1283,19 @@ mainHandleUpdates:
 @updStats:
 		JSR	statsDisplay
 
+		LDA	game + GAME::dirty
+		AND	#GAME_DRT_DLGU
+		BEQ	@updMenu
+		
+		LDA	game + GAME::dlgVis
+		BNE	@updMenu
+		
+		JSR	statsRecolour
+		
 @updMenu:
 		JSR	menuDisplay
 
+@updTstPrmpt:
 		LDA	game + GAME::dirty
 		AND	#GAME_DRT_PRMP
 		BEQ	@updTstCont1
@@ -1315,7 +1324,7 @@ mainHandleUpdates:
 		BEQ	@tstcpu1
 		
 		CMP	#GAME_MDE_OVER
-		BPL	@human
+		BCS	@human
 		
 @tstcpu1:
 		LDA	keyQueueEnPos
@@ -1400,7 +1409,7 @@ updatesExit:
 ;-------------------------------------------------------------------------------
 mainRebuildScreen:
 ;-------------------------------------------------------------------------------
-		JSR	screenBeginButtons	
+;		JSR	screenBeginButtons	
 
 		LDA	#<screenQErase0
 		STA	$FD
@@ -1409,9 +1418,9 @@ mainRebuildScreen:
 		
 		JSR	screenPerformList
 		
-		JSR	statsClear
+;		JSR	statsRecolour
 		
-		LDA	#GAME_DRT_ALLD
+		LDA	#(GAME_DRT_ALLD | GAME_DRT_DLGU)
 		STA	game + GAME::dirty
 
 		RTS
@@ -6242,7 +6251,7 @@ statsStrLen:
 		
 		
 ;-------------------------------------------------------------------------------
-statsClear:
+statsRecolour:
 ;-------------------------------------------------------------------------------
 		LDX	#$00			;Colour each line in the 
 @loop:						;player's colour
@@ -6265,7 +6274,6 @@ statsClear:
 		
 		LDY	#PLAYER::colour
 		LDA	($FB), Y
-		
 		ORA	#$20
 		STA	statsPerfLstH
 
@@ -7340,13 +7348,6 @@ uiActionBuy:
 		
 		JSR	gamePlayerChanged
 		
-;		LDY	#PLAYER::money
-;		LDA	($8B), Y
-;		STA	game + GAME::varS
-;		INY
-;		LDA	($8B), Y
-;		STA	game + GAME::varT
-
 		LDA	$6A
 		JSR	uiActionFocusSquare
 
@@ -8553,11 +8554,6 @@ menuPageSetup1Keys:
 		
 		LDX	menuTemp0
 		
-;		LDA	plrLo, X
-;		STA	$FB
-;		LDA	plrHi, X
-;		STA	$FC
-		
 		LDY	#PLAYER::colour
 		
 		PLA
@@ -8573,7 +8569,7 @@ menuPageSetup1Keys:
 		STA	irqBlinkSeq0		;Naughty but it will work in this
 		STA	irqBlinkSeq0 + 1	;context
 
-		JSR	statsClear
+		JSR	statsRecolour
 
 		LDA	#<SFXDING
 		LDY	#>SFXDING
@@ -8582,9 +8578,9 @@ menuPageSetup1Keys:
 		
 		LDX	menuTemp0
 
-		LDA	game + GAME::dirty
-		ORA	#(GAME_DRT_STAT | GAME_DRT_MENU)
-		STA	game + GAME::dirty		
+;		LDA	game + GAME::dirty
+;		ORA	#(GAME_DRT_STAT | GAME_DRT_MENU)
+;		STA	game + GAME::dirty		
 		
 		INX
 		STX	menuTemp0
@@ -8716,9 +8712,9 @@ menuPageSetup2Keys:
 		
 		JSR	menuSetPage
 
-		LDA	game + GAME::dirty
-		ORA	#GAME_DRT_STAT
-		STA	game + GAME::dirty
+;		LDA	game + GAME::dirty
+;		ORA	#GAME_DRT_STAT
+;		STA	game + GAME::dirty
 
 @exit:
 		RTS
@@ -8964,7 +8960,7 @@ menuPageSetup4Keys:
 		JSR	gamePlayerChanged
 
 		LDA	game + GAME::dirty
-		ORA	#(GAME_DRT_STAT | GAME_DRT_MENU)
+		ORA	#GAME_DRT_MENU
 		STA	game + GAME::dirty		
 		
 @exit:
@@ -11378,42 +11374,48 @@ menuPageManage0Keys:
 		CMP	#'Y'
 		BNE	@keysU
 		
-		JSR	gameIncMoney100
+		LDA	#100
+		JSR	gameIncMoney
 		JMP	@exit
 		
 @keysU:
 		CMP	#'U'
 		BNE	@keysPL
 		
-		JSR	gameDecMoney100
+		LDA	#100
+		JSR	gameDecMoney
 		JMP	@exit
 		
 @keysPL:
 		CMP	#'+'
 		BNE	@keysMN
 		
-		JSR	gameIncMoney1
+		LDA	#01
+		JSR	gameIncMoney
 		JMP	@exit
 		
 @keysMN:
 		CMP	#'-'
 		BNE	@keys0
 		
-		JSR	gameDecMoney1
+		LDA	#01
+		JSR	gameDecMoney
 		JMP	@exit
 		
 @keys0:
 		CMP	#'0'
 		BNE	@keys9
 		
-		JSR	gameIncMoney10
+		LDA	#10
+		JSR	gameIncMoney
 		JMP	@exit
 		
 @keys9:
 		CMP	#'9'
 		BNE	@keysJ
 		
-		JSR	gameDecMoney10
+		LDA	#10
+		JSR	gameDecMoney
 		JMP	@exit
 		
 @keysJ:
@@ -12215,9 +12217,9 @@ menuPageTrade1DefKeys:
 		LDX	#$07
 		JSR	SNDBASE + 6
 
-		LDA	game + GAME::dirty
-		ORA	#GAME_DRT_STAT
-		STA	game + GAME::dirty
+;		LDA	game + GAME::dirty
+;		ORA	#GAME_DRT_STAT
+;		STA	game + GAME::dirty
 
 		JMP	@keysDing
 		
@@ -13333,10 +13335,6 @@ menuPageQuit1Keys:
 @update:
 		JSR	gameUpdateMenu
 		
-;		LDA	game + GAME::dirty
-;		ORA	#GAME_DRT_ALLD
-;		STA	game + GAME::dirty
-		
 @ding:
 		LDA	#<SFXDING
 		LDY	#>SFXDING
@@ -13399,10 +13397,6 @@ menuPageQuit2Keys:
 @update:
 		JSR	gameUpdateMenu
 		
-;		LDA	#$01
-;		ORA	game + GAME::dirty
-;		STA	game + GAME::dirty
-		
 @ding:
 		LDA	#<SFXDING
 		LDY	#>SFXDING
@@ -13429,7 +13423,7 @@ menuPageQuit2Draw:
 
 gameStateStack:
 	.repeat	10, I
-		.byte	$00, $00
+		.byte	$00, $00, $00, $00
 	.endrep
 	
 gameStateIdx:
@@ -13441,6 +13435,7 @@ gamePushState:
 ;-------------------------------------------------------------------------------
 		LDA	gameStateIdx
 		ASL
+		ASL
 		TAX
 
 		LDA	game + GAME::gMode
@@ -13448,7 +13443,10 @@ gamePushState:
 		
 		LDA	game + GAME::pActive
 		STA	gameStateStack + 1, X
-		
+
+		LDA	game + GAME::sSelect
+		STA	gameStateStack + 2, X
+
 		INC	gameStateIdx
 		
 	.if	DEBUG_GSTATE		
@@ -13469,6 +13467,7 @@ gamePopState:
 	
 		LDA	gameStateIdx
 		ASL
+		ASL
 		TAX
 		
 		LDA	gameStateStack, X
@@ -13477,8 +13476,18 @@ gamePopState:
 		LDA	gameStateStack + 1, X
 		STA	game + GAME::pActive
 
+		LDA	gameStateStack + 2, X
+		STA	game + GAME::sSelect
+		
 		JSR	gamePlayerChanged
 
+		LDA	game + GAME::sSelect
+		CMP	#$FF
+		BEQ	@tstactions
+		
+		JSR	gameSelect
+		
+@tstactions:
 		LDA	game + GAME::gMode
 		CMP	#GAME_MDE_ACTS
 		BNE	@exit
@@ -13497,6 +13506,10 @@ gamePlayerChanged:
 		STA	$8B
 		LDA	plrHi, X
 		STA	$8C
+		
+		LDA	game + GAME::dirty
+		ORA	#GAME_DRT_STAT
+		STA	game + GAME::dirty		
 		
 		RTS
 
@@ -14413,10 +14426,6 @@ gameUpdateForMustPay:
 		
 		JSR	menuSetPage
 
-;		LDA	#$08
-;		ORA	game + GAME::dirty
-;		STA	game + GAME::dirty
-		
 		RTS
 		
 @switchelmin:
@@ -14424,11 +14433,6 @@ gameUpdateForMustPay:
 		STX	game + GAME::pActive
 		
 		JSR	gamePlayerChanged
-		
-;		LDA	plrLo, X
-;		STA	$FB
-;		LDA	plrHi, X
-;		STA	$FC
 		
 		JSR	gameSwitchMPayToElmin
 		
@@ -15050,9 +15054,9 @@ gameNextAuction:
 		
 		JSR	gameUpdateMenu
 
-		LDA	game + GAME::dirty
-		ORA	#GAME_DRT_STAT
-		STA	game + GAME::dirty
+;		LDA	game + GAME::dirty
+;		ORA	#GAME_DRT_STAT
+;		STA	game + GAME::dirty
 
 		RTS
 		
@@ -15355,6 +15359,8 @@ gameInitTrdIntrptDirect:
 		LDA	trade0, Y
 		STA	game + GAME::pActive
 		
+		JSR	gamePlayerChanged
+		
 		LDA	#GAME_MDE_TRDA
 		STA	game + GAME::gMode
 		
@@ -15362,9 +15368,9 @@ gameInitTrdIntrptDirect:
 
 		JSR	rulesFocusOnActive
 		
-		LDA	game + GAME::dirty
-		ORA	#GAME_DRT_STAT
-		STA	game + GAME::dirty
+;		LDA	game + GAME::dirty
+;		ORA	#GAME_DRT_STAT
+;		STA	game + GAME::dirty
 		
 		LDA	#<SFXPULSE
 		LDY	#>SFXPULSE
@@ -15847,9 +15853,9 @@ gamePerfTradeFull:
 
 		JSR	gameUpdateMenu
 
-		LDA	game + GAME::dirty
-		ORA	#GAME_DRT_STAT
-		STA	game + GAME::dirty
+;		LDA	game + GAME::dirty
+;		ORA	#GAME_DRT_STAT
+;		STA	game + GAME::dirty
 		
 		RTS
 		
@@ -16063,6 +16069,7 @@ gamePlayerHasWealth:
 		BMI	@fail
 
 ;***FIXME:	Is there a better way to test for 16 bit overflow?
+;		Yes there is using the overflow flag...  *doh*
 
 		BNE	@success
 		LDA	game + GAME::varE	;
@@ -16092,99 +16099,15 @@ gamePlayerHasWealth:
 
 	.if	DEBUG_EXTRAS
 ;-------------------------------------------------------------------------------
-gameDecMoney1:
-;------------------------------------------------------------------------------- 
-		LDY	#PLAYER::money
-		
-		SEC
-		LDA	($8B), Y
-		SBC	#1
-		STA	($8B), Y
-		INY
-		LDA	($8B), Y
-		SBC	#0
-		STA	($8B), Y
-		
-		LDA	game + GAME::dirty
-		ORA	#GAME_DRT_STAT
-		STA	game + GAME::dirty
-
-		RTS
-
-
+gameDecMoney:
 ;-------------------------------------------------------------------------------
-gameIncMoney1:
-;-------------------------------------------------------------------------------
-		LDY	#PLAYER::money
-		
-		CLC
-		LDA	($8B), Y
-		ADC	#1
-		STA	($8B), Y
-		INY
-		LDA	($8B), Y
-		ADC	#0
-		STA	($8B), Y
-		
-		LDA	game + GAME::dirty
-		ORA	#GAME_DRT_STAT
-		STA	game + GAME::dirty
-
-		RTS
-		
-;-------------------------------------------------------------------------------
-gameDecMoney10:
-;-------------------------------------------------------------------------------
-		LDY	#PLAYER::money
-		
-		SEC
-		LDA	($8B), Y
-		SBC	#10
-		STA	($8B), Y
-		INY
-		LDA	($8B), Y
-		SBC	#0
-		STA	($8B), Y
-		
-		LDA	game + GAME::dirty
-		ORA	#GAME_DRT_STAT
-		STA	game + GAME::dirty
-
-		RTS
-
-;-------------------------------------------------------------------------------
-gameIncMoney10:
-;-------------------------------------------------------------------------------
-		LDY	#PLAYER::money
-		
-		CLC
-		LDA	($8B), Y
-		ADC	#10
-		STA	($8B), Y
-		INY
-		LDA	($8B), Y
-		ADC	#0
-		STA	($8B), Y
-		
-		LDA	game + GAME::dirty
-		ORA	#GAME_DRT_STAT
-		STA	game + GAME::dirty
-
-		RTS
-
-;-------------------------------------------------------------------------------
-gameDecMoney100:
-;-------------------------------------------------------------------------------
-		LDA	#<100
 		STA	game + GAME::varD
-		LDA	#>100
+		LDA	#$00
 		STA	game + GAME::varE
 		
 		LDX	game + GAME::pActive
 		JSR	rulesSubCash
 		
-;		JSR	gameUpdateMenu
-		
 		LDA	game + GAME::dirty
 		ORA	#GAME_DRT_STAT
 		STA	game + GAME::dirty
@@ -16193,9 +16116,8 @@ gameDecMoney100:
 		
 
 ;-------------------------------------------------------------------------------
-gameIncMoney100:
+gameIncMoney:
 ;-------------------------------------------------------------------------------
-		LDA	#100
 		STA	game + GAME::varD
 		LDA	#$00
 		STA	game + GAME::varE
@@ -16230,10 +16152,6 @@ gameToggleDialog:
 		STA	game + GAME::pVis
 		
 		JSR	gamePlayersDirty
-		
-;		LDA	#$10
-;		ORA	game + GAME::dirty
-;		STA	game + GAME::dirty
 		
 		LDA	game + GAME::dirty
 		ORA	#GAME_DRT_DLGU
@@ -18368,7 +18286,7 @@ dialogWindowTrdSel0:
 			.byte	$44, $04, $15, $20
 			.byte	$54, $23, $03, $12
 			
-			.byte	$2B, $03, $03, $20	;clr frame
+			.byte	$2B, $04, $03, $20	;clr frame
 			.byte	$3B, $04, $04, $12
 			.byte	$2B, $04, $15, $20
 			.byte	$3B, $23, $03, $12
@@ -26667,6 +26585,7 @@ rulesDoPlayerElimin:
 @skipcash:
 		LDX	game + GAME::varW
 		JSR	rulesDoPlyrLostPlyr	;Player lost to other player
+
 		RTS
 
 
@@ -26681,16 +26600,15 @@ rulesDoGameOver:
 		JSR	gameUpdateMenu
 		
 		JSR	rulesFocusOnActive
-		BCC	@juststats
+;		BCC	@juststats
 
 		RTS
 
-@juststats:		
-		LDA	game + GAME::dirty
-		ORA	#GAME_DRT_STAT
-		STA	game + GAME::dirty
-
-		RTS
+;@juststats:		
+;		LDA	game + GAME::dirty
+;		ORA	#GAME_DRT_STAT
+;		STA	game + GAME::dirty
+;		RTS
 
 
 ;-------------------------------------------------------------------------------
@@ -26772,13 +26690,13 @@ rulesInitEliminToPlyr:
 
 		JSR	gamePlayerChanged
 
+		JSR	rulesInitTradeData
+		
 		JSR	menuElimin0RemWlthRecalc
 		
 		LDA	#$00
 		STA	menuElimin0HaveOffer
 		STA	game + GAME::varW
-		
-		JSR	rulesInitTradeData
 
 		LDX	#$00
 @loop:
@@ -26825,8 +26743,6 @@ rulesInitEliminToBank:
 		LDX	game + GAME::pActive
 		STX	game + GAME::varA
 
-		JSR	menuElimin0RemWlthRecalc
-
 		LDX	#TRADE::player
 		LDA	#$FF
 		STA	trade1, X
@@ -26841,6 +26757,8 @@ rulesInitEliminToBank:
 
 		JSR	rulesInitTradeData
 
+		JSR	menuElimin0RemWlthRecalc
+		
 		LDX	#$00
 		STX	game + GAME::varB
 @loop:
@@ -27017,7 +26935,7 @@ rulesDoNextPlyr:
 		STX	game + GAME::pActive
 	
 		JSR	gamePlayerChanged
-
+		
 		RTS
 
 
@@ -27091,18 +27009,15 @@ rulesNextTurn:
 		JSR	gameUpdateMenu
 		
 		JSR	rulesFocusOnActive
-		BCC	@juststats
+;		BCC	@juststats
 
-;		LDA	#$01
+		RTS
+
+;@juststats:		
+;		LDA	game + GAME::dirty
+;		ORA	#GAME_DRT_STAT
 ;		STA	game + GAME::dirty
-		RTS
-
-@juststats:		
-		LDA	game + GAME::dirty
-		ORA	#GAME_DRT_STAT
-		STA	game + GAME::dirty
-
-		RTS
+;		RTS
 		
 		
 ;-------------------------------------------------------------------------------
@@ -29884,11 +29799,16 @@ rulesAutoAuction:
 	
 		BPL	@bid
 		
+;		LDA	game + GAME::varD
+;		STA	game + GAME::varQ
+;		LDA	game + GAME::varE
+;		STA	game + GAME::varR
+
 		LDA	game + GAME::varD
-		STA	game + GAME::varQ
+		STA	game + GAME::mACurr
 		LDA	game + GAME::varE
-		STA	game + GAME::varR
-		
+		STA	game + GAME::mACurr + 1
+
 		SEC
 		LDA	#$00
 		SBC	game + GAME::varO
@@ -29901,17 +29821,20 @@ rulesAutoAuction:
 		
 		JSR	rulesAutoRecover
 
-		LDA	game + GAME::varQ
-		STA	game + GAME::varD
-		LDA	game + GAME::varR
-		STA	game + GAME::varE
+;		LDA	game + GAME::varQ
+;		STA	game + GAME::varD
+;		LDA	game + GAME::varR
+;		STA	game + GAME::varE
+
+		JMP	@dobid
 
 @bid:
 		LDA	game + GAME::varD
 		STA	game + GAME::mACurr
 		LDA	game + GAME::varE
 		STA	game + GAME::mACurr + 1
-		
+
+@dobid:
 ;	Make our bid
 		LDA	#UI_ACT_SKEY
 		STA	$68
@@ -32591,7 +32514,7 @@ initNew:
 		STA	$FE
 		
 		JSR	screenPerformList
-		
+
 		RTS
 
 
@@ -32603,7 +32526,7 @@ initScreen:
 		STA	ui + UI::fBtUpd0
 		STA	ui + UI::fBtUpd1 
 		
-		JSR	statsClear
+		JSR	statsRecolour
 		JSR	prmptClear
 		
 		RTS
