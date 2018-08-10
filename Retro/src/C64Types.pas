@@ -2,6 +2,8 @@ unit C64Types;
 
 interface
 
+//23420
+
 uses
     Messages;
 
@@ -102,7 +104,7 @@ const
 
 
 	VAL_DEF_C64SYSTYPE = cstPAL;
-	VAL_DEF_C64SIDMODL = csmMOS8580;
+	VAL_DEF_C64SIDMODL = csmMOS6581;
 
 
 

@@ -26,8 +26,9 @@ type
 		constructor Create;
 		destructor Destroy; override;
 
-		procedure AddIO(const AStart, AEnd: Word; const ARead: TC64MemoryRead;
-				const AWrite: TC64MemoryWrite);
+		function  AddIO(const AStart, AEnd: Word; const ARead: TC64MemoryRead;
+				const AWrite: TC64MemoryWrite): Integer;
+		procedure RemoveIO(AIndex: Integer);
 
 		procedure Write(const AAddress: Word; const AValue: Byte);
 		function  Read(const AAddress: Word): Byte;
@@ -59,8 +60,8 @@ procedure WriteMemory(AAddress: Word; AValue: Byte);
 
 { TC64Memory }
 
-procedure TC64Memory.AddIO(const AStart, AEnd: Word; const ARead: TC64MemoryRead;
-		const AWrite: TC64MemoryWrite);
+function TC64Memory.AddIO(const AStart, AEnd: Word; const ARead: TC64MemoryRead;
+		const AWrite: TC64MemoryWrite): Integer;
 	var
 	io: TC64MemoryIO;
 
@@ -70,7 +71,7 @@ procedure TC64Memory.AddIO(const AStart, AEnd: Word; const ARead: TC64MemoryRead
 	io.ARead:= ARead;
 	io.AWrite:= AWrite;
 
-	FIO.Add(io);
+	Result:= FIO.Add(io);
 	end;
 
 constructor TC64Memory.Create;
@@ -136,6 +137,11 @@ function TC64Memory.Read(const AAddress: Word): Byte;
 			end;
 
 	Result:= FRAM[AAddress];
+	end;
+
+procedure TC64Memory.RemoveIO(AIndex: Integer);
+	begin
+    FIO.Delete(AIndex);
 	end;
 
 procedure TC64Memory.Write(const AAddress: Word; const AValue: Byte);

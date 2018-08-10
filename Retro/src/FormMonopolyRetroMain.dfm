@@ -31,8 +31,6 @@ object MonopolyRetroMainForm: TMonopolyRetroMainForm
     Align = alClient
     BevelOuter = bvNone
     TabOrder = 0
-    ExplicitLeft = 20
-    ExplicitTop = -6
   end
   object Panel2: TPanel
     Left = 0
@@ -82,6 +80,12 @@ object MonopolyRetroMainForm: TMonopolyRetroMainForm
           Action = actInputJoystick
         end
       end
+      object Configure1: TMenuItem
+        Caption = 'Configure'
+        object SIDAudio1: TMenuItem
+          Action = actConfigSID
+        end
+      end
     end
     object Help1: TMenuItem
       Caption = '&Help'
@@ -94,6 +98,11 @@ object MonopolyRetroMainForm: TMonopolyRetroMainForm
       Category = 'Input'
       Caption = '&Joystick Enable'
       OnExecute = actInputJoystickExecute
+    end
+    object actConfigSID: TAction
+      Category = 'Config'
+      Caption = 'SID Audio'
+      OnExecute = actConfigSIDExecute
     end
   end
   object Timer1: TTimer

@@ -138,7 +138,7 @@ constructor TC64SID.Create(ABuffer: TC64AudioBuffer);
 	var
 	sl: TStringList;
 	r: TXSIDAudioRendererClass;
-	f,
+//	f,
 	sr,
 	sz: Cardinal;
 
@@ -193,7 +193,7 @@ constructor TC64SID.Create(ABuffer: TC64AudioBuffer);
 		end;
 
 //  Test tone
-	f:= Trunc(55.000 / XSIDGlobalConfig.FreqFactor);
+(*	f:= Trunc(55.000 / XSIDGlobalConfig.FreqFactor);
 
 	ReSIDWrite(FReSID, 1, (f and $FF00) shr 8);
 	ReSIDClock(FReSID, 3, @FAudioBuffer.FBuffer[0]);
@@ -206,7 +206,15 @@ constructor TC64SID.Create(ABuffer: TC64AudioBuffer);
 	ReSIDWrite(FReSID, 24, $0F);
 	ReSIDClock(FReSID, 3, @FAudioBuffer.FBuffer[0]);
 	ReSIDWrite(FReSID, 4, $11);
+	ReSIDClock(FReSID, 3, @FAudioBuffer.FBuffer[0]);*)
+
+	ReSIDWrite(FReSID, $0E, $FF);
 	ReSIDClock(FReSID, 3, @FAudioBuffer.FBuffer[0]);
+	ReSIDWrite(FReSID, $0F, $FF);
+	ReSIDClock(FReSID, 3, @FAudioBuffer.FBuffer[0]);
+	ReSIDWrite(FReSID, $12, $80);
+	ReSIDClock(FReSID, 3, @FAudioBuffer.FBuffer[0]);
+	ReSIDWrite(FReSID, 24, $0F);
 
 	end;
 
@@ -357,9 +365,9 @@ procedure TSIDEventManager.CopyEvents({const AQueue: TXSIDEventQueue;}
 	end;
 
 procedure TSIDEventManager.ClearEvents(const ARelease: Boolean){(const AQueue: TXSIDEventQueue)};
-	var
+(*	var
 	evt,
-	dis: PXSIDEvent;
+	dis: PXSIDEvent;*)
 
 	begin
 //	Lock;

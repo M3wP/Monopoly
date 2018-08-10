@@ -39,6 +39,7 @@ type
 
 		FSID: TC64SID;
 		FSIDIO: TC64SIDIO;
+		FSIDIOIdx: Integer;
 
 		FUSERIO: TMR64USERIO;
 		FBoardIO: TMR64BoardIIO;
@@ -50,6 +51,8 @@ type
 
 		constructor Create(const AConfig: TC64MachineConfig);
 		destructor  Destroy; override;
+
+		procedure ReinitialiseAudio;
 	end;
 
 var
@@ -99,6 +102,8 @@ constructor TC64Machine.Create(const AConfig: TC64MachineConfig);
 
 	XSIDInitialiseConfig(FConfig.IniFile);
 
+	XSIDGlobalConfig.System:= cstPAL;
+
 	FConfig.Lock;
 	try
 		FConfig.System:= cstPAL;
@@ -110,8 +115,7 @@ constructor TC64Machine.Create(const AConfig: TC64MachineConfig);
 	FMultiOut:= TC64MultiOutput.Create;
 	FMultiIn:= TC64MultiInput.Create;
 
-	FSID:= TC64SID.Create(FMultiOut.FAudioBuffer);
-	FSIDIO:= TC64SIDIO.Create(FSID);
+    ReinitialiseAudio;
 
 	FVICIIFrame:= TC64VICIIFrame.Create(FMultiOut.FVideoBuffer);
 	FVICIIRaster:= TC64VICIIRaster.Create(FMultiOut.FVideoBuffer);
@@ -121,7 +125,6 @@ constructor TC64Machine.Create(const AConfig: TC64MachineConfig);
 	FUSERIO:= TMR64USERIO.Create(FMultiIn.FUserBuffer);
 	FBoardIO:= TMR64BoardIIO.Create;
 
-	GlobalC64Memory.AddIO($D400, $D7FF, FSIDIO.Read, FSIDIO.Write);
 	GlobalC64Memory.AddIO($D000, $D3FF, FVICIIIO.Read, FVICIIIO.Write);
 	GlobalC64Memory.AddIO($DE00, $DEFF, FUSERIO.Read, FUSERIO.Write);
 	GlobalC64Memory.AddIO($DF00, $DFFF, FBoardIO.Read, FBoardIO.Write);
@@ -135,6 +138,8 @@ constructor TC64Machine.Create(const AConfig: TC64MachineConfig);
 
 destructor TC64Machine.Destroy;
 	begin
+	XSIDFinaliseConfig(FConfig.IniFile);
+
 	inherited;
 	end;
 
@@ -236,6 +241,24 @@ procedure TC64Machine.DoPlay;
 	FConfig.Started:= True;
 	end;
 
+procedure TC64Machine.ReinitialiseAudio;
+	begin
+	if  Assigned(FSID) then
+		FSID.Free;
+
+	if  Assigned(FSIDIO) then
+		begin
+		GlobalC64Memory.RemoveIO(FSIDIOIdx);
+		FSIDIO.Free;
+		end;
+
+	if  Assigned(FMultiOut.FAudioBuffer.FRenderer) then
+		FMultiOut.FAudioBuffer.FRenderer.Free;
+
+	FSID:= TC64SID.Create(FMultiOut.FAudioBuffer);
+	FSIDIO:= TC64SIDIO.Create(FSID);
+	FSIDIOIdx:= GlobalC64Memory.AddIO($D400, $D7FF, FSIDIO.Read, FSIDIO.Write);
+	end;
 
 { TC64MultiInput }
 

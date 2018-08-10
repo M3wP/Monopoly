@@ -103,6 +103,7 @@ procedure TC64SystemThread.Execute;
 			if  FWasPaused then
 				begin
 				FWasPaused:= False;
+				FPausedSignal.ResetEvent;
 				DoPlay;
 				end;
 

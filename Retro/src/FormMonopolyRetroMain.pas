@@ -26,6 +26,9 @@ type
 		actInputJoystick: TAction;
 		EnableJoystick1: TMenuItem;
 		Timer1: TTimer;
+    actConfigSID: TAction;
+    Configure1: TMenuItem;
+    SIDAudio1: TMenuItem;
 		procedure FormCreate(Sender: TObject);
 		procedure FormDestroy(Sender: TObject);
 		procedure FormShow(Sender: TObject);
@@ -34,6 +37,7 @@ type
 		procedure Timer1Timer(Sender: TObject);
 		procedure FormActivate(Sender: TObject);
 		procedure FormDeactivate(Sender: TObject);
+    procedure actConfigSIDExecute(Sender: TObject);
 	private
 		FRC: HGLRC;
 		FDC: HDC;
@@ -69,8 +73,31 @@ implementation
 
 uses
 	System.Character, AnsiStrings, SyncObjs, C64Memory, C64Video, C64MachineConfig,
-	MR64Board, XSIDAudioDSound;
+	MR64Board, XSIDAudioDSound, XSIDTypes, FormXSIDConfig;
 
+
+procedure TMonopolyRetroMainForm.actConfigSIDExecute(Sender: TObject);
+	begin
+	XSIDConfigForm:= TXSIDConfigForm.Create(Self);
+	try
+		if  XSIDConfigForm.ShowModal = mrOK then
+			begin
+			C64MachineGlobal.RunSignal.ResetEvent;
+			try
+				C64MachineGlobal.PausedSignal.WaitFor(INFINITE);
+				XSIDGlobalConfig.Assign(XSIDConfigForm.Config);
+				C64MachineGlobal.ReinitialiseAudio;
+
+				finally
+				C64MachineGlobal.RunSignal.SetEvent;
+				end;
+			end;
+
+		finally
+		XSIDConfigForm.Release;
+		end;
+
+	end;
 
 procedure TMonopolyRetroMainForm.actInputJoystickExecute(Sender: TObject);
 	var

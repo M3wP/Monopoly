@@ -119,6 +119,12 @@
         <DCCReference Include="MR64User.pas"/>
         <DCCReference Include="XInput.pas"/>
         <DCCReference Include="MR64Board.pas"/>
+        <DCCReference Include="FormXSIDConfig.pas">
+            <Form>XSIDConfigForm</Form>
+        </DCCReference>
+        <DCCReference Include="FormXSIDFilterConfig.pas">
+            <Form>XSIDFilterConfigForm</Form>
+        </DCCReference>
         <None Include="XSID.inc"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
@@ -575,13 +581,13 @@
                         <Operation>1</Operation>
                     </Platform>
                 </DeployClass>
-                <ProjectRoot Platform="iOSDevice32" Name="$(PROJECTNAME).app"/>
+                <ProjectRoot Platform="OSX32" Name="$(PROJECTNAME).app"/>
                 <ProjectRoot Platform="Android" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="Win32" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="iOSDevice64" Name="$(PROJECTNAME).app"/>
                 <ProjectRoot Platform="Win64" Name="$(PROJECTNAME)"/>
                 <ProjectRoot Platform="iOSSimulator" Name="$(PROJECTNAME).app"/>
-                <ProjectRoot Platform="OSX32" Name="$(PROJECTNAME).app"/>
+                <ProjectRoot Platform="iOSDevice32" Name="$(PROJECTNAME).app"/>
             </Deployment>
             <Platforms>
                 <Platform value="Win32">True</Platform>

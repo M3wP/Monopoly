@@ -1,5 +1,7 @@
 program MonopolyRetro;
 
+
+
 uses
   Vcl.Forms,
   FormMonopolyRetroMain in 'FormMonopolyRetroMain.pas' {MonopolyRetroMainForm},
@@ -21,7 +23,9 @@ uses
   dglOpenGL in 'dglOpenGL.pas',
   MR64User in 'MR64User.pas',
   XInput in 'XInput.pas',
-  MR64Board in 'MR64Board.pas';
+  MR64Board in 'MR64Board.pas',
+  FormXSIDConfig in 'FormXSIDConfig.pas' {XSIDConfigForm},
+  FormXSIDFilterConfig in 'FormXSIDFilterConfig.pas' {XSIDFilterConfigForm};
 
 {$R *.res}
 
