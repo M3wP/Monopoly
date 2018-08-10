@@ -165,7 +165,9 @@ var
 	GlobalMR64Board: TMR64Board;
 	PrevMR64Board: TMR64Board;
 	GlobalMR64BoardRegs: TMR64BoardRegs;
-	GlobalMR64BrdGlyphs: array[0..39] of TMR64BoardGlyph;
+	GlobalMR64BrdSelGlyphs: array[0..39] of TMR64BoardGlyph;
+	GlobalMR64BrdMrtGlyphs: array[0..39] of TMR64BoardGlyph;
+	GlobalMR64BrdSlMGlyphs: array[0..39] of TMR64BoardGlyph;
 
 
 implementation
@@ -205,11 +207,17 @@ procedure InitialiseBoard;
 	for i:= 0 to 39 do
 		if  ARR_REC_BOARD_DET[i].fg then
 			begin
-			SetLength(GlobalMR64BrdGlyphs[i], ARR_REC_BOARD_DET[i].h);
+			SetLength(GlobalMR64BrdSelGlyphs[i], ARR_REC_BOARD_DET[i].h);
+			SetLength(GlobalMR64BrdMrtGlyphs[i], ARR_REC_BOARD_DET[i].h);
+			SetLength(GlobalMR64BrdSlMGlyphs[i], ARR_REC_BOARD_DET[i].h);
 
 			for y:= 0 to ARR_REC_BOARD_DET[i].h - 1 do
 				begin
-				SetLength(GlobalMR64BrdGlyphs[i, (ARR_REC_BOARD_DET[i].h - 1) - y],
+				SetLength(GlobalMR64BrdSelGlyphs[i, (ARR_REC_BOARD_DET[i].h - 1) - y],
+						ARR_REC_BOARD_DET[i].w);
+				SetLength(GlobalMR64BrdMrtGlyphs[i, (ARR_REC_BOARD_DET[i].h - 1) - y],
+						ARR_REC_BOARD_DET[i].w);
+				SetLength(GlobalMR64BrdSlMGlyphs[i, (ARR_REC_BOARD_DET[i].h - 1) - y],
 						ARR_REC_BOARD_DET[i].w);
 
 				yp:= 319 - (ARR_REC_BOARD_DET[i].y + y);
@@ -221,16 +229,32 @@ procedure InitialiseBoard;
 					if  (GlobalMR64Board[yp, xp, 0] = GlobalC64Palette[0, 0])
 					and (GlobalMR64Board[yp, xp, 1] = GlobalC64Palette[0, 1])
 					and (GlobalMR64Board[yp, xp, 2] = GlobalC64Palette[0, 2]) then
-						Move(GlobalC64Palette[0], GlobalMR64BrdGlyphs[i,
-								(ARR_REC_BOARD_DET[i].h - 1) - y, x], 4)
-					else
-						Move(GlobalC64Palette[1], GlobalMR64BrdGlyphs[i,
+						begin
+						Move(GlobalC64Palette[0], GlobalMR64BrdSelGlyphs[i,
 								(ARR_REC_BOARD_DET[i].h - 1) - y, x], 4);
+						Move(GlobalC64Palette[0], GlobalMR64BrdMrtGlyphs[i,
+								(ARR_REC_BOARD_DET[i].h - 1) - y, x], 4);
+						Move(GlobalC64Palette[0], GlobalMR64BrdSlMGlyphs[i,
+								(ARR_REC_BOARD_DET[i].h - 1) - y, x], 4);
+						end
+					else
+						begin
+						Move(GlobalC64Palette[1], GlobalMR64BrdSelGlyphs[i,
+								(ARR_REC_BOARD_DET[i].h - 1) - y, x], 4);
+						Move(GlobalC64Palette[11], GlobalMR64BrdMrtGlyphs[i,
+								(ARR_REC_BOARD_DET[i].h - 1) - y, x], 4);
+						Move(GlobalC64Palette[15], GlobalMR64BrdSlMGlyphs[i,
+								(ARR_REC_BOARD_DET[i].h - 1) - y, x], 4);
+						end;
 					end;
 				end;
 			end
 		else
-			SetLength(GlobalMR64BrdGlyphs[i], 0);
+			begin
+			SetLength(GlobalMR64BrdSelGlyphs[i], 0);
+			SetLength(GlobalMR64BrdMrtGlyphs[i], 0);
+			SetLength(GlobalMR64BrdSlMGlyphs[i], 0);
+			end;
 	end;
 
 

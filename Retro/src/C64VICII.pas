@@ -298,7 +298,45 @@ procedure TC64VICIIFrame.Execute;
 			xp:= ARR_REC_BOARD_DET[ASquare].x;
 			sz:= ARR_REC_BOARD_DET[ASquare].w * 4;
 
-			Move(GlobalMR64BrdGlyphs[ASquare, (ARR_REC_BOARD_DET[ASquare].h - 1) - y,
+			Move(GlobalMR64BrdSelGlyphs[ASquare, (ARR_REC_BOARD_DET[ASquare].h - 1) - y,
+					0, 0], FBuffer.FBR^[yp, xp, 0], sz);
+			end;
+		end;
+
+	procedure DoCopyMrtGlyph(const ASquare: Integer);
+		var
+		y,
+		yp,
+		xp,
+		sz: Integer;
+
+		begin
+		for y:= 0 to ARR_REC_BOARD_DET[ASquare].h - 1 do
+			begin
+			yp:= 319 - (ARR_REC_BOARD_DET[ASquare].y + y);
+			xp:= ARR_REC_BOARD_DET[ASquare].x;
+			sz:= ARR_REC_BOARD_DET[ASquare].w * 4;
+
+			Move(GlobalMR64BrdMrtGlyphs[ASquare, (ARR_REC_BOARD_DET[ASquare].h - 1) - y,
+					0, 0], FBuffer.FBR^[yp, xp, 0], sz);
+			end;
+		end;
+
+	procedure DoCopySlMGlyph(const ASquare: Integer);
+		var
+		y,
+		yp,
+		xp,
+		sz: Integer;
+
+		begin
+		for y:= 0 to ARR_REC_BOARD_DET[ASquare].h - 1 do
+			begin
+			yp:= 319 - (ARR_REC_BOARD_DET[ASquare].y + y);
+			xp:= ARR_REC_BOARD_DET[ASquare].x;
+			sz:= ARR_REC_BOARD_DET[ASquare].w * 4;
+
+			Move(GlobalMR64BrdSlMGlyphs[ASquare, (ARR_REC_BOARD_DET[ASquare].h - 1) - y,
 					0, 0], FBuffer.FBR^[yp, xp, 0], sz);
 			end;
 		end;
@@ -326,7 +364,7 @@ procedure TC64VICIIFrame.Execute;
 
 				m:= m shr 1;
 				end;
-            end;
+			end;
 		end;
 
 	procedure UpdateOwn;
@@ -435,7 +473,10 @@ procedure TC64VICIIFrame.Execute;
 
 		for i:= 0 to 39 do
 			if  (FThisBrd[i].imprv and $80) <> 0 then
-				DoFillSquareSolid(i, p.int);
+				if  ARR_REC_BOARD_DET[i].fg then
+					DoCopyMrtGlyph(i)
+				else
+					DoFillSquareSolid(i, p.int);
 		end;
 
 	procedure ResetSelection;
@@ -447,7 +488,10 @@ procedure TC64VICIIFrame.Execute;
 		for i:= 0 to 39 do
 			if  (FPrevBrd[i].imprv and $20) <> 0 then
 				if  ARR_REC_BOARD_DET[i].fg then
-					DoCopyOrigGlyph(i)
+					if (FPrevBrd[i].imprv and $80) <> 0 then
+						DoCopyMrtGlyph(i)
+					else
+						DoCopyOrigGlyph(i)
 				else
 					begin
 					if (FPrevBrd[i].imprv and $80) <> 0 then
@@ -468,10 +512,15 @@ procedure TC64VICIIFrame.Execute;
 		for i:= 0 to 39 do
 			if  (FThisBrd[i].imprv and $20) <> 0 then
 				if  ARR_REC_BOARD_DET[i].fg then
-					DoCopySelGlyph(i)
+					begin
+					if (FThisBrd[i].imprv and $80) <> 0 then
+						DoCopySlMGlyph(i)
+					else
+						DoCopySelGlyph(i)
+					end
 				else
 					begin
-					if (FPrevBrd[i].imprv and $80) <> 0 then
+					if (FThisBrd[i].imprv and $80) <> 0 then
 						p.arr:= GlobalC64Palette[$0F]
 					else
 						p.arr:= GlobalC64Palette[$01];
