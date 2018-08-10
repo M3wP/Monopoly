@@ -69,7 +69,7 @@ implementation
 
 uses
 	System.Character, AnsiStrings, SyncObjs, C64Memory, C64Video, C64MachineConfig,
-	MR64Board;
+	MR64Board, XSIDAudioDSound;
 
 
 procedure TMonopolyRetroMainForm.actInputJoystickExecute(Sender: TObject);

@@ -55,11 +55,11 @@ class function TXSIDAudioOpenAL.GetName: AnsiString;
 
 class function TXSIDAudioOpenAL.GetWantPlatformDefault: Boolean;
 	begin
-{.IFDEF MSWINDOWS}
-//	Result:= False;
-{.ELSE}
+{$IFDEF MSWINDOWS}
+	Result:= False;
+{$ELSE}
 	Result:= True;
-{.ENDIF}
+{$ENDIF}
 	end;
 
 procedure TXSIDAudioOpenAL.Pause(var ABuffer: PArrSmallInt);
