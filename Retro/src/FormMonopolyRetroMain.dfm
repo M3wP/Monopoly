@@ -31,6 +31,10 @@ object MonopolyRetroMainForm: TMonopolyRetroMainForm
     Align = alClient
     BevelOuter = bvNone
     TabOrder = 0
+    OnMouseDown = Panel1MouseDown
+    OnMouseEnter = Panel1MouseEnter
+    OnMouseLeave = Panel1MouseLeave
+    OnMouseUp = Panel1MouseUp
   end
   object Panel2: TPanel
     Left = 0

@@ -117,7 +117,7 @@ procedure DoFillInt(const AArr: PInteger; const ASize: Integer;
 
 implementation
 uses
-{$IFDEF WIN32}
+{$IFDEF MSWINDOWS}
 	Windows;
 {$ENDIF}
 {$IFDEF LINUX}
@@ -128,7 +128,7 @@ uses
 {$ENDIF}
 
 
-{$IFDEF WIN32}
+{$IFDEF MSWINDOWS}
 function GetCurrentProcessorNumber: Cardinal; stdcall;
 		external 'Kernel32.dll' name 'GetCurrentProcessorNumber';
 
@@ -139,7 +139,7 @@ var
 
 function C64TimerGetTime: Double;
 	var
-{$IFDEF WIN32}
+{$IFDEF MSWINDOWS}
 	T: Int64;
 {$ENDIF}
 {$IFDEF LINUX}
@@ -167,6 +167,7 @@ function C64TimerGetTime: Double;
 procedure DoFillInt(const AArr: PInteger; const ASize: Integer;
 		const AValue: Integer);
 	begin
+{$IFDEF WIN32}
 	asm
 		push edi // points to the destination
 		mov edi, AArr
@@ -176,11 +177,23 @@ procedure DoFillInt(const AArr: PInteger; const ASize: Integer;
 		rep stosd
 		pop edi
 		end;
+{$ENDIF}
+{$IFDEF WIN64}
+	asm
+		push rdi // points to the destination
+		mov rdi, AArr
+		mov eax, AValue
+		mov ecx, ASize
+		cld // clear the direction flag
+		rep stosd
+		pop rdi
+		end;
+{$ENDIF}
 	end;
 
 
 
-{$IFDEF WIN32}
+{$IFDEF MSWINDOWS}
 initialization
 	QueryPerformanceFrequency(FTickFreq);
 	FUSecPTick:= 1 / FTickFreq;

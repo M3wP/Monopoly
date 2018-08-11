@@ -89,6 +89,10 @@ type
 	TC64UserBuffer = class(TC64LineSignal)
 		FKey: AnsiChar;
 		FJoy: Byte;
+		FMouseX,
+		FMouseY: Word;
+		FMouseBtn: Byte;
+		FMouseVis: Byte;
 	end;
 
 implementation

@@ -56,6 +56,68 @@ function TMR64USERIO.Read(const AAddress: Word): Byte;
 				FBuffer.FLock.Release;
 				end;
 			end;
+		$03:
+			begin
+			FBuffer.FLock.Acquire;
+			try
+				Result:= FBuffer.FMouseX and $00FF;
+
+				finally
+				FBuffer.FLock.Release;
+				end;
+			end;
+		$04:
+			begin
+			FBuffer.FLock.Acquire;
+			try
+				Result:= (FBuffer.FMouseX and $FF00) shr 8;
+
+				finally
+				FBuffer.FLock.Release;
+				end;
+			end;
+		$05:
+			begin
+			FBuffer.FLock.Acquire;
+			try
+				Result:= FBuffer.FMouseY and $00FF;
+
+				finally
+				FBuffer.FLock.Release;
+				end;
+			end;
+		$06:
+			begin
+			FBuffer.FLock.Acquire;
+			try
+				Result:= (FBuffer.FMouseY and $FF00) shr 8;
+
+				finally
+				FBuffer.FLock.Release;
+				end;
+			end;
+		$07:
+			begin
+			FBuffer.FLock.Acquire;
+			try
+				Result:= FBuffer.FMouseBtn;
+
+				finally
+				FBuffer.FLock.Release;
+				end;
+			end;
+		$08:
+			begin
+			FBuffer.FLock.Acquire;
+			try
+				Result:= FBuffer.FMouseVis;
+
+				finally
+				FBuffer.FLock.Release;
+				end;
+			end;
+		else
+			Result:= 0;
 		end;
 	end;
 

@@ -115,7 +115,7 @@ constructor TC64Machine.Create(const AConfig: TC64MachineConfig);
 	FMultiOut:= TC64MultiOutput.Create;
 	FMultiIn:= TC64MultiInput.Create;
 
-    ReinitialiseAudio;
+	ReinitialiseAudio;
 
 	FVICIIFrame:= TC64VICIIFrame.Create(FMultiOut.FVideoBuffer);
 	FVICIIRaster:= TC64VICIIRaster.Create(FMultiOut.FVideoBuffer);
@@ -138,8 +138,6 @@ constructor TC64Machine.Create(const AConfig: TC64MachineConfig);
 
 destructor TC64Machine.Destroy;
 	begin
-	XSIDFinaliseConfig(FConfig.IniFile);
-
 	inherited;
 	end;
 
@@ -151,9 +149,14 @@ procedure TC64Machine.DoClock(const ATicks: Cardinal);
 	bad: Word;
 
 	begin
+	C64GlobalVICIIRegs.rasterY:= FMultiOut.FVideoBuffer.FRaster;
+	C64GlobalVICIIRegs.rasterIRQSrc:= False;
+
 	if  FMultiOut.FVideoBuffer.FRaster = 0 then
 		begin
 		FMultiOut.FVideoBuffer.FBADLine:= $FF;
+
+		FVICIIFrame.DoneSignal.ResetEvent;
 		FVICIIFrame.RunSignal.SetEvent;
 		end
 //	else if FMultiOut.FVideoBuffer.FRaster = 8 then
@@ -167,12 +170,11 @@ procedure TC64Machine.DoClock(const ATicks: Cardinal);
 			FVICIIBadLine.DoneSignal.WaitFor(INFINITE);
 			FMultiOut.FVideoBuffer.FBADLine:= bad;
 			FVICIIBadLine.FRaster:= FMultiOut.FVideoBuffer.FRaster;
+
+			FVICIIBadLine.DoneSignal.ResetEvent;
 			FVICIIBadLine.RunSignal.SetEvent;
 			end;
 		end;
-
-	C64GlobalVICIIRegs.rasterY:= FMultiOut.FVideoBuffer.FRaster;
-	C64GlobalVICIIRegs.rasterIRQSrc:= False;
 
 	if  C64GlobalVICIIRegs.rasterIRQ
 	and (C64GlobalVICIIRegs.rasterY = C64GlobalVICIIRegs.rasterIRQY) then
@@ -181,6 +183,7 @@ procedure TC64Machine.DoClock(const ATicks: Cardinal);
 		irq6502;
 		end;
 
+	FVICIIRaster.DoneSignal.ResetEvent;
 	FVICIIRaster.RunSignal.SetEvent;
 
 	lastticks6502:= clockticks6502;
@@ -226,7 +229,7 @@ procedure TC64Machine.DoDestruction;
 	FMultiOut.Free;
 	FMultiIn.Free;
 
-//	FinaliseConfig(FIniFile);
+	XSIDFinaliseConfig(FConfig.IniFile);
 	end;
 
 procedure TC64Machine.DoPause;

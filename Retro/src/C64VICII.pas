@@ -6,11 +6,14 @@ uses
 	Classes, SyncObjs, C64Classes, MR64Board;
 
 type
-	TSpriteRegs = packed record
+	TC64SpriteMode = (csmHiRes, csmMulti, csmHiMulti);
+
+	TC64SpriteRegs = packed record
 		posX,
 		posY: Word;
 		enabled: Boolean;
 		colour: Byte;
+		mode: TC64SpriteMode;
 	end;
 
 	TC64VICIIRegs = packed record
@@ -20,7 +23,9 @@ type
 		rasterIRQSrc: Boolean;
 		borderClr: Byte;
 		backgdClr: Byte;
-		sprites: array[0..7] of TSpriteRegs;
+		sprtM0Clr: Byte;
+		sprtM1Clr: Byte;
+		sprites: array[0..7] of TC64SpriteRegs;
 	end;
 
 	TC64VICIIIO = class
@@ -69,7 +74,7 @@ type
 		FScreen: array[0..39] of Byte;
 		FColour: array[0..39] of Byte;
 
-        procedure DoDrawHiResText(AX, AY: Integer; AIndex: Integer);
+		procedure DoDrawHiResText(AX, AY: Integer; AIndex: Integer);
 
 	protected
 		procedure Execute; override;
@@ -101,15 +106,17 @@ function TC64VICIIIO.Read(const AAddress: Word): Byte;
 	case r of
 		$00..$0F:
 			if  (r and $01) <> 0 then
-				Result:= C64GlobalVICIIRegs.sprites[r div 2].posY
+				Result:= (C64GlobalVICIIRegs.sprites[r div 2].posY and $00FF)
 			else
 				Result:= (C64GlobalVICIIRegs.sprites[r div 2].posX and $00FF);
 		$10:
 			begin
 			Result:= 0;
 			for i:= 0 to 7 do
-				Result:= Result or
-						(((C64GlobalVICIIRegs.sprites[i].posX and $100) shr 8) shl i);
+				if  C64GlobalVICIIRegs.sprites[i].posX > $FF then
+					Result:= Result or (1 shl i)
+//				Result:= Result or
+//						(((C64GlobalVICIIRegs.sprites[i].posX and $100) shr 8) shl i);
 			end;
 		$11:
 			begin
@@ -121,7 +128,7 @@ function TC64VICIIIO.Read(const AAddress: Word): Byte;
 			begin
 			Result:= 0;
 			for i:= 0 to 7 do
-				if C64GlobalVICIIRegs.sprites[i].enabled then
+				if  C64GlobalVICIIRegs.sprites[i].enabled then
 					Result:= Result or (1 shl i);
 			end;
 		$19:
@@ -134,8 +141,26 @@ function TC64VICIIIO.Read(const AAddress: Word): Byte;
 			Result:= C64GlobalVICIIRegs.borderClr;
 		$21:
 			Result:= C64GlobalVICIIRegs.backgdClr;
+		$25:
+			Result:= C64GlobalVICIIRegs.sprtM0Clr;
+		$26:
+			Result:= C64GlobalVICIIRegs.sprtM1Clr;
 		$27..$2E:
 			Result:= C64GlobalVICIIRegs.sprites[r - $27].colour;
+		$2F:
+			begin
+			Result:= 0;
+			for i:= 0 to 7 do
+				if  C64GlobalVICIIRegs.sprites[i].mode = csmHiMulti then
+					Result:= Result or (1 shl i);
+			end;
+		$30:
+			begin
+			Result:= 0;
+			for i:= 0 to 7 do
+				Result:= Result or
+						(((C64GlobalVICIIRegs.sprites[i].posY and $100) shr 8) shl i);
+			end;
 		end;
 	end;
 
@@ -151,10 +176,11 @@ procedure TC64VICIIIO.Write(const AAddress: Word; const AValue: Byte);
 		$00..$0F:
 			begin
 			if  (r and $01) <> 0 then
-				C64GlobalVICIIRegs.sprites[r div 2].posY:= AValue
+				C64GlobalVICIIRegs.sprites[r div 2].posY:=
+						(C64GlobalVICIIRegs.sprites[r div 2].posY and $0100) or AValue
 			else
 				C64GlobalVICIIRegs.sprites[r div 2].posX:=
-					(C64GlobalVICIIRegs.sprites[r div 2].posX and $0100) or AValue;
+						(C64GlobalVICIIRegs.sprites[r div 2].posX and $0100) or AValue;
 			end;
 		$10:
 			begin
@@ -200,8 +226,40 @@ procedure TC64VICIIIO.Write(const AAddress: Word; const AValue: Byte);
 			C64GlobalVICIIRegs.borderClr:= AValue and $0F;
 		$21:
 			C64GlobalVICIIRegs.backgdClr:= AValue and $0F;
+		$25:
+			C64GlobalVICIIRegs.sprtM0Clr:= AValue and $0F;
+		$26:
+			C64GlobalVICIIRegs.sprtM1Clr:= AValue and $0F;
 		$27..$2E:
 			C64GlobalVICIIRegs.sprites[r - $27].colour:= AValue and $0F;
+		$2F:
+			begin
+			v:= AValue;
+			for i:= 0 to 7 do
+				begin
+				if  (v and $01) <> 0 then
+					C64GlobalVICIIRegs.sprites[i].mode:= csmHiMulti
+				else
+					C64GlobalVICIIRegs.sprites[i].mode:= csmHiRes;
+
+				v:= v shr 1;
+				end;
+			end;
+		$30:
+			begin
+			v:= AValue;
+			for i:= 0 to 7 do
+				begin
+				if  (v and $01) <> 0 then
+					C64GlobalVICIIRegs.sprites[i].posY:=
+							(C64GlobalVICIIRegs.sprites[i].posY and $00FF) or $0100
+				else
+					C64GlobalVICIIRegs.sprites[i].posY:=
+							(C64GlobalVICIIRegs.sprites[i].posY and $00FF);
+
+				v:= v shr 1;
+				end;
+			end;
 		end;
 	end;
 
@@ -665,8 +723,8 @@ procedure TC64VICIIFrame.Execute;
 
 			UpdatePlayers;
 
-			DoneSignal.SetEvent;
 			RunSignal.ResetEvent;
+			DoneSignal.SetEvent;
 			end;
 	end;
 
@@ -682,14 +740,14 @@ procedure TC64VICIIRaster.Execute;
 		begin
 		Result:= False;
 
-		if  (ARaster >= 51)
-		and (ARaster <= 250) then
+//		if  (ARaster >= 51)
+//		and (ARaster <= 250) then
 			if  (ARaster >= FRegs.sprites[ASprite].posY)
 			and (ARaster <= (FRegs.sprites[ASprite].posY + 20)) then
 				Result:= FRegs.sprites[ASprite].enabled;
 		end;
 
-	procedure DrawSpriteRaster(const ASprite, ARaster: Integer);
+	procedure DrawSpriteRasterHiRes(const ASprite, ARaster: Integer);
 		var
 		addr: Word;
 		offs: Integer;
@@ -722,9 +780,51 @@ procedure TC64VICIIRaster.Execute;
 			end;
 		end;
 
+	procedure DrawSpriteRasterHiMulti(const ASprite, ARaster: Integer);
+		var
+		addr: Word;
+		offs: Integer;
+		b,
+		m,
+		ch: Byte;
+		i,
+		j: Integer;
+
+		begin
+		offs:= ARaster - FRegs.sprites[ASprite].posY;
+		addr:= GlobalC64Memory.FRAM[$07F8 + ASprite] * 64 + offs * 6;
+
+		for i:= 0 to 5 do
+			begin
+			ch:= GlobalC64Memory.FRAM[addr];
+			m:= $C0;
+			for j:= 0 to 3 do
+				begin
+				b:= ch and m;
+				b:= b shr ((3 - j) * 2);
+				m:= m shr 2;
+
+				if  b = 1 then
+					Move(GlobalC64Palette[FRegs.sprtM0Clr],
+							FBuffer.FSP^[311 - ARaster,
+							FRegs.sprites[ASprite].posX + i * 4 + j, 0], 4)
+				else if b = 2 then
+					Move(GlobalC64Palette[FRegs.sprites[ASprite].colour],
+							FBuffer.FSP^[311 - ARaster,
+							FRegs.sprites[ASprite].posX + i * 4 + j, 0], 4)
+				else if b = 3 then
+					Move(GlobalC64Palette[FRegs.sprtM1Clr],
+							FBuffer.FSP^[311 - ARaster,
+							FRegs.sprites[ASprite].posX + i * 4 + j, 0], 4);
+				end;
+
+			Inc(addr);
+			end;
+		end;
 
 	begin
 	while not Terminated do
+		begin
 		if  RunSignal.WaitFor(1) = wrSignaled then
 			begin
 			DoneSignal.ResetEvent;
@@ -738,16 +838,17 @@ procedure TC64VICIIRaster.Execute;
 			p.arr:= ARR_CLR_C64ALPHA;
 			DoFillInt(PInteger(@FBuffer.FSP^[311 - y, 0]), 385, p.int);
 
-//			for x:= 0 to 384 do
-//				Move(GlobalC64Palette[FRegs.borderClr], FBuffer.FBG^[311 - y, x, 0], 4);
-
 			for x:= 7 downto 0 do
 				if  SpriteOnRaster(x, y) then
-					DrawSpriteRaster(x, y);
+					if  FRegs.sprites[x].mode = csmHiRes then
+						DrawSpriteRasterHiRes(x, y)
+					else if  FRegs.sprites[x].mode = csmHiMulti then
+						DrawSpriteRasterHiMulti(x, y);
 
-			DoneSignal.SetEvent;
 			RunSignal.ResetEvent;
+			DoneSignal.SetEvent;
 			end;
+		end;
 	end;
 
 { TC64VICIIBadLine }
@@ -816,15 +917,15 @@ procedure TC64VICIIBadLine.Execute;
 				y:= {51 + FBuffer.FBADLine * 8}FRaster + i;
 				x:= 24;
 
-                DoDrawHiResText(x, y, i);
+				DoDrawHiResText(x, y, i);
 
 //				for x:= 24 to 343 do
 //					Move(GlobalC64Palette[FRegs.backgdClr{FBuffer.FBADLine mod 16}],
 //							FBuffer.FFG^[311 - y, x, 0], 4);
 				end;
 
-			DoneSignal.SetEvent;
 			RunSignal.ResetEvent;
+			DoneSignal.SetEvent;
 			end;
 	end;
 

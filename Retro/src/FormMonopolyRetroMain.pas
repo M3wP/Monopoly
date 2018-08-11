@@ -26,9 +26,9 @@ type
 		actInputJoystick: TAction;
 		EnableJoystick1: TMenuItem;
 		Timer1: TTimer;
-    actConfigSID: TAction;
-    Configure1: TMenuItem;
-    SIDAudio1: TMenuItem;
+		actConfigSID: TAction;
+		Configure1: TMenuItem;
+		SIDAudio1: TMenuItem;
 		procedure FormCreate(Sender: TObject);
 		procedure FormDestroy(Sender: TObject);
 		procedure FormShow(Sender: TObject);
@@ -37,7 +37,13 @@ type
 		procedure Timer1Timer(Sender: TObject);
 		procedure FormActivate(Sender: TObject);
 		procedure FormDeactivate(Sender: TObject);
-    procedure actConfigSIDExecute(Sender: TObject);
+		procedure actConfigSIDExecute(Sender: TObject);
+    procedure Panel1MouseEnter(Sender: TObject);
+    procedure Panel1MouseLeave(Sender: TObject);
+    procedure Panel1MouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure Panel1MouseUp(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
 	private
 		FRC: HGLRC;
 		FDC: HDC;
@@ -160,13 +166,13 @@ procedure TMonopolyRetroMainForm.DoGLDraw;
 	var
 	i: Integer;
 	b: PByte;
-//	b2: PByte;
 //	x,
 //	y: Integer;
-//	a: Cardinal;
-//	p: TC64RGBA;
 //	pb1,
 //	pb2: PC64PALScreen;
+//	b2: PByte;
+//	a: Cardinal;
+//	p: TC64RGBA;
 
 	begin
 //	glClear(GL_COLOR_BUFFER_BIT);
@@ -188,7 +194,7 @@ procedure TMonopolyRetroMainForm.DoGLDraw;
 //			end;
 //
 //		pb1:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FSPBuf[i];
-//		pb2:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FBGBuf[i];
+//		pb2:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FFGBuf[i];
 //		for y:= 51 to 250 do
 //			for x:= 24 to 343 do
 //				if  (pb1[311 - y, x, 3] and $80) <> 0 then
@@ -219,7 +225,6 @@ procedure TMonopolyRetroMainForm.DoGLDraw;
 		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FSPBuf[i];
 		glWindowPos3i(0, -40, 0);
 		glDrawPixels(385, {272}312, GL_RGBA, GL_UNSIGNED_BYTE, b);
-
 
 		finally
 		C64MachineGlobal.FMultiOut.FVideoBuffer.FLock.Release;
@@ -493,10 +498,71 @@ procedure TMonopolyRetroMainForm.MsgC64MachineUpdVideo(var AMsg: TMessage);
 //	Application.ProcessMessages;
 	end;
 
+procedure TMonopolyRetroMainForm.Panel1MouseDown(Sender: TObject;
+		Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+	begin
+	if  Button = mbLeft then
+		begin
+		Mouse.Capture:= Panel1.Handle;
+
+		C64MachineGlobal.FMultiIn.FUserBuffer.FLock.Acquire;
+		try
+			C64MachineGlobal.FMultiIn.FUserBuffer.FMouseBtn:= 1;
+
+			finally
+			C64MachineGlobal.FMultiIn.FUserBuffer.FLock.Release;
+			end;
+		end;
+	end;
+
+procedure TMonopolyRetroMainForm.Panel1MouseEnter(Sender: TObject);
+	begin
+	ShowCursor(False);
+
+	C64MachineGlobal.FMultiIn.FUserBuffer.FLock.Acquire;
+	try
+		C64MachineGlobal.FMultiIn.FUserBuffer.FMouseVis:= 1;
+
+		finally
+		C64MachineGlobal.FMultiIn.FUserBuffer.FLock.Release;
+		end;
+	end;
+
+procedure TMonopolyRetroMainForm.Panel1MouseLeave(Sender: TObject);
+	begin
+	ShowCursor(True);
+
+	C64MachineGlobal.FMultiIn.FUserBuffer.FLock.Acquire;
+	try
+		C64MachineGlobal.FMultiIn.FUserBuffer.FMouseVis:= 0;
+
+		finally
+		C64MachineGlobal.FMultiIn.FUserBuffer.FLock.Release;
+		end;
+	end;
+
+procedure TMonopolyRetroMainForm.Panel1MouseUp(Sender: TObject; Button: TMouseButton;
+		Shift: TShiftState; X, Y: Integer);
+	begin
+	if  Button = mbLeft then
+		begin
+		Mouse.Capture:= 0;
+
+		C64MachineGlobal.FMultiIn.FUserBuffer.FLock.Acquire;
+		try
+			C64MachineGlobal.FMultiIn.FUserBuffer.FMouseBtn:= 0;
+
+			finally
+			C64MachineGlobal.FMultiIn.FUserBuffer.FLock.Release;
+			end;
+		end;
+	end;
+
 procedure TMonopolyRetroMainForm.Timer1Timer(Sender: TObject);
 	var
 	state: TXInputState;
 	j: Byte;
+	pt: TPoint;
 
 	begin
 	if  FJoystickIdx > -1 then
@@ -542,6 +608,26 @@ procedure TMonopolyRetroMainForm.Timer1Timer(Sender: TObject);
 			FJoystickIdx:= -1;
 			actInputJoystick.Checked:= False;
 			end;
+		end;
+
+	pt:= ScreenToClient(Mouse.CursorPos);
+	if  pt.X < 0 then
+		pt.X:= 0;
+	if  pt.X > ClientWidth then
+		pt.X:= ClientWidth;
+
+	if  pt.Y < 0 then
+		pt.Y:= 0;
+	if  pt.Y > ClientHeight then
+		pt.Y:= ClientHeight;
+
+	C64MachineGlobal.FMultiIn.FUserBuffer.FLock.Acquire;
+	try
+		C64MachineGlobal.FMultiIn.FUserBuffer.FMouseY:= pt.Y div 2 + 20;
+		C64MachineGlobal.FMultiIn.FUserBuffer.FMouseX:= pt.X div 2;
+
+		finally
+		C64MachineGlobal.FMultiIn.FUserBuffer.FLock.Release;
 		end;
 	end;
 
