@@ -29,6 +29,10 @@ type
 		actConfigSID: TAction;
 		Configure1: TMenuItem;
 		SIDAudio1: TMenuItem;
+		actViewDouble: TAction;
+		DoubleSize1: TMenuItem;
+    actViewFilter: TAction;
+    Filtering1: TMenuItem;
 		procedure FormCreate(Sender: TObject);
 		procedure FormDestroy(Sender: TObject);
 		procedure FormShow(Sender: TObject);
@@ -38,12 +42,14 @@ type
 		procedure FormActivate(Sender: TObject);
 		procedure FormDeactivate(Sender: TObject);
 		procedure actConfigSIDExecute(Sender: TObject);
-    procedure Panel1MouseEnter(Sender: TObject);
-    procedure Panel1MouseLeave(Sender: TObject);
-    procedure Panel1MouseDown(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Integer);
-    procedure Panel1MouseUp(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Integer);
+		procedure Panel1MouseEnter(Sender: TObject);
+		procedure Panel1MouseLeave(Sender: TObject);
+		procedure Panel1MouseDown(Sender: TObject; Button: TMouseButton;
+				Shift: TShiftState; X, Y: Integer);
+		procedure Panel1MouseUp(Sender: TObject; Button: TMouseButton;
+				Shift: TShiftState; X, Y: Integer);
+		procedure actViewDoubleExecute(Sender: TObject);
+	procedure actViewFilterExecute(Sender: TObject);
 	private
 		FRC: HGLRC;
 		FDC: HDC;
@@ -54,11 +60,15 @@ type
 		FFirstTime: Boolean;
 		FJoystickIdx: Integer;
 		FJoyState: TXInputState;
+		FScale: Integer;
+		FFilter: Boolean;
 
 		procedure DoGLDraw;
 //		procedure DoTryTurnOffVSync;
 
 		procedure DoUpdateFrame;
+		procedure DoUpdateFormSize;
+
 
 		procedure ApplicationMessage(var AMsg: TMsg; var ADone: Boolean);
 
@@ -80,6 +90,10 @@ implementation
 uses
 	System.Character, AnsiStrings, SyncObjs, C64Memory, C64Video, C64MachineConfig,
 	MR64Board, XSIDAudioDSound, XSIDTypes, FormXSIDConfig;
+
+const
+	VAL_SIZ_FORM_WIDTH = 720;
+	VAL_SIZ_FORM_HEIGHT = 544;
 
 
 procedure TMonopolyRetroMainForm.actConfigSIDExecute(Sender: TObject);
@@ -139,6 +153,23 @@ procedure TMonopolyRetroMainForm.actInputJoystickExecute(Sender: TObject);
 	GlobalC64Config.JoystickEnb:= actInputJoystick.Checked;
 	end;
 
+procedure TMonopolyRetroMainForm.actViewDoubleExecute(Sender: TObject);
+	begin
+	actViewDouble.Checked:= not actViewDouble.Checked;
+	if  actViewDouble.Checked then
+		FScale:= 2
+	else
+		FScale:= 1;
+
+	DoUpdateFormSize;
+	end;
+
+procedure TMonopolyRetroMainForm.actViewFilterExecute(Sender: TObject);
+	begin
+	actViewFilter.Checked:= not actViewFilter.Checked;
+	FFilter:= actViewFilter.Checked;
+	end;
+
 procedure TMonopolyRetroMainForm.ApplicationMessage(var AMsg: TMsg;
 		var ADone: Boolean);
 	begin
@@ -173,62 +204,237 @@ procedure TMonopolyRetroMainForm.DoGLDraw;
 //	b2: PByte;
 //	a: Cardinal;
 //	p: TC64RGBA;
+	texNames: array[0..4] of GLint;
 
 	begin
-//	glClear(GL_COLOR_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT);
+	glEnable(GL_TEXTURE_2D);
 
-//	Set the raster pos for our drawing
-	glRasterPos2i(0, 0);
-
-//	Draw the screen
 	C64MachineGlobal.FMultiOut.FVideoBuffer.FLock.Acquire;
 	try
 		i:= C64MachineGlobal.FMultiOut.FVideoBuffer.FBufferIdx xor 1;
-//		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FBGBuf[i];
-//		b2:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FFGBuf[i];
-//
-//		for y:= 51 to 250 do
-//			begin
-//			a:= (311 - y) * 385 * 4 + 96;
-//			Move(b2[a], b[a], 1280);
-//			end;
-//
-//		pb1:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FSPBuf[i];
-//		pb2:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FFGBuf[i];
-//		for y:= 51 to 250 do
-//			for x:= 24 to 343 do
-//				if  (pb1[311 - y, x, 3] and $80) <> 0 then
-//					Move(pb1[311 - y, x], pb2[311 - y, x], 4);
 
-		glWindowPos3i(0, -40, 0);
-//		glPixelZoom(2, 2.1355932);
-		glPixelZoom(2, 2);
+		glPixelStorei(GL_PACK_ALIGNMENT, 4);
+
+		glGenTextures(5, @texNames[0]);
+
+//		Background/border
+		glBindTexture(GL_TEXTURE_2D, texNames[0]);
+		if not FFilter then
+			begin
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			end
+		else
+			begin
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			end;
+
 		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FBGBuf[i];
-		glDrawPixels(385, {272}312, GL_RGBA, GL_UNSIGNED_BYTE, b);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 385, 312, 0, GL_RGBA,
+				GL_UNSIGNED_BYTE, b);
 
-		glWindowPos3i(352, 146, 0);
-//		glPixelZoom(1, 1.0677966);
-		glPixelZoom(1, 1);
+		glBegin(GL_QUADS);
+		glTexCoord2f(0.0, 1.0);
+		glVertex3f(0, -60 * FScale, 0); //bottom left
+
+		glTexCoord2f(1.0, 1.0);
+		glVertex3f((VAL_SIZ_FORM_WIDTH - 1 + 50) * FScale, -60 * FScale, 0); // bottom right
+
+		glTexCoord2f(1.0, 0.0);
+		glVertex3f((VAL_SIZ_FORM_WIDTH - 1 + 50) * FScale, (VAL_SIZ_FORM_HEIGHT - 1 + 20) * FScale, 0);//top right
+
+		glTexCoord2f(0.0, 0.0);
+		glVertex3f(0, (VAL_SIZ_FORM_HEIGHT - 1 + 20) * FScale, 0); //top left
+		glEnd;
+
+//		glWindowPos3i(352 * FScale, 146 * FScale, 0);
+
+//		Overlay/board
+		glBindTexture(GL_TEXTURE_2D, texNames[1]);
+		if not FFilter then
+			begin
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			end
+		else
+			begin
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			end;
+
 		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FBRBuf[i];
-		glDrawPixels(320, 320, GL_RGBA, GL_UNSIGNED_BYTE, b);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 320, 320, 0, GL_RGBA,
+				GL_UNSIGNED_BYTE, b);
 
-		glWindowPos3i(352, 146, 0);
+		glBegin(GL_QUADS);
+		glTexCoord2f(0.0, 1.0);
+		glVertex3f(351 * FScale, 58 * FScale, 0); //bottom left
+
+		glTexCoord2f(1.0, 1.0);
+		glVertex3f((351 + 320) * FScale, 58 * FScale, 0); // bottom right
+
+		glTexCoord2f(1.0, 0.0);
+		glVertex3f((351 + 320) * FScale, (320 + 58) * FScale, 0);//top right
+
+		glTexCoord2f(0.0, 0.0);
+		glVertex3f(351 * FScale, (320 + 58) * FScale, 0); //top left
+		glEnd;
+
+//		Overlay/players
+		glBindTexture(GL_TEXTURE_2D, texNames[1]);
+		if not FFilter then
+			begin
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			end
+		else
+			begin
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			end;
+
 		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FBPBuf[i];
-		glDrawPixels(320, 320, GL_RGBA, GL_UNSIGNED_BYTE, b);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 320, 320, 0, GL_RGBA,
+				GL_UNSIGNED_BYTE, b);
+
+		glBegin(GL_QUADS);
+		glTexCoord2f(0.0, 1.0);
+		glVertex3f(351 * FScale, 58 * FScale, 0); //bottom left
+
+		glTexCoord2f(1.0, 1.0);
+		glVertex3f((351 + 320) * FScale, 58 * FScale, 0); // bottom right
+
+		glTexCoord2f(1.0, 0.0);
+		glVertex3f((351 + 320) * FScale, (320 + 58) * FScale, 0);//top right
+
+		glTexCoord2f(0.0, 0.0);
+		glVertex3f(351 * FScale, (320 + 58) * FScale, 0); //top left
+		glEnd;
+
+//		Foreground/characters
+		glBindTexture(GL_TEXTURE_2D, texNames[3]);
+		if not FFilter then
+			begin
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			end
+		else
+			begin
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			end;
 
 		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FFGBuf[i];
-		glWindowPos3i(0, -40, 0);
-//		glPixelZoom(2, 2.1355932);
-		glPixelZoom(2, 2);
-		glDrawPixels(385, {272}312, GL_RGBA, GL_UNSIGNED_BYTE, b);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 385, 312, 0, GL_RGBA,
+				GL_UNSIGNED_BYTE, b);
+
+		glBegin(GL_QUADS);
+		glTexCoord2f(0.0, 1.0);
+		glVertex3f(0, -60 * FScale, 0); //bottom left
+
+		glTexCoord2f(1.0, 1.0);
+		glVertex3f((VAL_SIZ_FORM_WIDTH - 1 + 50) * FScale, -60 * FScale, 0); // bottom right
+
+		glTexCoord2f(1.0, 0.0);
+		glVertex3f((VAL_SIZ_FORM_WIDTH - 1 + 50) * FScale, (VAL_SIZ_FORM_HEIGHT - 1 + 20) * FScale, 0);//top right
+
+		glTexCoord2f(0.0, 0.0);
+		glVertex3f(0, (VAL_SIZ_FORM_HEIGHT - 1 + 20) * FScale, 0); //top left
+		glEnd;
+
+//		Foreground/sprites
+		glBindTexture(GL_TEXTURE_2D, texNames[3]);
+		if not FFilter then
+			begin
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			end
+		else
+			begin
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			end;
 
 		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FSPBuf[i];
-		glWindowPos3i(0, -40, 0);
-		glDrawPixels(385, {272}312, GL_RGBA, GL_UNSIGNED_BYTE, b);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 385, 312, 0, GL_RGBA,
+				GL_UNSIGNED_BYTE, b);
+
+		glBegin(GL_QUADS);
+		glTexCoord2f(0.0, 1.0);
+		glVertex3f(0, -60 * FScale, 0); //bottom left
+
+		glTexCoord2f(1.0, 1.0);
+		glVertex3f((VAL_SIZ_FORM_WIDTH - 1 + 50) * FScale, -60 * FScale, 0); // bottom right
+
+		glTexCoord2f(1.0, 0.0);
+		glVertex3f((VAL_SIZ_FORM_WIDTH - 1 + 50) * FScale, (VAL_SIZ_FORM_HEIGHT - 1 + 20) * FScale, 0);//top right
+
+		glTexCoord2f(0.0, 0.0);
+		glVertex3f(0, (VAL_SIZ_FORM_HEIGHT - 1 + 20) * FScale, 0); //top left
+		glEnd;
 
 		finally
 		C64MachineGlobal.FMultiOut.FVideoBuffer.FLock.Release;
 		end;
+
+	glDeleteTextures(5, @texNames[0]);
+
+////	glClear(GL_COLOR_BUFFER_BIT);
+//
+////	Set the raster pos for our drawing
+//	glRasterPos2i(0, 0);
+//
+////	Draw the screen
+//	C64MachineGlobal.FMultiOut.FVideoBuffer.FLock.Acquire;
+//	try
+//		i:= C64MachineGlobal.FMultiOut.FVideoBuffer.FBufferIdx xor 1;
+////		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FBGBuf[i];
+////		b2:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FFGBuf[i];
+////
+////		for y:= 51 to 250 do
+////			begin
+////			a:= (311 - y) * 385 * 4 + 96;
+////			Move(b2[a], b[a], 1280);
+////			end;
+////
+////		pb1:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FSPBuf[i];
+////		pb2:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FFGBuf[i];
+////		for y:= 51 to 250 do
+////			for x:= 24 to 343 do
+////				if  (pb1[311 - y, x, 3] and $80) <> 0 then
+////					Move(pb1[311 - y, x], pb2[311 - y, x], 4);
+//
+//		glWindowPos3i(0, -40 * FScale, 0);
+////		glPixelZoom(2, 2.1355932);
+//		glPixelZoom(2 * FScale, 2 * FScale);
+//		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FBGBuf[i];
+//		glDrawPixels(385, {272}312, GL_RGBA, GL_UNSIGNED_BYTE, b);
+//
+//		glWindowPos3i(352 * FScale, 146 * FScale, 0);
+////		glPixelZoom(1, 1.0677966);
+//		glPixelZoom(1 * FScale, 1 * FScale);
+//		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FBRBuf[i];
+//		glDrawPixels(320, 320, GL_RGBA, GL_UNSIGNED_BYTE, b);
+//
+//		glWindowPos3i(352 * FScale, 146 * FScale, 0);
+//		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FBPBuf[i];
+//		glDrawPixels(320, 320, GL_RGBA, GL_UNSIGNED_BYTE, b);
+//
+//		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FFGBuf[i];
+//		glWindowPos3i(0, -40 * FScale, 0);
+////		glPixelZoom(2, 2.1355932);
+//		glPixelZoom(2 * FScale, 2 * FScale);
+//		glDrawPixels(385, {272}312, GL_RGBA, GL_UNSIGNED_BYTE, b);
+//
+//		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FSPBuf[i];
+//		glWindowPos3i(0, -40 * FScale, 0);
+//		glDrawPixels(385, {272}312, GL_RGBA, GL_UNSIGNED_BYTE, b);
+//
+//		finally
+//		C64MachineGlobal.FMultiOut.FVideoBuffer.FLock.Release;
+//		end;
 
 //	Make sure the buffers are sent
 	glFlush;
@@ -261,6 +467,37 @@ procedure TMonopolyRetroMainForm.DoTryTurnOffVSync;
 			wglSwapIntervalEXT(0);
 		end;
 	end;}
+
+procedure TMonopolyRetroMainForm.DoUpdateFormSize;
+	begin
+	ClientWidth:= VAL_SIZ_FORM_WIDTH * FScale;
+	ClientHeight:= VAL_SIZ_FORM_HEIGHT * FScale + Panel2.Height;
+
+//	2x scaled output (with aspect ratio correction)
+	glViewport(0, 0, VAL_SIZ_FORM_WIDTH * FScale, VAL_SIZ_FORM_HEIGHT * FScale);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity;
+//	gluOrtho2D(0.0, VAL_SIZ_FORM_WIDTH * FScale, 0.0, VAL_SIZ_FORM_HEIGHT * FScale);
+	glOrtho(0, VAL_SIZ_FORM_WIDTH * FScale, VAL_SIZ_FORM_HEIGHT * FScale, 0, 0, 1);
+
+//	glMatrixMode(GL_MODELVIEW);
+//	glLoadIdentity;
+
+//	glPixelZoom(1.87301588, 2.0);
+//	glPixelZoom(2, 2.1355932);
+
+//	DoTryTurnOffVSync;
+
+//	glEnable(GL_ALPHA_TEST);
+//	glAlphaFunc(GL_GREATER, 0.5);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glBlendEquation(GL_FUNC_ADD);
+
+	glDisable(GL_DEPTH_TEST);
+
+	end;
 
 procedure TMonopolyRetroMainForm.DoUpdateFrame;
 	var
@@ -385,26 +622,9 @@ procedure TMonopolyRetroMainForm.FormCreate(Sender: TObject);
 	glShadeModel(GL_FLAT);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-//	2x scaled output (with aspect ratio correction)
-	glViewport(0, 0, 720, 544);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity;
-	gluOrtho2D(0.0, 720, 0.0, 544);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity;
-//	glPixelZoom(1.87301588, 2.0);
-//	glPixelZoom(2, 2.1355932);
+	FScale:= 1;
 
-//	DoTryTurnOffVSync;
-
-//	glEnable(GL_ALPHA_TEST);
-//	glAlphaFunc(GL_GREATER, 0.5);
-
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glBlendEquation(GL_FUNC_ADD);
-
-	glDisable(GL_DEPTH_TEST);
+	DoUpdateFormSize;
 
 //	State stuff
 	FLastTime:= GetTickCount;
@@ -621,9 +841,12 @@ procedure TMonopolyRetroMainForm.Timer1Timer(Sender: TObject);
 	if  pt.Y > ClientHeight then
 		pt.Y:= ClientHeight;
 
+	pt.X:= pt.X div FScale;
+	pt.Y:= pt.Y div FScale;
+
 	C64MachineGlobal.FMultiIn.FUserBuffer.FLock.Acquire;
 	try
-		C64MachineGlobal.FMultiIn.FUserBuffer.FMouseY:= pt.Y div 2 + 20;
+		C64MachineGlobal.FMultiIn.FUserBuffer.FMouseY:= pt.Y div 2 + 30;
 		C64MachineGlobal.FMultiIn.FUserBuffer.FMouseX:= pt.X div 2;
 
 		finally

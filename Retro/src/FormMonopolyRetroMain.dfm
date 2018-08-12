@@ -75,6 +75,12 @@ object MonopolyRetroMainForm: TMonopolyRetroMainForm
     end
     object View1: TMenuItem
       Caption = '&View'
+      object DoubleSize1: TMenuItem
+        Action = actViewDouble
+      end
+      object Filtering1: TMenuItem
+        Action = actViewFilter
+      end
     end
     object Tools1: TMenuItem
       Caption = '&Tools'
@@ -107,6 +113,16 @@ object MonopolyRetroMainForm: TMonopolyRetroMainForm
       Category = 'Config'
       Caption = 'SID Audio'
       OnExecute = actConfigSIDExecute
+    end
+    object actViewDouble: TAction
+      Category = 'View'
+      Caption = 'Double Size'
+      OnExecute = actViewDoubleExecute
+    end
+    object actViewFilter: TAction
+      Category = 'View'
+      Caption = 'Filtering'
+      OnExecute = actViewFilterExecute
     end
   end
   object Timer1: TTimer
