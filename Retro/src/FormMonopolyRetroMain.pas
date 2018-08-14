@@ -31,8 +31,8 @@ type
 		SIDAudio1: TMenuItem;
 		actViewDouble: TAction;
 		DoubleSize1: TMenuItem;
-    actViewFilter: TAction;
-    Filtering1: TMenuItem;
+		actViewFilter: TAction;
+		Filtering1: TMenuItem;
 		procedure FormCreate(Sender: TObject);
 		procedure FormDestroy(Sender: TObject);
 		procedure FormShow(Sender: TObject);
@@ -49,7 +49,7 @@ type
 		procedure Panel1MouseUp(Sender: TObject; Button: TMouseButton;
 				Shift: TShiftState; X, Y: Integer);
 		procedure actViewDoubleExecute(Sender: TObject);
-	procedure actViewFilterExecute(Sender: TObject);
+		procedure actViewFilterExecute(Sender: TObject);
 	private
 		FRC: HGLRC;
 		FDC: HDC;
@@ -204,7 +204,7 @@ procedure TMonopolyRetroMainForm.DoGLDraw;
 //	b2: PByte;
 //	a: Cardinal;
 //	p: TC64RGBA;
-	texNames: array[0..4] of GLint;
+	texNames: array[0..5] of GLint;
 
 	begin
 	glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT);
@@ -216,7 +216,7 @@ procedure TMonopolyRetroMainForm.DoGLDraw;
 
 		glPixelStorei(GL_PACK_ALIGNMENT, 4);
 
-		glGenTextures(5, @texNames[0]);
+		glGenTextures(6, @texNames[0]);
 
 //		Background/border
 		glBindTexture(GL_TEXTURE_2D, texNames[0]);
@@ -232,8 +232,8 @@ procedure TMonopolyRetroMainForm.DoGLDraw;
 			end;
 
 		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FBGBuf[i];
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 385, 312, 0, GL_RGBA,
-				GL_UNSIGNED_BYTE, b);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, VAL_SIZ_SCREEN_PALX2X,
+				VAL_SIZ_SCREEN_PALY2X, 0, GL_RGBA, GL_UNSIGNED_BYTE, b);
 
 		glBegin(GL_QUADS);
 		glTexCoord2f(0.0, 1.0);
@@ -265,7 +265,7 @@ procedure TMonopolyRetroMainForm.DoGLDraw;
 			end;
 
 		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FBRBuf[i];
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 320, 320, 0, GL_RGBA,
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 640, 640, 0, GL_RGBA,
 				GL_UNSIGNED_BYTE, b);
 
 		glBegin(GL_QUADS);
@@ -283,7 +283,7 @@ procedure TMonopolyRetroMainForm.DoGLDraw;
 		glEnd;
 
 //		Overlay/players
-		glBindTexture(GL_TEXTURE_2D, texNames[1]);
+		glBindTexture(GL_TEXTURE_2D, texNames[2]);
 		if not FFilter then
 			begin
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -296,7 +296,7 @@ procedure TMonopolyRetroMainForm.DoGLDraw;
 			end;
 
 		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FBPBuf[i];
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 320, 320, 0, GL_RGBA,
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 640, 640, 0, GL_RGBA,
 				GL_UNSIGNED_BYTE, b);
 
 		glBegin(GL_QUADS);
@@ -313,7 +313,7 @@ procedure TMonopolyRetroMainForm.DoGLDraw;
 		glVertex3f(351 * FScale, (320 + 58) * FScale, 0); //top left
 		glEnd;
 
-//		Foreground/characters
+//		Playfield background
 		glBindTexture(GL_TEXTURE_2D, texNames[3]);
 		if not FFilter then
 			begin
@@ -327,8 +327,8 @@ procedure TMonopolyRetroMainForm.DoGLDraw;
 			end;
 
 		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FFGBuf[i];
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 385, 312, 0, GL_RGBA,
-				GL_UNSIGNED_BYTE, b);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, VAL_SIZ_SCREEN_PALX2X,
+				VAL_SIZ_SCREEN_PALY2X, 0, GL_RGBA, GL_UNSIGNED_BYTE, b);
 
 		glBegin(GL_QUADS);
 		glTexCoord2f(0.0, 1.0);
@@ -344,8 +344,39 @@ procedure TMonopolyRetroMainForm.DoGLDraw;
 		glVertex3f(0, (VAL_SIZ_FORM_HEIGHT - 1 + 20) * FScale, 0); //top left
 		glEnd;
 
-//		Foreground/sprites
-		glBindTexture(GL_TEXTURE_2D, texNames[3]);
+//		Playfield foreground
+		glBindTexture(GL_TEXTURE_2D, texNames[4]);
+		if not FFilter then
+			begin
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			end
+		else
+			begin
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			end;
+
+		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FFPBuf[i];
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, VAL_SIZ_SCREEN_PALX2X,
+				VAL_SIZ_SCREEN_PALY2X, 0, GL_RGBA, GL_UNSIGNED_BYTE, b);
+
+		glBegin(GL_QUADS);
+		glTexCoord2f(0.0, 1.0);
+		glVertex3f(0, -60 * FScale, 0); //bottom left
+
+		glTexCoord2f(1.0, 1.0);
+		glVertex3f((VAL_SIZ_FORM_WIDTH - 1 + 50) * FScale, -60 * FScale, 0); // bottom right
+
+		glTexCoord2f(1.0, 0.0);
+		glVertex3f((VAL_SIZ_FORM_WIDTH - 1 + 50) * FScale, (VAL_SIZ_FORM_HEIGHT - 1 + 20) * FScale, 0);//top right
+
+		glTexCoord2f(0.0, 0.0);
+		glVertex3f(0, (VAL_SIZ_FORM_HEIGHT - 1 + 20) * FScale, 0); //top left
+		glEnd;
+
+//		Sprites
+		glBindTexture(GL_TEXTURE_2D, texNames[5]);
 		if not FFilter then
 			begin
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -379,62 +410,7 @@ procedure TMonopolyRetroMainForm.DoGLDraw;
 		C64MachineGlobal.FMultiOut.FVideoBuffer.FLock.Release;
 		end;
 
-	glDeleteTextures(5, @texNames[0]);
-
-////	glClear(GL_COLOR_BUFFER_BIT);
-//
-////	Set the raster pos for our drawing
-//	glRasterPos2i(0, 0);
-//
-////	Draw the screen
-//	C64MachineGlobal.FMultiOut.FVideoBuffer.FLock.Acquire;
-//	try
-//		i:= C64MachineGlobal.FMultiOut.FVideoBuffer.FBufferIdx xor 1;
-////		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FBGBuf[i];
-////		b2:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FFGBuf[i];
-////
-////		for y:= 51 to 250 do
-////			begin
-////			a:= (311 - y) * 385 * 4 + 96;
-////			Move(b2[a], b[a], 1280);
-////			end;
-////
-////		pb1:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FSPBuf[i];
-////		pb2:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FFGBuf[i];
-////		for y:= 51 to 250 do
-////			for x:= 24 to 343 do
-////				if  (pb1[311 - y, x, 3] and $80) <> 0 then
-////					Move(pb1[311 - y, x], pb2[311 - y, x], 4);
-//
-//		glWindowPos3i(0, -40 * FScale, 0);
-////		glPixelZoom(2, 2.1355932);
-//		glPixelZoom(2 * FScale, 2 * FScale);
-//		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FBGBuf[i];
-//		glDrawPixels(385, {272}312, GL_RGBA, GL_UNSIGNED_BYTE, b);
-//
-//		glWindowPos3i(352 * FScale, 146 * FScale, 0);
-////		glPixelZoom(1, 1.0677966);
-//		glPixelZoom(1 * FScale, 1 * FScale);
-//		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FBRBuf[i];
-//		glDrawPixels(320, 320, GL_RGBA, GL_UNSIGNED_BYTE, b);
-//
-//		glWindowPos3i(352 * FScale, 146 * FScale, 0);
-//		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FBPBuf[i];
-//		glDrawPixels(320, 320, GL_RGBA, GL_UNSIGNED_BYTE, b);
-//
-//		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FFGBuf[i];
-//		glWindowPos3i(0, -40 * FScale, 0);
-////		glPixelZoom(2, 2.1355932);
-//		glPixelZoom(2 * FScale, 2 * FScale);
-//		glDrawPixels(385, {272}312, GL_RGBA, GL_UNSIGNED_BYTE, b);
-//
-//		b:= @C64MachineGlobal.FMultiOut.FVideoBuffer.FSPBuf[i];
-//		glWindowPos3i(0, -40 * FScale, 0);
-//		glDrawPixels(385, {272}312, GL_RGBA, GL_UNSIGNED_BYTE, b);
-//
-//		finally
-//		C64MachineGlobal.FMultiOut.FVideoBuffer.FLock.Release;
-//		end;
+	glDeleteTextures(6, @texNames[0]);
 
 //	Make sure the buffers are sent
 	glFlush;
@@ -676,7 +652,7 @@ procedure TMonopolyRetroMainForm.FormShow(Sender: TObject);
 	begin
 	if  FFirstTime then
 		begin
-		C64CharGenROMInit('chargen');
+		C64CharGenROMInit('res\newchargen.data');
 
 //		GlobalC64Memory.Load($8000, 'test.bin');
 //		GlobalC64Memory.Write($FFFC, $00);
@@ -684,10 +660,10 @@ procedure TMonopolyRetroMainForm.FormShow(Sender: TObject);
 //		GlobalC64Memory.Write($FFFE, $64);
 //		GlobalC64Memory.Write($FFFF, $90);
 
-		GlobalC64Memory.Load($0000, 'clientretro.prg', True);
-		GlobalC64Memory.Load($0000, 'strings.prg', True);
-		GlobalC64Memory.Load($0000, 'screen.prg', True);
-		GlobalC64Memory.Load($0000, 'rules.prg', True);
+		GlobalC64Memory.Load($0000, 'res\clientretro.prg', True);
+		GlobalC64Memory.Load($0000, 'res\strings.prg', True);
+		GlobalC64Memory.Load($0000, 'res\screen.prg', True);
+		GlobalC64Memory.Load($0000, 'res\rules.prg', True);
 
 		GlobalC64Memory.Write($FFFC, $22);
 		GlobalC64Memory.Write($FFFD, $08);

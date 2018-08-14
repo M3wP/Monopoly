@@ -316,7 +316,7 @@ procedure TC64VICIIFrame.Execute;
 		begin
 		for y:= 0 to ARR_REC_BOARD_DET[ASquare].h - 1 do
 			begin
-			yp:= 319 - (ARR_REC_BOARD_DET[ASquare].y + y);
+			yp:= 639 - (ARR_REC_BOARD_DET[ASquare].y + y);
 			xp:= ARR_REC_BOARD_DET[ASquare].x;
 			sz:= ARR_REC_BOARD_DET[ASquare].w;
 
@@ -334,7 +334,7 @@ procedure TC64VICIIFrame.Execute;
 		begin
 		for y:= 0 to ARR_REC_BOARD_DET[ASquare].h - 1 do
 			begin
-			yp:= 319 - (ARR_REC_BOARD_DET[ASquare].y + y);
+			yp:= 639 - (ARR_REC_BOARD_DET[ASquare].y + y);
 			xp:= ARR_REC_BOARD_DET[ASquare].x;
 			sz:= ARR_REC_BOARD_DET[ASquare].w * 4;
 
@@ -352,7 +352,7 @@ procedure TC64VICIIFrame.Execute;
 		begin
 		for y:= 0 to ARR_REC_BOARD_DET[ASquare].h - 1 do
 			begin
-			yp:= 319 - (ARR_REC_BOARD_DET[ASquare].y + y);
+			yp:= 639 - (ARR_REC_BOARD_DET[ASquare].y + y);
 			xp:= ARR_REC_BOARD_DET[ASquare].x;
 			sz:= ARR_REC_BOARD_DET[ASquare].w * 4;
 
@@ -371,7 +371,7 @@ procedure TC64VICIIFrame.Execute;
 		begin
 		for y:= 0 to ARR_REC_BOARD_DET[ASquare].h - 1 do
 			begin
-			yp:= 319 - (ARR_REC_BOARD_DET[ASquare].y + y);
+			yp:= 639 - (ARR_REC_BOARD_DET[ASquare].y + y);
 			xp:= ARR_REC_BOARD_DET[ASquare].x;
 			sz:= ARR_REC_BOARD_DET[ASquare].w * 4;
 
@@ -390,7 +390,7 @@ procedure TC64VICIIFrame.Execute;
 		begin
 		for y:= 0 to ARR_REC_BOARD_DET[ASquare].h - 1 do
 			begin
-			yp:= 319 - (ARR_REC_BOARD_DET[ASquare].y + y);
+			yp:= 639 - (ARR_REC_BOARD_DET[ASquare].y + y);
 			xp:= ARR_REC_BOARD_DET[ASquare].x;
 			sz:= ARR_REC_BOARD_DET[ASquare].w * 4;
 
@@ -399,36 +399,70 @@ procedure TC64VICIIFrame.Execute;
 			end;
 		end;
 
-	procedure DoDrawVICIIChar(const AX, AY: Integer; const AChar, AFGClr, ABGClr: Byte);
+//	procedure DoDrawVICIIChar(const AX, AY: Integer; const AChar, AFGClr, ABGClr: Byte);
+//		var
+//		x,
+//		y: Integer;
+//		b: Byte;
+////		m: Byte;
+//		p: TC64RGBA;
+//
+//		begin
+//		for y:= 0 to 15 do
+//			begin
+//			for x:= 0 to 15 do
+//				begin
+//				p:= GlobalC64Palette[ABGClr];
+//				Move(p[0], FBuffer.FBR^[639 - (AY + y), AX + x, 0], 4);
+//
+//				b:= GlobalC64CharGen[AChar * 256 + y * 16 + x];
+//				p:= GlobalC64Palette[AFGClr];
+//				p[3]:= b;
+//
+//				Move(p[0], FBuffer.FBP^[639 - (AY + y), AX + x, 0], 4);
+//				end;
+//			end;
+//		end;
+
+	procedure DoDrawOwnGlyph(const AX, AY: Integer; const AFGClr: Byte;
+			const AAll: Boolean);
 		var
 		x,
 		y: Integer;
-		b,
-		m: Byte;
+		p: TC64RGBA;
 
 		begin
-		for y:= 0 to 7 do
-			begin
-			b:= GlobalC64CharGen[AChar * 8 + y];
-			m:= $80;
-			for x:= 0 to 7 do
+		for y:= 0 to 15 do
+			for x:= 0 to 15 do
 				begin
-				if  (b and m) <> 0 then
-					Move(GlobalC64Palette[AFGClr, 0], FBuffer.FBR^[319 - (AY + y),
-							AX + x, 0], 4)
+				if  AAll then
+					p:= GlobalC64Palette[AFGClr]
 				else
-					Move(GlobalC64Palette[ABGClr, 0], FBuffer.FBR^[319 - (AY + y),
-							AX + x, 0], 4);
+					p:= GlobalMR64OwnGlyphs[AFGClr, 15 - y, x];
 
-				m:= m shr 1;
+				Move(p[0], FBuffer.FBR^[639 - (AY + y), AX + x, 0], 4);
 				end;
-			end;
+		end;
+
+	procedure DoDrawImprvGlyph(const AX, AY: Integer; const AImprv: Byte);
+		var
+		x,
+		y: Integer;
+		p: TC64RGBA;
+
+		begin
+		for y:= 0 to 15 do
+			for x:= 0 to 15 do
+				begin
+				p:= GlobalMR64ImprvGlyphs[AImprv, 15 - y, x];
+				Move(p[0], FBuffer.FBR^[639 - (AY + y), AX + x, 0], 4);
+				end;
 		end;
 
 	procedure UpdateOwn;
 		var
 		i: Integer;
-		ch,
+		all: Boolean;
 		cl: Byte;
 		x,
 		y: Integer;
@@ -436,10 +470,7 @@ procedure TC64VICIIFrame.Execute;
 		begin
 		for i:= 0 to 39 do
 			begin
-			if  (FThisBrd[i].imprv and $40) <> 0 then
-				ch:= $A0
-			else
-				ch:= $E6;
+			all:= (FThisBrd[i].imprv and $40) <> 0;
 
 			if  FThisBrd[i].own = $FF then
 				cl:= $0B
@@ -452,26 +483,26 @@ procedure TC64VICIIFrame.Execute;
 					if  ARR_REC_BOARD_DET[i].ps = mbpBottom then
 						x:= ARR_REC_BOARD_DET[i].x
 					else
-						x:= ARR_REC_BOARD_DET[i].x - 2;
+						x:= ARR_REC_BOARD_DET[i].x - 4;
 
 					y:= ARR_VAL_BOARD_OWN[ARR_REC_BOARD_DET[i].ps];
 
-					DoDrawVICIIChar(x, y, ch, cl, $00);
-					DoDrawVICIIChar(x + 8, y, ch, cl, $00);
-					DoDrawVICIIChar(x + 16, y, ch, cl, $00);
+					DoDrawOwnGlyph(x, y, cl, all);
+					DoDrawOwnGlyph(x + 16, y, cl, all);
+					DoDrawOwnGlyph(x + 32, y, cl, all);
 					end;
 				mbpLeft, mbpRight:
 					begin
 					if  ARR_REC_BOARD_DET[i].ps = mbpRight then
 						y:= ARR_REC_BOARD_DET[i].y
 					else
-						y:= ARR_REC_BOARD_DET[i].y - 2;
+						y:= ARR_REC_BOARD_DET[i].y - 4;
 
 					x:= ARR_VAL_BOARD_OWN[ARR_REC_BOARD_DET[i].ps];
 
-					DoDrawVICIIChar(x, y, ch, cl, $00);
-					DoDrawVICIIChar(x, y + 8, ch, cl, $00);
-					DoDrawVICIIChar(x, y + 16, ch, cl, $00);
+					DoDrawOwnGlyph(x, y, cl, all);
+					DoDrawOwnGlyph(x, y + 16, cl, all);
+					DoDrawOwnGlyph(x, y + 32, cl, all);
 					end;
 				end;
 			end;
@@ -480,8 +511,8 @@ procedure TC64VICIIFrame.Execute;
 	procedure UpdateImprove;
 		var
 		i: Integer;
-		ch,
-		cl: Byte;
+		ch: Byte;
+//		cl: Byte;
 		x,
 		y: Integer;
 
@@ -491,15 +522,9 @@ procedure TC64VICIIFrame.Execute;
 			if  (FThisBrd[i].imprv and $0F) <> 0 then
 				begin
 				if  (FThisBrd[i].imprv and $08) <> 0 then
-					begin
-					ch:= $88;
-					cl:= $0A;
-					end
+					ch:= 4
 				else
-					begin
-					ch:= $B0 + (FThisBrd[i].imprv and $07);
-					cl:= $0D;
-					end;
+					ch:= FThisBrd[i].imprv and $07 - 1;
 
 				case ARR_REC_BOARD_DET[i].ps of
 					mbpBottom, mbpTop:
@@ -507,14 +532,14 @@ procedure TC64VICIIFrame.Execute;
 						x:= ARR_REC_BOARD_DET[i].x;
 						y:= ARR_VAL_BOARD_IMP[ARR_REC_BOARD_DET[i].ps];
 
-						DoDrawVICIIChar(x, y, ch, cl, $00);
+						DoDrawImprvGlyph(x, y, ch);
 						end;
 					mbpLeft, mbpRight:
 						begin
 						y:= ARR_REC_BOARD_DET[i].y;
 						x:= ARR_VAL_BOARD_IMP[ARR_REC_BOARD_DET[i].ps];
 
-						DoDrawVICIIChar(x, y, ch, cl, $00);
+						DoDrawImprvGlyph(x, y, ch);
 						end;
 					end;
 				end;
@@ -531,7 +556,7 @@ procedure TC64VICIIFrame.Execute;
 
 		for i:= 0 to 39 do
 			if  (FThisBrd[i].imprv and $80) <> 0 then
-				if  ARR_REC_BOARD_DET[i].fg then
+				if  ARR_REC_BOARD_DET[i].st <> mstStreet then
 					DoCopyMrtGlyph(i)
 				else
 					DoFillSquareSolid(i, p.int);
@@ -545,7 +570,7 @@ procedure TC64VICIIFrame.Execute;
 		begin
 		for i:= 0 to 39 do
 			if  (FPrevBrd[i].imprv and $20) <> 0 then
-				if  ARR_REC_BOARD_DET[i].fg then
+				if  ARR_REC_BOARD_DET[i].st <> mstStreet then
 					if (FPrevBrd[i].imprv and $80) <> 0 then
 						DoCopyMrtGlyph(i)
 					else
@@ -569,7 +594,7 @@ procedure TC64VICIIFrame.Execute;
 		begin
 		for i:= 0 to 39 do
 			if  (FThisBrd[i].imprv and $20) <> 0 then
-				if  ARR_REC_BOARD_DET[i].fg then
+				if  ARR_REC_BOARD_DET[i].st <> mstStreet then
 					begin
 					if (FThisBrd[i].imprv and $80) <> 0 then
 						DoCopySlMGlyph(i)
@@ -599,35 +624,35 @@ procedure TC64VICIIFrame.Execute;
 		case ARR_REC_BOARD_DET[s].ps of
 			mbpBottom:
 				begin
-				AX:= ARR_REC_BOARD_DET[s].x + 2;
-				AY:= ARR_REC_BOARD_DET[s].y + 1 + p * 9;
+				AX:= ARR_REC_BOARD_DET[s].x + 4;
+				AY:= ARR_REC_BOARD_DET[s].y + 2 + p * 18;
 				if  APlayer > 2 then
-					Inc(AX, 10);
-				if  ARR_REC_BOARD_DET[s].fg then
-					Inc(AY, 10);
+					Inc(AX, 20);
+				if  ARR_REC_BOARD_DET[s].st <> mstStreet then
+					Inc(AY, 20);
 				end;
 			mbpLeft:
 				begin
-				AX:= ARR_REC_BOARD_DET[s].x + 1 + p * 9;
-				AY:= ARR_REC_BOARD_DET[s].y + 2;
+				AX:= ARR_REC_BOARD_DET[s].x + 2 + p * 18;
+				AY:= ARR_REC_BOARD_DET[s].y + 4;
 				if  APlayer > 2 then
-					Inc(AY, 10);
+					Inc(AY, 20);
 				end;
 			mbpTop:
 				begin
-				AX:= ARR_REC_BOARD_DET[s].x + 2;
-				AY:= ARR_REC_BOARD_DET[s].y + 1 + p * 9;
+				AX:= ARR_REC_BOARD_DET[s].x + 4;
+				AY:= ARR_REC_BOARD_DET[s].y + 2 + p * 18;
 				if  APlayer > 2 then
-					Inc(AX, 10);
+					Inc(AX, 20);
 				end;
 			mbpRight:
 				begin
-				AX:= ARR_REC_BOARD_DET[s].x + 1 + p * 9;
-				AY:= ARR_REC_BOARD_DET[s].y + 2;
+				AX:= ARR_REC_BOARD_DET[s].x + 2 + p * 18;
+				AY:= ARR_REC_BOARD_DET[s].y + 4;
 				if  APlayer > 2 then
-					Inc(AY, 10);
-				if  ARR_REC_BOARD_DET[s].fg then
-					Inc(AX, 10);
+					Inc(AY, 20);
+				if  ARR_REC_BOARD_DET[s].st <> mstStreet then
+					Inc(AX, 20);
 				end;
 			end;
 		end;
@@ -636,8 +661,6 @@ procedure TC64VICIIFrame.Execute;
 		var
 		x,
 		y: Integer;
-		b,
-		m: Byte;
 		cl: Byte;
 
 		begin
@@ -646,20 +669,10 @@ procedure TC64VICIIFrame.Execute;
 			if  ARR_VAL_TOKEN_BNK[FBlnkIdx] <> $FF then
 				cl:= ARR_VAL_TOKEN_BNK[FBlnkIdx];
 
-		for y:= 0 to 7 do
-			begin
-			b:= ARR_VAL_TOKEN_CHR[y];
-			m:= $80;
-			for x:= 0 to 7 do
-				begin
-				if  (b and m) <> 0 then
-					Move(GlobalC64Palette[cl, 0],
-							FBuffer.FBP^[319 - (AY + y), AX + x, 0], 4);
-
-				m:= m shr 1;
-				end;
-			end;
-
+		for y:= 0 to High(GlobalMR64TokenGlyphs[cl]) do
+			for x:= 0 to High(GlobalMR64TokenGlyphs[cl, y]) do
+				Move(GlobalMR64TokenGlyphs[cl, y, x],
+						FBuffer.FBP^[639 - (AY + y), AX + x, 0], 4);
 		end;
 
 	procedure UpdatePlayers;
@@ -687,20 +700,20 @@ procedure TC64VICIIFrame.Execute;
 			GlobalMR64BoardRegs.dirty:= mbdNone;
 
 			p.arr:= ARR_CLR_C64ALPHA;
-			DoFillInt(PInteger(FBuffer.FBP), 320 * 320, p.int);
+			DoFillInt(PInteger(FBuffer.FBP), 640 * 640, p.int);
 
 			if  FBrdRegs.dirty <> mbdNone then
 				Move(GlobalC64Memory.FRAM[FBrdRegs.address], FThisBrd[0], 80);
 
 			if  FBrdRegs.dirty = mbdAll then
 				begin
-				Move(GlobalMR64Board[0], FBuffer.FBR^, 320 * 320 * 4);
+				Move(GlobalMR64Board[0], FBuffer.FBR^, 640 * 640 * 4);
 				UpdateOwn;
 				UpdateImprove;
 				UpdateMortgage;
 				end
 			else
-				Move(PrevMR64Board[0], FBuffer.FBR^, 320 * 320 * 4);
+				Move(PrevMR64Board[0], FBuffer.FBR^, 640 * 640 * 4);
 
 			if  FBrdRegs.dirty = mbdSelect then
 				ResetSelection;
@@ -709,7 +722,7 @@ procedure TC64VICIIFrame.Execute;
 				begin
 				UpdateSelection;
 
-				Move(FBuffer.FBR^, PrevMR64Board[0], 320 * 320 * 4);
+				Move(FBuffer.FBR^, PrevMR64Board[0], 640 * 640 * 4);
 				Move(FThisBrd[0], FPrevBrd[0], 80);
 				end;
 
@@ -732,7 +745,7 @@ procedure TC64VICIIFrame.Execute;
 
 procedure TC64VICIIRaster.Execute;
 	var
-	y,
+	y: Integer;
 	x: Integer;
 	p: TC64PalToInt;
 
@@ -833,7 +846,8 @@ procedure TC64VICIIRaster.Execute;
 			y:= FRegs.rasterY;
 
 			p.arr:= GlobalC64Palette[FRegs.borderClr];
-			DoFillInt(PInteger(@FBuffer.FBG^[311 - y, 0]), 385, p.int);
+			DoFillInt(PInteger(@FBuffer.FBG^[(VAL_SIZ_SCREEN_PALY2X - 1) - (y * 2) - 1, 0]),
+					VAL_SIZ_SCREEN_PALX2X * 2, p.int);
 
 			p.arr:= ARR_CLR_C64ALPHA;
 			DoFillInt(PInteger(@FBuffer.FSP^[311 - y, 0]), 385, p.int);
@@ -858,32 +872,42 @@ procedure TC64VICIIBadLine.DoDrawHiResText(AX, AY, AIndex: Integer);
 	chrgen: Integer;
 	ch: Byte;
 	cl: Byte;
-	b: Byte;
-	m: Byte;
+//	b: Byte;
+//	m: Byte;
 	i,
 	j: Integer;
+	p: TC64PalToInt;
 
 	begin
 	for i:= 0 to 39 do
 		begin
 		cl:= FColour[i];
-		chrgen:= FScreen[i] * 8 + AIndex;
-		ch:= GlobalC64CharGen[chrgen];
-		m:= $80;
-		for j:= 0 to 7 do
+		chrgen:= FScreen[i] * 256 + AIndex * 16;
+
+		for j:= 0 to 15 do
 			begin
-			b:= ch and m;
-			m:= m shr 1;
+			ch:= GlobalC64CharGen[chrgen + j];
 
 			if  cl > $0F then
+				begin
 				Move(ARR_CLR_C64ALPHA[0],
-						FBuffer.FFG^[311 - AY, AX + i * 8 + j, 0], 4)
-			else if  b = 0 then
-				Move(GlobalC64Palette[FRegs.backgdClr],
-						FBuffer.FFG^[311 - AY, AX + i * 8 + j, 0], 4)
+						FBuffer.FFG^[(VAL_SIZ_SCREEN_PALY2X - 1) - AY,
+						AX + i * 16 + j, 0], 4);
+				Move(ARR_CLR_C64ALPHA[0],
+						FBuffer.FFP^[(VAL_SIZ_SCREEN_PALY2X - 1) - AY,
+						AX + i * 16 + j, 0], 4);
+				end
 			else
-				Move(GlobalC64Palette[cl and $0F],
-						FBuffer.FFG^[311 - AY, AX + i * 8 + j, 0], 4);
+				begin
+				Move(GlobalC64Palette[FRegs.backgdClr],
+						FBuffer.FFG^[(VAL_SIZ_SCREEN_PALY2X - 1) - AY,
+						AX + i * 16 + j, 0], 4);
+
+				p.arr:= GlobalC64Palette[cl];
+				p.arr[3]:= ch;
+				Move(p.arr[0], FBuffer.FFP^[(VAL_SIZ_SCREEN_PALY2X - 1) - AY,
+						AX + i * 16 + j, 0], 4);
+				end;
 			end;
 		end;
 
@@ -912,10 +936,10 @@ procedure TC64VICIIBadLine.Execute;
 			for i:= 0 to 39 do
 				FColour[i]:= GlobalC64Memory.FRAM[addr + i];
 
-			for i:= 0 to 7 do
+			for i:= 0 to 15 do
 				begin
-				y:= {51 + FBuffer.FBADLine * 8}FRaster + i;
-				x:= 24;
+				y:= {51 + FBuffer.FBADLine * 8}FRaster * 2 + i;
+				x:= 24 * 2;
 
 				DoDrawHiResText(x, y, i);
 

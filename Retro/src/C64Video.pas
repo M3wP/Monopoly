@@ -2,15 +2,23 @@ unit C64Video;
 
 interface
 
+const
+	VAL_SIZ_SCREEN_PALY2X = 624;
+	VAL_SIZ_SCREEN_PALX2X = 770;
+
+
 type
 	TC64RGBA = array[0..3] of Byte;
 
 	TC64PaletteRGBA = array[0..15] of TC64RGBA;
 
 	PC64PALScreen = ^TC64PALScreen;
-	TC64PALScreen = array[0..{271}311,0..384] of TC64RGBA;
+	TC64PALScreen = array[0..VAL_SIZ_SCREEN_PALY2X - 1, 0..VAL_SIZ_SCREEN_PALX2X - 1] of TC64RGBA;
 
-	TC64CharGenROM = array[0..4095] of Byte;
+	PC64PALHalfScreen = ^TC64PALHalfScreen;
+	TC64PALHalfScreen = array[0..311, 0..384] of TC64RGBA;
+
+	TC64CharGenROM = array[0..65535] of Byte;
 
 	TC64PalToInt = record
 		case Boolean of
@@ -241,7 +249,7 @@ procedure C64CharGenROMInit(const AFileName: string);
 		m.LoadFromFile(AFileName);
 		m.Position:= 0;
 
-		Move(m.Memory^, GlobalC64CharGen[0], 4096);
+		Move(m.Memory^, GlobalC64CharGen[0], m.Size);
 
 		finally
 		m.Free;

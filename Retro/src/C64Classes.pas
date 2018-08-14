@@ -56,8 +56,11 @@ type
 		FFGBuf: array [0..1] of TC64PALScreen;
 		FFG: PC64PALScreen;
 
-		FSPBuf: array [0..1] of TC64PALScreen;
-		FSP: PC64PALScreen;
+		FFPBuf: array [0..1] of TC64PALScreen;
+		FFP: PC64PALScreen;
+
+		FSPBuf: array [0..1] of TC64PALHalfScreen;
+		FSP: PC64PALHalfScreen;
 
 		FFrameCnt: Cardinal;
 		FFrameDone: Boolean;
@@ -252,6 +255,7 @@ constructor TC64VideoBuffer.Create;
 	FBR:= @FBRBuf[FBufferIdx];
 	FBP:= @FBPBuf[FBufferIdx];
 	FFG:= @FFGBuf[FBufferIdx];
+	FFP:= @FFPBuf[FBufferIdx];
 	FSP:= @FSPBuf[FBufferIdx];
 
 	FFrameDone:= False;
@@ -267,6 +271,7 @@ procedure TC64VideoBuffer.SignalHigh;
 		FBR:= @FBRBuf[FBufferIdx];
 		FBP:= @FBPBuf[FBufferIdx];
 		FFG:= @FFGBuf[FBufferIdx];
+		FFP:= @FFPBuf[FBufferIdx];
 		FSP:= @FSPBuf[FBufferIdx];
 		Inc(FFrameCnt);
 		FFrameDone:= True;

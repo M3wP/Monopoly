@@ -7,7 +7,7 @@ uses
 
 type
 	PMR64Board = ^TMR64Board;
-	TMR64Board = array[0..319, 0..319] of TC64RGBA;
+	TMR64Board = array[0..639, 0..639] of TC64RGBA;
 
 	TMR64BoardPlayerDet = record
 		colour: Byte;
@@ -17,6 +17,7 @@ type
 	end;
 
 	TMR64BoardDirty = (mbdNone, mbdAll, mbdSelect);
+	TMR64SquareType = (mstStreet, mstStation, mstUtility, mstAction);
 
 	TMR64BoardRegs = record
 		address: Word;
@@ -37,7 +38,7 @@ type
 		y,
 		w,
 		h: Integer;
-		fg: Boolean;
+		st: TMR64SquareType;
 		ps: TMR64BoardPos;
 	end;
 
@@ -64,92 +65,99 @@ const
 //Right Imprv X: 272
 
 	ARR_VAL_BOARD_OWN: array[TMR64BoardPos] of Integer =
-		(306, 6, 0, 312);
+		(612, 12, 0, 624);
 
 	ARR_VAL_BOARD_IMP: array[TMR64BoardPos] of Integer =
-		(266, 46, 40, 272);
+		(532, 92, 80, 544);
 
 	ARR_REC_BOARD_DET: array[0..39] of TMR64BoardSqDet = (
 //0:
-			(x:	272; y:	266; w:	38; h:	38; fg:	True; ps:	mbpBottom),
+			(x:	544; y:	532; w:	76; h:	76; st:	mstAction; ps:	mbpBottom),
 //1:
-			(x:	248; y:	276; w:	22; h:	28; fg:	False; ps:	mbpBottom),
+			(x:	496; y:	552; w:	44; h:	56; st: mstStreet; ps:	mbpBottom),
 //2:
-			(x:	224; y:	266; w:	22; h:	38; fg:	True; ps:	mbpBottom),
+			(x:	448; y:	532; w:	44; h:	76; st: mstAction; ps:	mbpBottom),
 //3:
-			(x:	200; y:	276; w:	22; h:	28; fg:	False; ps:	mbpBottom),
+			(x:	400; y:	552; w:	44; h:	56; st: mstStreet; ps:	mbpBottom),
 //4:
-			(x:	176; y:	266; w:	22; h:	38; fg:	True; ps:	mbpBottom),
+			(x:	352; y:	532; w:	44; h:	76; st: mstAction; ps:	mbpBottom),
 //5:
-			(x:	152; y:	266; w:	22; h:	38; fg:	True; ps:	mbpBottom),
+			(x:	304; y:	532; w:	44; h:	76; st: mstStation; ps:	mbpBottom),
 //6:
-			(x:	128; y:	276; w:	22; h:	28; fg:	False; ps:	mbpBottom),
+			(x:	256; y:	552; w:	44; h:	56; st: mstStreet; ps:	mbpBottom),
 //7:
-			(x:	104; y:	266; w:	22; h:	38; fg:	True; ps:	mbpBottom),
+			(x:	208; y:	532; w:	44; h:	76; st: mstAction; ps:	mbpBottom),
 //8:
-			(x:	80; y:	276; w:	22; h:	28; fg:	False; ps:	mbpBottom),
+			(x:	160; y:	552; w:	44; h:	56; st: mstStreet; ps:	mbpBottom),
 //9:
-			(x:	56; y:	276; w:	22; h:	28; fg:	False; ps:	mbpBottom),
+			(x:	112; y:	552; w:	44; h:	56; st: mstStreet; ps:	mbpBottom),
 //10:
-			(x:	16; y:	266; w:	38; h:	38; fg:	True; ps:	mbpLeft),
+			(x:	32; y:	532; w:	76; h:	76; st: mstAction; ps:	mbpLeft),
+
+
 //11:
-			(x:	16; y:	242; w:	28; h:	22; fg:	False; ps:	mbpLeft),
+			(x:	32; y:	484; w:	56; h:	44; st: mstStreet; ps:	mbpLeft),
 //12:
-			(x:	16; y:	218; w:	38; h:	22; fg:	True; ps:	mbpLeft),
+			(x:	32; y:	436; w:	76; h:	44; st: mstUtility; ps:	mbpLeft),
 //13:
-			(x:	16; y:	194; w:	28; h:	22; fg:	False; ps:	mbpLeft),
+			(x:	32; y:	388; w:	56; h:	44; st: mstStreet; ps:	mbpLeft),
 //14:
-			(x:	16; y:	170; w:	28; h:	22; fg:	False; ps:	mbpLeft),
+			(x:	32; y:	340; w:	56; h:	44; st: mstStreet; ps:	mbpLeft),
 //15:
-			(x:	16; y:	146; w:	38; h:	22; fg:	True; ps:	mbpLeft),
+			(x:	32; y:	292; w:	76; h:	44; st: mstStation; ps:	mbpLeft),
 //16:
-			(x:	16; y:	122; w:	28; h:	22; fg:	False; ps:	mbpLeft),
+			(x:	32; y:	244; w:	56; h:	44; st: mstStreet; ps:	mbpLeft),
 //17:
-			(x:	16; y:	98; w:	38; h:	22; fg:	True; ps:	mbpLeft),
+			(x:	32; y:	196; w:	76; h:	44; st: mstAction; ps:	mbpLeft),
 //18:
-			(x:	16; y:	74; w:	28; h:	22; fg:	False; ps:	mbpLeft),
+			(x:	32; y:	148; w:	56; h:	44; st: mstStreet; ps:	mbpLeft),
 //19:
-			(x:	16; y:	50; w:	28; h:	22; fg:	False; ps:	mbpLeft),
+			(x:	32; y:	100; w:	56; h:	44; st: mstStreet; ps:	mbpLeft),
 //20:
-			(x:	16; y:	10; w:	38; h:	38; fg:	True; ps:	mbpTop),
+			(x:	32; y:	20; w:	76; h:	76; st: mstAction; ps:	mbpTop),
+
+
+
 //21:
-			(x:	56; y:	10; w:	22; h:	28; fg:	False; ps:	mbpTop),
+			(x:	112; y:	20; w:	44; h:	56; st: mstStreet; ps:	mbpTop),
 //22:
-			(x:	80; y:	10; w:	22; h:	38; fg:	True; ps:	mbpTop),
+			(x:	160; y:	20; w:	44; h:	76; st: mstAction; ps:	mbpTop),
 //23:
-			(x:	104; y:	10; w:	22; h:	28; fg:	False; ps:	mbpTop),
+			(x:	208; y:	20; w:	44; h:	56; st: mstStreet; ps:	mbpTop),
 //24:
-			(x:	128; y:	10; w:	22; h:	28; fg:	False; ps:	mbpTop),
+			(x:	256; y:	20; w:	44; h:	56; st: mstStreet; ps:	mbpTop),
 //25:
-			(x:	152; y:	10; w:	22; h:	38; fg:	True; ps:	mbpTop),
+			(x:	304; y:	20; w:	44; h:	76; st: mstStation; ps:	mbpTop),
 //26:
-			(x:	176; y:	10; w:	22; h:	28; fg:	False; ps:	mbpTop),
+			(x:	352; y:	20; w:	44; h:	56; st: mstStreet; ps:	mbpTop),
 //27:
-			(x:	200; y:	10; w:	22; h:	28; fg:	False; ps:	mbpTop),
+			(x:	400; y:	20; w:	44; h:	56; st: mstStreet; ps:	mbpTop),
 //28:
-			(x:	224; y:	10; w:	22; h:	38; fg:	True; ps:	mbpTop),
+			(x:	448; y:	20; w:	44; h:	76; st: mstUtility; ps:	mbpTop),
 //29:
-			(x:	248; y:	10; w:	22; h:	28; fg:	False; ps:	mbpTop),
+			(x:	496; y:	20; w:	44; h:	56; st: mstStreet; ps:	mbpTop),
+
+
 //30:
-			(x:	272; y:	10; w:	38; h:	38; fg:	True; ps:	mbpRight),
+			(x:	544; y:	20; w:	76; h:	76; st: mstAction; ps:	mbpRight),
 //31:
-			(x:	282; y:	50; w:	28; h:	22; fg:	False; ps:	mbpRight),
+			(x:	564; y:	100; w:	56; h:	44; st: mstStreet; ps:	mbpRight),
 //32:
-			(x:	282; y:	74; w:	28; h:	22; fg:	False; ps:	mbpRight),
+			(x:	564; y:	148; w:	56; h:	44; st: mstStreet; ps:	mbpRight),
 //33:
-			(x:	272; y:	98; w:	38; h:	22; fg:	True; ps:	mbpRight),
+			(x:	544; y:	196; w:	76; h:	44; st: mstAction; ps:	mbpRight),
 //34:
-			(x:	282; y:	122; w:	28; h:	22; fg:	False; ps:	mbpRight),
+			(x:	564; y:	244; w:	56; h:	44; st: mstStreet; ps:	mbpRight),
 //35:
-			(x:	272; y:	146; w:	38; h:	22; fg:	True; ps:	mbpRight),
+			(x:	544; y:	292; w:	76; h:	44; st: mstStation; ps:	mbpRight),
 //36:
-			(x:	272; y:	170; w:	38; h:	22; fg:	True; ps:	mbpRight),
+			(x:	544; y:	340; w:	76; h:	44; st: mstAction; ps:	mbpRight),
 //37:
-			(x:	282; y:	194; w:	28; h:	22; fg:	False; ps:	mbpRight),
+			(x:	564; y:	388; w:	56; h:	44; st: mstStreet; ps:	mbpRight),
 //38:
-			(x:	272; y:	218; w:	38; h:	22; fg:	True; ps:	mbpRight),
+			(x:	544; y:	436; w:	76; h:	44; st: mstAction; ps:	mbpRight),
 //39:
-			(x:	282; y:	242; w:	28; h:	22; fg:	False; ps:	mbpRight));
+			(x:	564; y:	484; w:	56; h:	44; st: mstStreet; ps:	mbpRight));
 
 	ARR_VAL_TOKEN_CHR: array[0..7] of Byte = (
 			$18, $7E, $7E, $FF, $FF, $7E, $7E, $18);
@@ -169,84 +177,112 @@ var
 	GlobalMR64BrdMrtGlyphs: array[0..39] of TMR64BoardGlyph;
 	GlobalMR64BrdSlMGlyphs: array[0..39] of TMR64BoardGlyph;
 
+	GlobalMR64TokenGlyphs: array[0..15] of TMR64BoardGlyph;
+	GlobalMR64OwnGlyphs: array[0..15] of TMR64BoardGlyph;
+	GlobalMR64ImprvGlyphs: array[0..4] of TMR64BoardGlyph;
+
 
 implementation
 
 uses
-	Classes;
+	SysUtils, Classes, PNGImage;
+
+
+procedure DoLoadGlyph(const AFileName: string; var AGlyph: TMR64BoardGlyph);
+	var
+	i: TPNGImage;
+	y,
+	x: Integer;
+	sl: PByteArray;
+	p: TC64RGBA;
+	al: PByteArray;
+
+	begin
+	i:= TPNGImage.Create;
+	try
+		i.LoadFromFile(AFileName);
+
+		SetLength(AGlyph, i.Height);
+
+		for y:= 0 to i.Height - 1 do
+			begin
+			SetLength(AGlyph[(i.Height - 1) - y], i.Width);
+
+			sl:= PByteArray(i.Scanline[y]);
+			al:= i.AlphaScanline[y];
+
+			for x:= 0 to i.Width - 1 do
+				begin
+				p[0]:= sl[x * 3 + 2];
+				p[1]:= sl[x * 3 + 1];
+				p[2]:= sl[x * 3];
+				if  Assigned(al) then
+					p[3]:= al[x]
+				else
+					p[3]:= $FF;
+
+				Move(p[0], AGlyph[(i.Height - 1) - y, x], 4);
+				end;
+			end;
+
+		finally
+		i.Free;
+		end;
+	end;
+
 
 procedure InitialiseBoard;
 	var
-	m: TMemoryStream;
+	m: TPNGImage;
 	i,
 	x,
 	y: Integer;
-	p: Byte;
-	xp,
-	yp: Integer;
+	sl: PByteArray;
+	p: TC64RGBA;
 
 	begin
-	m:= TMemoryStream.Create;
+	m:= TPNGImage.Create;
 	try
-		m.LoadFromFile('board.data');
-		m.Position:= 0;
+		m.LoadFromFile('res\board.png');
 
-		for y:= 0 to 319 do
-			for x:= 0 to 319 do
+		for y:= 0 to 639 do
+			begin
+			sl:= PByteArray(m.Scanline[y]);
+
+			for x:= 0 to 639 do
 				begin
-				m.ReadData(p, 1);
-				Move(GlobalC64Palette[p], GlobalMR64Board[319 - y, x], 4);
+				p[0]:= sl[x * 3 + 2];
+				p[1]:= sl[x * 3 + 1];
+				p[2]:= sl[x * 3];
+				p[3]:= $FF;
+
+				Move(p[0], GlobalMR64Board[639 - y, x], 4);
 				end;
+			end;
 
 		finally
 		m.Free;
 		end;
 
-	Move(GlobalMR64Board[0], PrevMR64Board[0], 320 * 320 * 4);
+	Move(GlobalMR64Board[0], PrevMR64Board[0], 640 * 640 * 4);
 
 	for i:= 0 to 39 do
-		if  ARR_REC_BOARD_DET[i].fg then
+		if  ARR_REC_BOARD_DET[i].st <> mstStreet then
 			begin
-			SetLength(GlobalMR64BrdSelGlyphs[i], ARR_REC_BOARD_DET[i].h);
-			SetLength(GlobalMR64BrdMrtGlyphs[i], ARR_REC_BOARD_DET[i].h);
-			SetLength(GlobalMR64BrdSlMGlyphs[i], ARR_REC_BOARD_DET[i].h);
+			DoLoadGlyph(Format('res\Square%2.2xS.png', [i]),
+					GlobalMR64BrdSelGlyphs[i]);
 
-			for y:= 0 to ARR_REC_BOARD_DET[i].h - 1 do
+			if  ARR_REC_BOARD_DET[i].st <> mstAction then
 				begin
-				SetLength(GlobalMR64BrdSelGlyphs[i, (ARR_REC_BOARD_DET[i].h - 1) - y],
-						ARR_REC_BOARD_DET[i].w);
-				SetLength(GlobalMR64BrdMrtGlyphs[i, (ARR_REC_BOARD_DET[i].h - 1) - y],
-						ARR_REC_BOARD_DET[i].w);
-				SetLength(GlobalMR64BrdSlMGlyphs[i, (ARR_REC_BOARD_DET[i].h - 1) - y],
-						ARR_REC_BOARD_DET[i].w);
-
-				yp:= 319 - (ARR_REC_BOARD_DET[i].y + y);
-
-				for x:= 0 to ARR_REC_BOARD_DET[i].w - 1 do
-					begin
-					xp:= ARR_REC_BOARD_DET[i].x + x;
-
-					if  (GlobalMR64Board[yp, xp, 0] = GlobalC64Palette[0, 0])
-					and (GlobalMR64Board[yp, xp, 1] = GlobalC64Palette[0, 1])
-					and (GlobalMR64Board[yp, xp, 2] = GlobalC64Palette[0, 2]) then
-						begin
-						Move(GlobalC64Palette[0], GlobalMR64BrdSelGlyphs[i,
-								(ARR_REC_BOARD_DET[i].h - 1) - y, x], 4);
-						Move(GlobalC64Palette[0], GlobalMR64BrdMrtGlyphs[i,
-								(ARR_REC_BOARD_DET[i].h - 1) - y, x], 4);
-						Move(GlobalC64Palette[0], GlobalMR64BrdSlMGlyphs[i,
-								(ARR_REC_BOARD_DET[i].h - 1) - y, x], 4);
-						end
-					else
-						begin
-						Move(GlobalC64Palette[1], GlobalMR64BrdSelGlyphs[i,
-								(ARR_REC_BOARD_DET[i].h - 1) - y, x], 4);
-						Move(GlobalC64Palette[11], GlobalMR64BrdMrtGlyphs[i,
-								(ARR_REC_BOARD_DET[i].h - 1) - y, x], 4);
-						Move(GlobalC64Palette[15], GlobalMR64BrdSlMGlyphs[i,
-								(ARR_REC_BOARD_DET[i].h - 1) - y, x], 4);
-						end;
-					end;
+				DoLoadGlyph(Format('res\Square%2.2xM.png', [i]),
+						GlobalMR64BrdMrtGlyphs[i]);
+				DoLoadGlyph(Format('res\Square%2.2xSM.png', [i]),
+						GlobalMR64BrdSlMGlyphs[i]);
+				end
+			else
+				begin
+				SetLength(GlobalMR64BrdMrtGlyphs[i], 0);
+				SetLength(GlobalMR64BrdSlMGlyphs[i], 0);
 				end;
 			end
 		else
@@ -255,6 +291,33 @@ procedure InitialiseBoard;
 			SetLength(GlobalMR64BrdMrtGlyphs[i], 0);
 			SetLength(GlobalMR64BrdSlMGlyphs[i], 0);
 			end;
+	end;
+
+procedure InitialiseTokens;
+	var
+	i: Integer;
+
+	begin
+	for i:= 0 to 15 do
+		DoLoadGlyph(Format('res\Token%2.2x.png', [i]), GlobalMR64TokenGlyphs[i]);
+	end;
+
+procedure InitialiseOwn;
+	var
+	i: Integer;
+
+	begin
+	for i:= 0 to 15 do
+		DoLoadGlyph(Format('res\Own%2.2x.png', [i]), GlobalMR64OwnGlyphs[i]);
+	end;
+
+procedure InitialiseImprv;
+	var
+	i: Integer;
+
+	begin
+	for i:= 0 to 4 do
+		DoLoadGlyph(Format('res\Improve%2.2x.png', [i]), GlobalMR64ImprvGlyphs[i]);
 	end;
 
 
@@ -305,5 +368,8 @@ procedure TMR64BoardIIO.Write(const AAddress: Word; const AValue: Byte);
 
 initialization
 	InitialiseBoard;
+	InitialiseTokens;
+	InitialiseOwn;
+	InitialiseImprv;
 
 end.
