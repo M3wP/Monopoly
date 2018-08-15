@@ -57,11 +57,13 @@ uses
 const
   // Current name of the DLL shipped in the same SDK as this header.
   // The name reflects the current version
-  XINPUT_DLL_A  = 'xinput1_3.dll';
+  
+//dengland
+XINPUT_DLL_A  = 'xinput1_4.dll';
   {$EXTERNALSYM XINPUT_DLL_A}
-  XINPUT_DLL_W  = 'xinput1_3.dll';
+XINPUT_DLL_W  = 'xinput1_4.dll';
   {$EXTERNALSYM XINPUT_DLL_W}
-  XINPUT_DLL = XINPUT_DLL_A;
+XINPUT_DLL = XINPUT_DLL_A;
   {$EXTERNALSYM XINPUT_DLL}
 
   //
@@ -77,6 +79,14 @@ const
   {$EXTERNALSYM XINPUT_DEVSUBTYPE_FLIGHT_SICK}
   XINPUT_DEVSUBTYPE_DANCE_PAD     = $05;
   {$EXTERNALSYM XINPUT_DEVSUBTYPE_DANCE_PAD}
+  
+
+//dengland
+XINPUT_DEVSUBTYPE_GUITAR        =	$06;
+  {$EXTERNALSYM XINPUT_DEVSUBTYPE_GUITAR}
+XINPUT_DEVSUBTYPE_DRUM_KIT      =	$08;
+  {$EXTERNALSYM XINPUT_DEVSUBTYPE_DRUM_KIT}
+  
 
   //
   // Device subtypes available in XINPUT_CAPABILITIES
