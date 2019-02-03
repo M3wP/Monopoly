@@ -2,7 +2,7 @@
 ;RULES.S
 ;===============================================================================
 
-	.include	"strings.inc"
+	.include	"strrefs.inc"
 	.include 	"screen.inc"
 
 	.code
@@ -666,17 +666,17 @@ rulesSqrStrsCrnr3:
 			.word 	strText3Crnr3
 			.word 	strText4Crnr3
 rulesSqrStrsChest0:
-			.word 	strText0Chest0
-			.word 	strText1Chest0
-			.word 	strText2Chest0
-			.word 	strText3Chest0
-			.word 	strText4Chest0
+			.word 	strText0Chest10
+			.word 	strText1Chest10
+			.word 	strText2Chest10
+			.word 	strText3Chest10
+			.word 	strText4Chest10
 rulesSqrStrsChance0:
-			.word 	strText0Chance0
-			.word 	strText1Chance0
-			.word 	strText2Chance0
-			.word 	strText3Chance0
-			.word 	strText4Chance0
+			.word 	strText0Chance10
+			.word 	strText1Chance10
+			.word 	strText2Chance10
+			.word 	strText3Chance10
+			.word 	strText4Chance10
 rulesSqrStrsTax0:
 			.word 	strText0Tax0
 			.word 	strText1Tax0
@@ -726,39 +726,39 @@ rulesChestStrsHi:
 			.byte	>rulesChestStrsF
 
 rulesChestStrs0:
-			.word	strDesc0Chest0
-			.word	strDesc1Chest0
+			.word	strText0Chest0
+			.word	strText1Chest0
 			.word 	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$01
 			.word	strText0CCCCard0
 rulesChestStrs1:
-			.word	strDesc0Chest1
-			.word	strDesc1Chest1
+			.word	strText0Chest1
+			.word	strText1Chest1
 			.word 	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 rulesChestStrs2:
-			.word	strDesc0Chest2
-			.word	strDesc1Chest2
+			.word	strText0Chest2
+			.word	strText1Chest2
 			.word 	strDummyDummy0
 			.byte	$01
 			.word	strText2CCCCard0
 			.byte	$01
 			.word	strText3CCCCard0
 rulesChestStrs3:
-			.word	strDesc0Chest3
-			.word	strDesc1Chest3
-			.word 	strDesc2Chest3
+			.word	strText0Chest3
+			.word	strText1Chest3
+			.word 	strText2Chest3
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$01
 			.word	strText0CCCCard0
 rulesChestStrs4:
-			.word	strDesc0Chest4
+			.word	strText0Chest4
 			.word	strDummyDummy0
 			.word 	strDummyDummy0
 			.byte	$00
@@ -766,7 +766,7 @@ rulesChestStrs4:
 			.byte	$01
 			.word	strText0CCCCard0
 rulesChestStrs5:
-			.word	strDesc0Chest5
+			.word	strText0Chest5
 			.word	strDummyDummy0
 			.word 	strDummyDummy0
 			.byte	$00
@@ -774,7 +774,7 @@ rulesChestStrs5:
 			.byte	$01
 			.word	strText0CCCCard0
 rulesChestStrs6:
-			.word	strDesc0Chest6
+			.word	strText0Chest6
 			.word	strDummyDummy0
 			.word 	strDummyDummy0
 			.byte	$00
@@ -782,7 +782,7 @@ rulesChestStrs6:
 			.byte	$01
 			.word	strText4CCCCard0
 rulesChestStrs7:
-			.word	strDesc0Chest7
+			.word	strText0Chest7
 			.word	strDummyDummy0
 			.word 	strDummyDummy0
 			.byte	$00
@@ -790,15 +790,15 @@ rulesChestStrs7:
 			.byte	$01
 			.word	strText0CCCCard0
 rulesChestStrs8:
-			.word	strDesc0Chest8
-			.word	strDesc1Chest8
-			.word 	strDesc2Chest8
+			.word	strText0Chest8
+			.word	strText1Chest8
+			.word 	strText2Chest8
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 rulesChestStrs9:
-			.word	strDesc0Chest9
+			.word	strText0Chest9
 			.word	strDummyDummy0
 			.word 	strDummyDummy0
 			.byte	$00
@@ -806,7 +806,7 @@ rulesChestStrs9:
 			.byte	$01
 			.word	strText1CCCCard0
 rulesChestStrsA:
-			.word	strDesc0ChestA
+			.word	strText0ChestA
 			.word	strDummyDummy0
 			.word 	strDummyDummy0
 			.byte	$00
@@ -814,7 +814,7 @@ rulesChestStrsA:
 			.byte	$01
 			.word	strText0CCCCard0
 rulesChestStrsB:
-			.word	strDesc0ChestB
+			.word	strText0ChestB
 			.word	strDummyDummy0
 			.word 	strDummyDummy0
 			.byte	$00
@@ -822,23 +822,23 @@ rulesChestStrsB:
 			.byte	$01
 			.word	strText1CCCCard0
 rulesChestStrsC:
-			.word	strDesc0ChestC
-			.word	strDesc1ChestC
+			.word	strText0ChestC
+			.word	strDummyDummy0
 			.word 	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$01
 			.word	strText0CCCCard0
 rulesChestStrsD:
-			.word	strDesc0ChestD
-			.word	strDesc1ChestD
+			.word	strText0ChestD
+			.word	strDummyDummy0
 			.word 	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$01
 			.word	strText0CCCCard0
 rulesChestStrsE:
-			.word	strDesc0ChestE
+			.word	strText0ChestE
 			.word	strDummyDummy0
 			.word 	strDummyDummy0
 			.byte	$00
@@ -846,9 +846,9 @@ rulesChestStrsE:
 			.byte	$01
 			.word	strText1CCCCard0
 rulesChestStrsF:
-			.word	strDesc0ChestF
-			.word	strDesc1ChestF
-			.word 	strDesc2ChestF
+			.word	strText0ChestF
+			.word	strText1ChestF
+			.word 	strText2ChestF
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$00
@@ -941,23 +941,23 @@ rulesChanceStrsHi:
 			.byte	>rulesChanceStrsF
 
 rulesChanceStrs0:
-			.word	strDesc0Chance0
-			.word	strDesc1Chance0
-			.word 	strDesc2Chance0
+			.word	strText0Chance0
+			.word	strText1Chance0
+			.word 	strText2Chance0
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 rulesChanceStrs1:
-			.word	strDesc0Chance1
-			.word	strDesc1Chance1
-			.word 	strDesc2Chance1
+			.word	strText0Chance1
+			.word	strText1Chance1
+			.word 	strText2Chance1
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 rulesChanceStrs2:
-			.word	strDesc0Chance2
+			.word	strText0Chance2
 			.word	strDummyDummy0
 			.word 	strDummyDummy0
 			.byte	$00
@@ -965,47 +965,47 @@ rulesChanceStrs2:
 			.byte	$01
 			.word	strText1CCCCard0
 rulesChanceStrs3:
-			.word	strDesc0Chance3
-			.word	strDesc1Chance3
+			.word	strText0Chance3
+			.word	strDummyDummy0
 			.word 	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 rulesChanceStrs4:
-			.word	strDesc0Chance4
-			.word	strDesc1Chance4
+			.word	strText0Chance4
+			.word	strText1Chance4
 			.word 	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$01
 			.word	strText5CCCCard0
 rulesChanceStrs5:
-			.word	strDesc0Chance5
+			.word	strText0Chance5
 			.word	strDummyDummy0
-			.word 	strDesc1Chance5
+			.word 	strText1Chance5
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 rulesChanceStrs6:
-			.word	strDesc0Chance6
-			.word	strDesc1Chance6
-			.word 	strDesc2Chance6
+			.word	strText0Chance6
+			.word	strText1Chance6
+			.word 	strText2Chance6
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 rulesChanceStrs7:
-			.word	strDesc0Chance7
-			.word	strDesc1Chance7
+			.word	strText0Chance7
+			.word	strText1Chance7
 			.word 	strDummyDummy0
 			.byte	$01
 			.word	strText2CCCCard0
 			.byte	$01
 			.word	strText3CCCCard0
 rulesChanceStrs8:
-			.word	strDesc0Chance8
+			.word	strText0Chance8
 			.word	strDummyDummy0
 			.word 	strDummyDummy0
 			.byte	$00
@@ -1013,57 +1013,57 @@ rulesChanceStrs8:
 			.byte	$01
 			.word	strText0CCCCard0
 rulesChanceStrs9:
-			.word	strDesc0Chance9
-			.word	strDesc1Chance9
+			.word	strText0Chance9
+			.word	strText1Chance9
 			.word 	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 rulesChanceStrsA:
-			.word	strDesc0ChanceA
-			.word	strDesc1ChanceA
-			.word 	strDesc2ChanceA
+			.word	strText0ChanceA
+			.word	strText1ChanceA
+			.word 	strText2ChanceA
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 rulesChanceStrsB:
-			.word	strDesc0ChanceB
-			.word	strDesc1ChanceB
-			.word 	strDesc2ChanceB
+			.word	strText0ChanceB
+			.word	strText1ChanceB
+			.word 	strText2ChanceB
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 rulesChanceStrsC:
-			.word	strDesc0ChanceC
+			.word	strText0ChanceC
 			.word	strDummyDummy0
-			.word 	strDesc1ChanceC
+			.word 	strText1ChanceC
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 rulesChanceStrsD:
-			.word	strDesc0ChanceD
-			.word	strDesc1ChanceD
+			.word	strText0ChanceD
+			.word	strText1ChanceD
 			.word 	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$01
 			.word	strText0CCCCard0
 rulesChanceStrsE:
-			.word	strDesc0ChanceE
-			.word	strDesc1ChanceE
+			.word	strText0ChanceE
+			.word	strText1ChanceE
 			.word 	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$00
 			.word	strDummyDummy0
 rulesChanceStrsF:
-			.word	strDesc0ChanceF
+			.word	strText0ChanceF
 			.word	strDummyDummy0
-			.word 	strDesc1ChanceF
+			.word 	strText1ChanceF
 			.byte	$00
 			.word	strDummyDummy0
 			.byte	$00

@@ -2,12 +2,10 @@
 ;SCREEN.S
 ;===============================================================================
 
-	.include	"strings.inc"
-
 	.code
-	.org	STRINGS_END - 2
+	.org	$F300 - 2
 	
-	.word	STRINGS_END
+	.word	$F300
 
 
 SCREEN_BEGIN	=	*
@@ -54,7 +52,7 @@ pointCodes:
 			.byte	$CF, $D0, $CC, $FA
 			.byte 	$A0, $B1, $B2, $B3
 			.byte	$B4, $88, $20, $F7
-			.byte	$E7, $D7
+			.byte	$E7, $D7, $DA
 			
 screenClear0:
 			.byte	$11, $00, $00, $28, $19

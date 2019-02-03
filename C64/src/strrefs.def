@@ -1,0 +1,732 @@
+strDummyDummy0:
+			.word _strDummyDummy0
+strHeaderTitles0:
+			.word _strHeaderTitles0
+strText0Titles0:
+			.word _strText0Titles0
+strText1Titles0:
+			.word _strText1Titles0
+strText2Titles0:
+			.word _strText2Titles0
+strText3Titles0:
+			.word _strText3Titles0
+strText4Titles0:
+			.word _strText4Titles0
+strText8Titles0:
+			.word _strText8Titles0
+strText5Titles0:
+			.word _strText5Titles0
+strText6Titles0:
+			.word _strText6Titles0
+strText7Titles0:
+			.word _strText7Titles0
+strText0NumConv0:
+			.word _strText0NumConv0
+strHeaderNull0:
+			.word _strHeaderNull0
+strText0Null0:
+			.word _strText0Null0
+strHeaderSetup0:
+			.word _strHeaderSetup0
+strDescSetup0:
+			.word _strDescSetup0
+strOptn0Setup0:
+			.word _strOptn0Setup0
+strOptn1Setup0:
+			.word _strOptn1Setup0
+strOptn2Setup0:
+			.word _strOptn2Setup0
+strOptn3Setup0:
+			.word _strOptn3Setup0
+strOptn4Setup0:
+			.word _strOptn4Setup0
+strDescSetup1:
+			.word _strDescSetup1
+strOptn0Setup1:
+			.word _strOptn0Setup1
+strOptn1Setup1:
+			.word _strOptn1Setup1
+strOptn2Setup1:
+			.word _strOptn2Setup1
+strOptn3Setup1:
+			.word _strOptn3Setup1
+strOptn4Setup1:
+			.word _strOptn4Setup1
+strOptn5Setup1:
+			.word _strOptn5Setup1
+strOptn6Setup1:
+			.word _strOptn6Setup1
+strOptn7Setup1:
+			.word _strOptn7Setup1
+strOptn8Setup1:
+			.word _strOptn8Setup1
+strOptn9Setup1:
+			.word _strOptn9Setup1
+strDescSetup2:
+			.word _strDescSetup2
+strOptn0Setup2:
+			.word _strOptn0Setup2
+strOptn1Setup2:
+			.word _strOptn1Setup2
+strOptn2Setup2:
+			.word _strOptn2Setup2
+strHeaderSetup3:
+			.word _strHeaderSetup3
+strDescSetup3:
+			.word _strDescSetup3
+strText0Setup3:
+			.word _strText0Setup3
+strText1Setup3:
+			.word _strText1Setup3
+strOptn0Setup3:
+			.word _strOptn0Setup3
+strOptn1Setup3:
+			.word _strOptn1Setup3
+strDescSetup4:
+			.word _strDescSetup4
+strOptn0Setup4:
+			.word _strOptn0Setup4
+strDescSetup5:
+			.word _strDescSetup5
+strText0Setup5:
+			.word _strText0Setup5
+strText1Setup5:
+			.word _strText1Setup5
+strDescSetup6:
+			.word _strDescSetup6
+strOptn0Setup6:
+			.word _strOptn0Setup6
+strOptn1Setup6:
+			.word _strOptn1Setup6
+strOptn2Setup6:
+			.word _strOptn2Setup6
+strText0Setup6:
+			.word _strText0Setup6
+strText1Setup6:
+			.word _strText1Setup6
+strHeaderSetup7:
+			.word _strHeaderSetup7
+strDescSetup7:
+			.word _strDescSetup7
+strOptn0Setup7:
+			.word _strOptn0Setup7
+strOptn1Setup7:
+			.word _strOptn1Setup7
+strOptn2Setup7:
+			.word _strOptn2Setup7
+strDescSetup8:
+			.word _strDescSetup8
+strOptn0Setup8:
+			.word _strOptn0Setup8
+strOptn1Setup8:
+			.word _strOptn1Setup8
+strOptn2Setup8:
+			.word _strOptn2Setup8
+strDescSetup9:
+			.word _strDescSetup9
+strOptn0Setup9:
+			.word _strOptn0Setup9
+strOptn1Setup9:
+			.word _strOptn1Setup9
+strHeaderStart0:
+			.word _strHeaderStart0
+strText0Start0:
+			.word _strText0Start0
+strHeaderWaitFor0:
+			.word _strHeaderWaitFor0
+strText0WaitFor0:
+			.word _strText0WaitFor0
+strText1WaitFor0:
+			.word _strText1WaitFor0
+strHeaderPlay0:
+			.word _strHeaderPlay0
+strDescPlay0:
+			.word _strDescPlay0
+strOptn0Play0:
+			.word _strOptn0Play0
+strOptn1Play0:
+			.word _strOptn1Play0
+strOptn2Play0:
+			.word _strOptn2Play0
+strOptn3Play0:
+			.word _strOptn3Play0
+strOptn4Play0:
+			.word _strOptn4Play0
+strOptn5Play0:
+			.word _strOptn5Play0
+strOptn6Play0:
+			.word _strOptn6Play0
+strOptn7Play0:
+			.word _strOptn7Play0
+strOptn8Play0:
+			.word _strOptn8Play0
+strOptn9Play0:
+			.word _strOptn9Play0
+strOptn0Ftr0:
+			.word _strOptn0Ftr0
+strOptn1Ftr0:
+			.word _strOptn1Ftr0
+strOptn2Ftr0:
+			.word _strOptn2Ftr0
+strOptn3Ftr0:
+			.word _strOptn3Ftr0
+strHeaderPlay1:
+			.word _strHeaderPlay1
+strOptn0Play1:
+			.word _strOptn0Play1
+strOptn1Play1:
+			.word _strOptn1Play1
+strHeaderAuctn0:
+			.word _strHeaderAuctn0
+strOptn0Auctn0:
+			.word _strOptn0Auctn0
+strOptn1Auctn0:
+			.word _strOptn1Auctn0
+strOptn2Auctn0:
+			.word _strOptn2Auctn0
+strOptn3Auctn0:
+			.word _strOptn3Auctn0
+strOptn4Auctn0:
+			.word _strOptn4Auctn0
+strOptn5Auctn0:
+			.word _strOptn5Auctn0
+strHeaderGaol0:
+			.word _strHeaderGaol0
+strDescGaol0:
+			.word _strDescGaol0
+strHeaderGaol1:
+			.word _strHeaderGaol1
+strDescGaol1:
+			.word _strDescGaol1
+strOptn0Gaol1:
+			.word _strOptn0Gaol1
+strOptn1Gaol1:
+			.word _strOptn1Gaol1
+strOptn2Gaol1:
+			.word _strOptn2Gaol1
+strDescGaol2:
+			.word _strDescGaol2
+strHeaderGaol3:
+			.word _strHeaderGaol3
+strHeaderMustPay0:
+			.word _strHeaderMustPay0
+strDescMustPay0:
+			.word _strDescMustPay0
+strOptn0MustPay0:
+			.word _strOptn0MustPay0
+strHeaderMng0:
+			.word _strHeaderMng0
+strOptn0Mng0:
+			.word _strOptn0Mng0
+strOptn1Mng0:
+			.word _strOptn1Mng0
+strOptn2Mng0:
+			.word _strOptn2Mng0
+strOptn3Mng0:
+			.word _strOptn3Mng0
+strOptn4Mng0:
+			.word _strOptn4Mng0
+strOptn5Mng0:
+			.word _strOptn5Mng0
+strOptn6Mng0:
+			.word _strOptn6Mng0
+strHeaderTrade0:
+			.word _strHeaderTrade0
+strOptn0Trade0:
+			.word _strOptn0Trade0
+strOptn1Trade0:
+			.word _strOptn1Trade0
+strOptn2Trade0:
+			.word _strOptn2Trade0
+strOptn3Trade0:
+			.word _strOptn3Trade0
+strOptn4Trade0:
+			.word _strOptn4Trade0
+strHeaderTrade1:
+			.word _strHeaderTrade1
+strHeaderTrade2:
+			.word _strHeaderTrade2
+strDescTrade2:
+			.word _strDescTrade2
+strText0Trade2:
+			.word _strText0Trade2
+strText1Trade2:
+			.word _strText1Trade2
+strText0Trade3:
+			.word _strText0Trade3
+strText1Trade3 	 = strText1Trade2
+strDescTrade4:
+			.word _strDescTrade4
+strHeaderTrade5:
+			.word _strHeaderTrade5
+strDescTrade5:
+			.word _strDescTrade5
+strText0Trade5:
+			.word _strText0Trade5
+strText1Trade5:
+			.word _strText1Trade5
+strText2Trade5:
+			.word _strText2Trade5
+strHeaderTrade7:
+			.word _strHeaderTrade7
+strText0Trade7:
+			.word _strText0Trade7
+strHeaderPSel0:
+			.word _strHeaderPSel0
+strOptn0PSel0:
+			.word _strOptn0PSel0
+strOptn1PSel0:
+			.word _strOptn1PSel0
+strOptn2PSel0:
+			.word _strOptn2PSel0
+strOptn3PSel0:
+			.word _strOptn3PSel0
+strOptn4PSel0:
+			.word _strOptn4PSel0
+strOptn5PSel0:
+			.word _strOptn5PSel0
+strOptn0TrdSel0:
+			.word _strOptn0TrdSel0
+strOptn1TrdSel0:
+			.word _strOptn1TrdSel0
+strOptn2TrdSel0:
+			.word _strOptn2TrdSel0
+strOptn3TrdSel0:
+			.word _strOptn3TrdSel0
+strOptn4TrdSel0:
+			.word _strOptn4TrdSel0
+strOptn5TrdSel0:
+			.word _strOptn5TrdSel0
+strText0TrdSel0:
+			.word _strText0TrdSel0
+strText1TrdSel0:
+			.word _strText1TrdSel0
+strText2TrdSel0:
+			.word _strText2TrdSel0
+strText3TrdSel0:
+			.word _strText3TrdSel0
+strText4TrdSel0:
+			.word _strText4TrdSel0
+strText5TrdSel0:
+			.word _strText5TrdSel0
+strText6TrdSel0:
+			.word _strText6TrdSel0
+strText7TrdSel0:
+			.word _strText7TrdSel0
+strHeaderJump0:
+			.word _strHeaderJump0
+strText0Jump0:
+			.word _strText0Jump0
+strText1Jump0:
+			.word _strText1Jump0
+strHeaderJump1:
+			.word _strHeaderJump1
+strText0Jump1:
+			.word _strText0Jump1
+strText1Jump1:
+			.word _strText1Jump1
+strText0PStats0:
+			.word _strText0PStats0
+strText1PStats0:
+			.word _strText1PStats0
+strText2PStats0:
+			.word _strText2PStats0
+strText3PStats0:
+			.word _strText3PStats0
+strText4PStats0:
+			.word _strText4PStats0
+strText5PStats0:
+			.word _strText5PStats0
+strText6PStats0:
+			.word _strText6PStats0
+strText7PStats0:
+			.word _strText7PStats0
+strText8PStats0:
+			.word _strText8PStats0
+strText9PStats0:
+			.word _strText9PStats0
+strHeaderElimin0:
+			.word _strHeaderElimin0
+strDescElimin0:
+			.word _strDescElimin0
+strText0Elimin0:
+			.word _strText0Elimin0
+strHeaderElimin1:
+			.word _strHeaderElimin1
+strDescElimin1:
+			.word _strDescElimin1
+strText0Elimin1:
+			.word _strText0Elimin1
+strText1Elimin1:
+			.word _strText1Elimin1
+strHeaderGameOver0:
+			.word _strHeaderGameOver0
+strText0GameOver0:
+			.word _strText0GameOver0
+strHeaderQuit0:
+			.word _strHeaderQuit0
+strText0Quit0:
+			.word _strText0Quit0
+strText1Quit0:
+			.word _strText1Quit0
+strDescQuit1:
+			.word _strDescQuit1
+strText0Quit1:
+			.word _strText0Quit1
+strHeaderQuit2:
+			.word _strHeaderQuit2
+strHeaderCCCCard0:
+			.word _strHeaderCCCCard0
+strText0CCCCard0:
+			.word _strText0CCCCard0
+strText1CCCCard0:
+			.word _strText1CCCCard0
+strText2CCCCard0:
+			.word _strText2CCCCard0
+strText3CCCCard0:
+			.word _strText3CCCCard0
+strText4CCCCard0:
+			.word _strText4CCCCard0
+strText5CCCCard0:
+			.word _strText5CCCCard0
+strHeaderCCCCard1:
+			.word _strHeaderCCCCard1
+strText0Chest0:
+			.word _strText0Chest0
+strText1Chest0:
+			.word _strText1Chest0
+strText0Chest1:
+			.word _strText0Chest1
+strText1Chest1:
+			.word _strText1Chest1
+strText0Chest2:
+			.word _strText0Chest2
+strText1Chest2:
+			.word _strText1Chest2
+strText0Chest3:
+			.word _strText0Chest3
+strText1Chest3:
+			.word _strText1Chest3
+strText2Chest3:
+			.word _strText2Chest3
+strText0Chest4:
+			.word _strText0Chest4
+strText0Chest5:
+			.word _strText0Chest5
+strText0Chest6:
+			.word _strText0Chest6
+strText0Chest7:
+			.word _strText0Chest7
+strText0Chest8:
+			.word _strText0Chest8
+strText1Chest8:
+			.word _strText1Chest8
+strText2Chest8:
+			.word _strText2Chest8
+strText0Chest9:
+			.word _strText0Chest9
+strText0ChestA:
+			.word _strText0ChestA
+strText0ChestB:
+			.word _strText0ChestB
+strText0ChestC:
+			.word _strText0ChestC
+strText0ChestD:
+			.word _strText0ChestD
+strText0ChestE:
+			.word _strText0ChestE
+strText0ChestF:
+			.word _strText0ChestF
+strText1ChestF:
+			.word _strText1ChestF
+strText2ChestF:
+			.word _strText2ChestF
+strText0Chance0:
+			.word _strText0Chance0
+strText1Chance0:
+			.word _strText1Chance0
+strText2Chance0:
+			.word _strText2Chance0
+strText0Chance1  = strText0Chance0
+strText1Chance1  = strText1Chance0
+strText2Chance1  = strText2Chance0
+strText0Chance2:
+			.word _strText0Chance2
+strText0Chance3:
+			.word _strText0Chance3
+strText0Chance4:
+			.word _strText0Chance4
+strText1Chance4:
+			.word _strText1Chance4
+strText0Chance5:
+			.word _strText0Chance5
+strText1Chance5:
+			.word _strText1Chance5
+strText0Chance6	 = strText0ChestF
+strText1Chance6	 = strText1ChestF
+strText2Chance6	 = strText2ChestF
+strText0Chance7:
+			.word _strText0Chance7
+strText1Chance7:
+			.word _strText1Chance7
+strText0Chance8:
+			.word _strText0Chance8
+strText0Chance9	 = strText0Chest1
+strText1Chance9  = strText1Chest1
+strText0ChanceA	 = strText0Chest8
+strText1ChanceA	 = strText1Chest8
+strText2ChanceA	 = strText2Chest8
+strText0ChanceB	 = strText0Chance0
+strText1ChanceB:
+			.word _strText1ChanceB
+strText2ChanceB:
+			.word _strText2ChanceB
+strText0ChanceC  = strText0Chance5
+strText1ChanceC:
+			.word _strText1ChanceC
+strText0ChanceD:
+			.word _strText0ChanceD
+strText1ChanceD:
+			.word _strText1ChanceD
+strText0ChanceE:
+			.word _strText0ChanceE
+strText1ChanceE:
+			.word _strText1ChanceE
+strText0ChanceF  = strText0Chance5
+strText1ChanceF:
+			.word _strText1ChanceF
+strTitle0Brown0:
+			.word _strTitle0Brown0
+strTitle0Brown1:
+			.word _strTitle0Brown1
+strTitle0LBlue0:
+			.word _strTitle0LBlue0
+strTitle1LBlue0:
+			.word _strTitle1LBlue0
+strTitle0LBlue1:
+			.word _strTitle0LBlue1
+strTitle0LBlue2:
+			.word _strTitle0LBlue2
+strTitle0Prple0:
+			.word _strTitle0Prple0
+strTitle0Prple1:
+			.word _strTitle0Prple1
+strTitle0Prple2:
+			.word _strTitle0Prple2
+strTitle1Prple2:
+			.word _strTitle1Prple2
+strTitle0Ornge0:
+			.word _strTitle0Ornge0
+strTitle0Ornge1:
+			.word _strTitle0Ornge1
+strTitle0Ornge2:
+			.word _strTitle0Ornge2
+strTitle0Red0:
+			.word _strTitle0Red0
+strTitle0Red1:
+			.word _strTitle0Red1
+strTitle0Red2:
+			.word _strTitle0Red2
+strTitle0Yellw0:
+			.word _strTitle0Yellw0
+strTitle0Yellw1:
+			.word _strTitle0Yellw1
+strTitle0Yellw2:
+			.word _strTitle0Yellw2
+strTitle0Green0:
+			.word _strTitle0Green0
+strTitle0Green1:
+			.word _strTitle0Green1
+strTitle0Green2:
+			.word _strTitle0Green2
+strTitle0Blue0:
+			.word _strTitle0Blue0
+strTitle0Blue1:
+			.word _strTitle0Blue1
+strTitle0Stn0:
+			.word _strTitle0Stn0
+strTitle1Stn0:
+			.word _strTitle1Stn0
+strTitle0Stn1:
+			.word _strTitle0Stn1
+strTitle0Stn2:
+			.word _strTitle0Stn2
+strTitle1Stn2	 = strTitle1Stn0
+strTitle0Stn3:
+			.word _strTitle0Stn3
+strTitle1Stn3 	 = strTitle1Stn0
+strTitle0Util0:
+			.word _strTitle0Util0
+strTitle0Util1:
+			.word _strTitle0Util1
+strTitle0Crnr0:
+			.word _strTitle0Crnr0
+strTitle0Crnr1:
+			.word _strTitle0Crnr1
+strTitle0Crnr2:
+			.word _strTitle0Crnr2
+strTitle0Crnr3:
+			.word _strTitle0Crnr3
+strTitle0Tax0:
+			.word _strTitle0Tax0
+strTitle0Tax1:
+			.word _strTitle0Tax1
+strText0Street0:
+			.word _strText0Street0
+strText1Street0:
+			.word _strText1Street0
+strText2Street0:
+			.word _strText2Street0
+strText3Street0:
+			.word _strText3Street0
+strText4Street0:
+			.word _strText4Street0
+strText5Street0:
+			.word _strText5Street0
+strText6Street0:
+			.word _strText6Street0
+strText7Street0:
+			.word _strText7Street0
+strText8Street0:
+			.word _strText8Street0
+strText9Street0:
+			.word _strText9Street0
+strText0Stn0:
+			.word _strText0Stn0
+strText1Stn0:
+			.word _strText1Stn0
+strText2Stn0:
+			.word _strText2Stn0
+strText0Util0:
+			.word _strText0Util0
+strText1Util0:
+			.word _strText1Util0
+strText2Util0:
+			.word _strText2Util0
+strText3Util0:
+			.word _strText3Util0
+strText0Crnr0:
+			.word _strText0Crnr0
+strText1Crnr0	 = strDummyDummy0
+strText2Crnr0:
+			.word _strText2Crnr0
+strText3Crnr0:
+			.word _strText3Crnr0
+strText4Crnr0:
+			.word _strText4Crnr0
+strText0Crnr1:
+			.word _strText0Crnr1
+strText1Crnr1	 = strDummyDummy0
+strText2Crnr1:
+			.word _strText2Crnr1
+strText3Crnr1:
+			.word _strText3Crnr1
+strText4Crnr1:
+			.word _strText4Crnr1
+strText0Crnr2:
+			.word _strText0Crnr2
+strText1Crnr2:
+			.word _strText1Crnr2
+strText2Crnr2:
+			.word _strText2Crnr2
+strText3Crnr2	 = strDummyDummy0
+strText4Crnr2:
+			.word _strText4Crnr2
+strText0Crnr3:
+			.word _strText0Crnr3
+strText1Crnr3:
+			.word _strText1Crnr3
+strText2Crnr3:
+			.word _strText2Crnr3
+strText3Crnr3:
+			.word _strText3Crnr3
+strText4Crnr3:
+			.word _strText4Crnr3
+strText0Chest10:
+			.word _strText0Chest10
+strText1Chest10:
+			.word _strText1Chest10
+strText2Chest10	 = strDummyDummy0
+strText3Chest10:
+			.word _strText3Chest10
+strText4Chest10:
+			.word _strText4Chest10
+strText0Chance10:
+			.word _strText0Chance10
+strText1Chance10:
+			.word _strText1Chance10
+strText2Chance10  = strDummyDummy0
+strText3Chance10  = strText3Chest10
+strText4Chance10  = strText4Chest10
+strText0Tax0:
+			.word _strText0Tax0
+strText1Tax0:
+			.word _strText1Tax0
+strText2Tax0:
+			.word _strText2Tax0
+strText3Tax0	 = strDummyDummy0
+strText4Tax0	 = strDummyDummy0
+strText0Tax1	 = strText0Tax0
+strText1Tax1	 = strText1Tax0
+strText2Tax1:
+			.word _strText2Tax1
+strText3Tax1	 = strDummyDummy0
+strText4Tax1	 = strDummyDummy0
+tokPrmptRolled:
+			.word _tokPrmptRolled
+tokPrmptRent:
+			.word _tokPrmptRent
+tokPrmptBought:
+			.word _tokPrmptBought
+tokPrmptTax:
+			.word _tokPrmptTax
+tokPrmptGaol:
+			.word _tokPrmptGaol
+tokPrmptManage:
+			.word _tokPrmptManage
+tokPrmptMustSell:
+			.word _tokPrmptMustSell
+tokPrmptSalary:
+			.word _tokPrmptSalary
+tokPrmptFParking:
+			.word _tokPrmptFParking
+tokPrmptMortgage:
+			.word _tokPrmptMortgage
+tokPrmptRepay:
+			.word _tokPrmptRepay
+tokPrmptSold:
+			.word _tokPrmptSold
+tokPrmptShuffle:
+			.word _tokPrmptShuffle
+tokPrmptChest:
+			.word _tokPrmptChest
+tokPrmptChance:
+			.word _tokPrmptChance
+tokPrmptForSale:
+			.word _tokPrmptForSale
+tokPrmptPostBail:
+			.word _tokPrmptPostBail
+tokPrmptFee:
+			.word _tokPrmptFee
+tokPrmptForfeit:
+			.word _tokPrmptForfeit
+tokPrmptPass:
+			.word _tokPrmptPass
+tokPrmptBid:
+			.word _tokPrmptBid
+tokPrmptInTrade:
+			.word _tokPrmptInTrade
+tokPrmptTrading:
+			.word _tokPrmptTrading
+tokPrmptTrdApprv:
+			.word _tokPrmptTrdApprv
+tokPrmptTrdDecln:
+			.word _tokPrmptTrdDecln
+tokPrmptThinking:
+			.word _tokPrmptThinking
+tokPrmptConstruct:
+			.word _tokPrmptConstruct
+tokPrmptAuction:
+			.word _tokPrmptAuction
+tokPrmptAcquired:
+			.word _tokPrmptAcquired

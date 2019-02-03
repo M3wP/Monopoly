@@ -58,7 +58,7 @@
 ;	   3 house rules (one always enabled:  reshuffle CCCCards)
 ;	     strictly turn-based (with interrupts and flexible management)
 ;
-;	  an estimated 18.75KB data, 34.75KB code, 1.5KB heap, 5.25KB system
+;	  an estimated 19.75KB data, 36KB code, 1.5KB heap, 5.25KB system
 ;	 650 portrait A4 pages of source code with small font
 ;	1100 A4 pages to print the old landscape list style with normal font
 ;
@@ -75,26 +75,27 @@
 ;
 ;
 ;Memory map (as of last update):
-;	0000 -	00FF	Zero page (256 bytes)
-;	0100 -	01FF	System stack (256 bytes)
-;	0200 - 	03FF	Global state data (495 bytes used, 17 bytes free)
-;	0400 - 	07FF	System screen and sprite pointer data (1KB)
-;	0800 - 	08FF	Bootstrap/sprite data (256 bytes)
-;	0900 -  7FFF	Program code and data (~30KB)
-;	8000 -	9FFF	Program code and data (8KB)
-;	A000 -	BF1F	Program code and data (~8KB)
-;	BF20 -  BFFF	Discard/display heap (224 bytes)
-;	C000 -	C11F	Discard/display heap (288 bytes, 6 discard free)
-;	C120 -	CDFF	Free (~3.5KB)
-;	CE00 - 	CFFF	Reserved (discard/display heap, 512 bytes)
-;	D000 - 	DFFF	System I/O (4KB)
-;	E000 -	F240	Strings const data (4673 bytes)
-;	F241 - 	F39E	Screen const data (350 bytes)
-;	F39F - 	F9CC	Rules const data (1582 bytes)
-;	F9CD - 	FAFF	Free (307 bytes)
-;	FB00 - 	FEFF	Action heap (1KB)
-;	FF00 -  FFF9	Trade global data (233 bytes used, 17 bytes free)
-;	FFFA -	FFFF	System vectors (6 bytes)
+;	0000 -	00FF	* Zero page (256 bytes)
+;	0100 -	01FF	* System stack (256 bytes)
+;	0200 - 	03FF	+ Global state data (495 bytes used, 17 bytes free)
+;	0400 - 	07FF	* System screen and sprite pointer data (1KB)
+;	0800 - 	08FF	= Bootstrap/sprite data (256 bytes)
+;	0900 - 	0CFF	> String translation references (1KB)
+;	0D00 -  7FFF	. Program code and data (~29KB)
+;	8000 -	9FFF	. Program code and data (8KB)
+;	A000 -	C60C	. Program code and data (~9.75KB)
+;	C60D -	C806	- Discard/display heap (506 bytes, 6 discard free)
+;	C807 -	CDFF	? Free (~1.5KB)
+;	CE00 - 	CFFF	! Reserved (discard/display heap, 512 bytes)
+;	D000 - 	DFFF	* System I/O (4KB)
+;	E000 -	F240	> Strings const data (4639 bytes)
+;	F21F - 	F2FF    ? Free (strings, 225 bytes)
+;	F300 - 	F45D	> Screen const data (350 bytes)
+;	F45E - 	FA8B	> Rules const data (1582 bytes)
+;	FA8C - 	FAFF	? Free (116 bytes)
+;	FB00 - 	FEFF	- Action heap (1KB)
+;	FF00 -  FFF9	> Trade global data (233 bytes used, 17 bytes free)
+;	FFFA -	FFFF	* System vectors (6 bytes)
 ;
 ;
 ;I will need to provide a break-down of the use of zero page at some point for
@@ -116,12 +117,12 @@
 	.define DEBUG_CPUCCCC	0
 	.define	DEBUG_AUCTIONS	0
 
-	.define	DEBUG_HEAP	1
-	.define	DEBUG_GSTATE	1
-	.define	DEBUG_ACTIONS	1
-	.define DEBUG_KEYS	1
-	.define	DEBUG_DICE	1
-	.define	DEBUG_EQUITY	1
+	.define	DEBUG_HEAP	0
+	.define	DEBUG_GSTATE	0
+	.define	DEBUG_ACTIONS	0
+	.define DEBUG_KEYS	0
+	.define	DEBUG_DICE	0
+	.define	DEBUG_EQUITY	0
 	
 	.define DEBUG_DEMO	0
 	.define DEBUG_EXTRAS	0
@@ -304,10 +305,7 @@ uiActnCache	=	$FB00
 		cActns	.byte
 		cLstAct	.byte
 		
-;		gMdAct	.byte			;Remove for game state stack
-;		pActBak .byte			;Remove for game state stack
-		
-		fActTyp .byte			;type (regular, elimin)
+		fActTyp .byte			;type (regular, elimin, auction)
 		fActInt .byte			;interactive
 		
 		fInjKey .byte
@@ -676,7 +674,7 @@ GAME_DRT_SHF0	=	$80
 	.endstruct
 	
 	.struct GROUP
-;		type	.byte			;I was going to use this to 
+;		class	.byte			;I was going to use this to 
 						;indicate street/stn/util etc
 		colour	.byte
 		count	.byte
@@ -769,15 +767,6 @@ irqglob		=	sqr00 + (.sizeof(SQUARE) * 40)		;$03C2
 
 GLOBALS_END 	= 	irqglob + .sizeof(IRQGLOBS)		;$03EE
 
-;keyBuffer0	=	sqr00 + (.sizeof(SQUARE) * 40)
-;keyBufferSize 	=	keyBuffer0 + 10
-;keyRepeatFlag 	=	keyBufferSize + 1
-;keyRepeatSpeed  =	keyRepeatFlag + 1
-;keyRepeatDelay	=	keyRepeatSpeed + 1
-;keyModifierFlag = 	keyRepeatDelay + 1
-;keyModifierLast =	keyModifierFlag + 1
-;globalsEnd	=	keyModifierLast + 1
-
 	.if 	LIST_GLBINF
 	.out	.concat("- loc ui:  ", .string((.hibyte(ui) * 256) + .lobyte(ui)))
 	.out	.concat("- loc game:  ", .string((.hibyte(game) * 256) + .lobyte(game)))
@@ -794,12 +783,6 @@ GLOBALS_END 	= 	irqglob + .sizeof(IRQGLOBS)		;$03EE
 	.endif
 
 	.assert GLOBALS_END <= $0400, error, .concat("Global data space too large! ", .string((.hibyte(GLOBALS_END) * 256) + .lobyte(GLOBALS_END))) 
-
-
-;-------------------------------------------------------------------------------
-;String data defines
-;-------------------------------------------------------------------------------
-	.include 	"strings.inc"
 
 
 ;-------------------------------------------------------------------------------
@@ -947,6 +930,17 @@ sprMiniMap:
 
 
 ;-------------------------------------------------------------------------------
+;String table translation references
+;-------------------------------------------------------------------------------
+	.include 	"stringsu.inc"
+	.include	"strrefs.def"
+
+	.repeat	($0C00 - *), I
+		.byte	$00
+	.endrep
+
+
+;-------------------------------------------------------------------------------
 ;Audio driver and SFX
 ;-------------------------------------------------------------------------------
 
@@ -1016,6 +1010,36 @@ plrLo:
 plrHi:
 			.byte	>plr0, >plr1, >plr2
 			.byte	>plr3, >plr4, >plr5
+			
+plrName0Ref:
+			.word	plr0 + PLAYER::name
+plrName1Ref:
+			.word	plr1 + PLAYER::name
+plrName2Ref:
+			.word	plr2 + PLAYER::name
+plrName3Ref:
+			.word	plr3 + PLAYER::name
+plrName4Ref:
+			.word	plr4 + PLAYER::name
+plrName5Ref:
+			.word	plr5 + PLAYER::name
+
+plrNameRefLo:
+			.byte	<plrName0Ref
+			.byte	<plrName1Ref
+			.byte	<plrName2Ref
+			.byte	<plrName3Ref
+			.byte	<plrName4Ref
+			.byte	<plrName5Ref
+
+plrNameRefHi:
+			.byte	>plrName0Ref
+			.byte	>plrName1Ref
+			.byte	>plrName2Ref
+			.byte	>plrName3Ref
+			.byte	>plrName4Ref
+			.byte	>plrName5Ref
+
 plrNameLo:		
 			.byte	<(plr0 + PLAYER::name)
 			.byte	<(plr1 + PLAYER::name) 
@@ -1076,15 +1100,11 @@ TRADE_END	=	trdauto0 + (.sizeof(TRADEAUTO) * 6) ;$FFE9
 ;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 ;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 ;		.byte	$00, $00, $00, $00
-;;		.byte			    $00, $00, $00, $00
-;;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 ;trdrepay0:		
 ;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 ;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 ;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 ;		.byte	$00, $00, $00, $00
-;;		.byte			    $00, $00, $00, $00
-;;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 ;		
 ;trade1:	.tag	TRADE
 ;trddeeds1:		
@@ -1092,15 +1112,11 @@ TRADE_END	=	trdauto0 + (.sizeof(TRADEAUTO) * 6) ;$FFE9
 ;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 ;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 ;		.byte	$00, $00, $00, $00
-;;		.byte			    $00, $00, $00, $00
-;;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 ;trdrepay1:		
 ;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 ;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 ;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 ;		.byte	$00, $00, $00, $00
-;;		.byte			    $00, $00, $00, $00
-;;		.byte	$00, $00, $00, $00, $00, $00, $00, $00
 
 ;trade2:	.tag	TRADE
 ;trddeeds2:		
@@ -1300,6 +1316,7 @@ mainHandleUpdates:
 		AND	#GAME_DRT_PRMP
 		BEQ	@updTstCont1
 
+		LDX	#$01
 		JSR	prmptDisplay
 		
 @updTstCont1:
@@ -1430,17 +1447,6 @@ mainRebuildScreen:
 ;FOR KEYS.S
 ;==============================================================================
 
-;keyBuffer0	=	$0277			;to 0280 so 10 bytes
-;keyBufferSize 	=	$0289       		;byte
-;keyRepeatFlag 	=	$028A       		;byte
-;keyRepeatSpeed  =	$028B			;byte
-;keyRepeatDelay	=	$028C       		;byte
-;keyModifierFlag = 	$028D			;byte
-;keyModifierLast =	$028E			;byte
-;keyModifierVect =	$028F			;word
-;keyModifierLock =	$0291			;byte
-
-
 keyBuffer0:
 	.repeat	10, I
 		.byte	$00
@@ -1457,6 +1463,10 @@ keyModifierFlag:
 		.byte	$00
 keyModifierLast:
 		.byte	$00
+
+;keyModifierVect =	$028F			;word
+;keyModifierLock =	$0291			;byte
+
 
 keyQueue0:
 		.byte	$00, $00, $00, $00, $00, $00, $00, $00
@@ -1927,14 +1937,16 @@ buttonB:	.tag	BUTTON
 buttonC:	.tag	BUTTON
 buttonD:	.tag	BUTTON
 
-buttonLo:		.byte 	<button0, <button1, <button2, <button3
-			.byte	<button4, <button5, <button6, <button7
-			.byte	<button8, <button9, <buttonA, <buttonB
-			.byte 	<buttonC, <buttonD
-buttonHi:		.byte 	>button0, >button1, >button2, >button3
-			.byte	>button4, >button5, >button6, >button7
-			.byte	>button8, >button9, >buttonA, >buttonB
-			.byte 	>buttonC, <buttonD
+buttonLo:		
+		.byte 	<button0, <button1, <button2, <button3
+		.byte	<button4, <button5, <button6, <button7
+		.byte	<button8, <button9, <buttonA, <buttonB
+		.byte 	<buttonC, <buttonD
+buttonHi:	
+		.byte 	>button0, >button1, >button2, >button3
+		.byte	>button4, >button5, >button6, >button7
+		.byte	>button8, >button9, >buttonA, >buttonB
+		.byte 	>buttonC, <buttonD
 
 
 screenBtnCnt:
@@ -2743,9 +2755,9 @@ screenFillPtClrM:
 screenFillTextM:
 ;-------------------------------------------------------------------------------
 		JSR 	screenReadByte
-		STA	game+GAME::varA
+		STA	game + GAME::varA
 		JSR	screenReadByte
-		STA	game+GAME::varB
+		STA	game + GAME::varB
 		
 		TAX
 		JSR	screenSetScreenPtr
@@ -2753,6 +2765,18 @@ screenFillTextM:
 		JSR 	screenReadByte
 		STA	$A7
 		JSR	screenReadByte
+		STA	$A8
+		
+		LDY	#$00
+		LDA	($A7), Y
+		STA	game + GAME::varC
+		INY	
+		LDA	($A7), Y
+		STA	game + GAME::varD
+		
+		LDA	game + GAME::varC
+		STA	$A7
+		LDA	game + GAME::varD
 		STA	$A8
 		
 		LDY	#$00		
@@ -3285,10 +3309,10 @@ installPlyr:
 		AND	vicCtrlReg		;    less than $0100
 		STA	vicCtrlReg
 		
-;***FIXME: 	This will have to be higher (lower value) in order to prevent
-;		the mouse from tearing.  Need to change IRQ handler, too.  Don't
-;		want it too high to allow for as much time in lowest IRQ phase 
-;		as possible.  Some experimentation may be required.
+;***FIXME: 	I have changed the value in order to prevent the mouse from 
+;		tearing.  Don't want it too low to allow for as much time in 
+;		last IRQ phase as possible.  Some experimentation may be 
+;		required.
 ;		LDA	#$32			;Initial raster interrupt pos
 		LDA	#$19
 		STA	vicRstrVal
@@ -5329,6 +5353,7 @@ plyrDispUpdShort:
 ;===============================================================================
 prmptTok0 	=	$70
 prmptTok1	=	$72
+prmptTok2	=	$74
 
 prmpt0Txt0	=	$0783
 prmpt0Clr0	=	$DB83
@@ -5426,6 +5451,9 @@ prmptClear2:
 ;-------------------------------------------------------------------------------
 prmptDisplay:
 ;-------------------------------------------------------------------------------
+		TXA
+		PHA
+		
 		LDX	#$0F
 @loop0:
 		LDA 	#$20
@@ -5448,10 +5476,17 @@ prmptDisplay:
 
 		LDY	 #$00
 		LDA	(prmptTok0), Y
+		STA	prmptTok2
+		INY
+		LDA	(prmptTok0), Y
+		STA	prmptTok2 + 1
+		
+		LDY	 #$00
+		LDA	(prmptTok2), Y
 		BEQ	@second
 		TAY
 @loop1:
-		LDA	(prmptTok0), Y
+		LDA	(prmptTok2), Y
 		STA	prmpt0Txt0 - 1, Y
 		DEY
 		BNE	@loop1
@@ -5459,17 +5494,28 @@ prmptDisplay:
 @second:
 		LDY	 #$00
 		LDA	(prmptTok1), Y
+		STA	prmptTok2
+		INY
+		LDA	(prmptTok1), Y
+		STA	prmptTok2 + 1
+
+		LDY	 #$00
+		LDA	(prmptTok2), Y
 		BEQ	@update
 		TAY
 @loop2:
-		LDA	(prmptTok1), Y
+		LDA	(prmptTok2), Y
 		STA	prmpt1Txt0 - 1, Y
 		DEY
 		BNE	@loop2
 
 @update:
+		PLA
+		BEQ	@exit
+
 		JSR	prmptUpdate
 
+@exit:
 		RTS
 	
 	
@@ -5994,24 +6040,39 @@ prmptChanceAdd:
 ;-------------------------------------------------------------------------------
 prmptShuffle:
 ;-------------------------------------------------------------------------------
-		LDX	#$0F
+		LDA	tokPrmptShuffle
+		STA	prmptTok2
+		
+		LDA	tokPrmptShuffle + 1
+		STA	prmptTok2 + 1
+		
+		CLC
+		LDA	prmptTok2
+		ADC	#$01
+		STA	prmptTok2
+		
+		LDA	prmptTok2 + 1
+		ADC	#$00
+		STA	prmptTok2 + 1
+
+		LDY	#$0F
 @loop0:
 		LDA	#$20
-;		STA	prmpt0Txt0, X
-		STA	prmpt1Txt0, X
+;		STA	prmpt0Txt0, Y
+		STA	prmpt1Txt0, Y
 
-		DEX
+		DEY
 		BPL	@loop0
 
-		LDX	#$0F
+		LDY	#$0F
 @loop1:
-		LDA	tokPrmptShuffle + 1, X
-		STA	prmpt0Txt0, X
+		LDA	(prmptTok2), Y
+		STA	prmpt0Txt0, Y
 
 		LDA	#$0C
-		STA	prmpt0Clr0, X
+		STA	prmpt0Clr0, Y
 
-		DEX
+		DEY
 		BPL	@loop1
 		
 		LDA	#$01
@@ -6207,15 +6268,30 @@ prmptThinking:
 		TXA
 		PHA
 		
-		LDX	#$0F
+		LDA	tokPrmptThinking
+		STA	prmptTok2
+		
+		LDA	tokPrmptThinking + 1
+		STA	prmptTok2 + 1
+		
+		CLC
+		LDA	prmptTok2
+		ADC	#$01
+		STA	prmptTok2
+		
+		LDA	prmptTok2 + 1
+		ADC	#$00
+		STA	prmptTok2 + 1
+		
+		LDY	#$0F
 @loop1:
-		LDA	tokPrmptThinking + 1, X
-		STA	prmpt0Txt0, X
+		LDA	(prmptTok2), Y
+		STA	prmpt0Txt0, Y
 
 		LDA	#$0C
-		STA	prmpt0Clr0, X
+		STA	prmpt0Clr0, Y
 
-		DEX
+		DEY
 		BPL	@loop1
 		
 		PLA
@@ -8355,10 +8431,13 @@ menuPopPage:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuPageBlank0Keys:
+;-------------------------------------------------------------------------------
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuWindowSetup0:	
 			.byte	$90, $01, $07
 			.word	     strHeaderSetup0
@@ -8378,7 +8457,9 @@ menuWindowSetup0:
 			.byte	$00
 			
 			
+;-------------------------------------------------------------------------------
 menuPageSetup0Keys:
+;-------------------------------------------------------------------------------
 		CMP	#'2'
 		BMI	@exit
 		 
@@ -8443,7 +8524,9 @@ menuPageSetup0Keys:
 		RTS
 
 						
+;-------------------------------------------------------------------------------
 menuPageSetup0Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<menuWindowSetup0
 		STA	$FD
 		LDA	#>menuWindowSetup0
@@ -8453,6 +8536,8 @@ menuPageSetup0Draw:
 
 		RTS
 
+
+;-------------------------------------------------------------------------------
 menuWindowSetup1Btns:
 		.byte	(menuWindowSetup1B0 - menuWindowSetup1)
 		.byte	(menuWindowSetup1B1 - menuWindowSetup1)
@@ -8505,7 +8590,9 @@ menuWindowSetup1B9:
 			.byte	$00
 
 
+;-------------------------------------------------------------------------------
 menuPageSetup1EnbAll:
+;-------------------------------------------------------------------------------
 		LDA	#<menuWindowSetup1
 		STA	$A3
 		LDA	#>menuWindowSetup1
@@ -8524,7 +8611,9 @@ menuPageSetup1EnbAll:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 menuPageSetup1Keys:
+;-------------------------------------------------------------------------------
 		CMP	#'0'
 		BMI	@exit
 		
@@ -8617,7 +8706,9 @@ menuPageSetup1Keys:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuPageSetup1Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<menuWindowSetup1
 		STA	$FD
 		LDA	#>menuWindowSetup1
@@ -8628,6 +8719,7 @@ menuPageSetup1Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuWindowSetup2:	
 			.byte	$90, $01, $07
 			.word	     strHeaderSetup0
@@ -8650,7 +8742,9 @@ menuCashStartHigh:
 			.word	2000
 			
 
+;-------------------------------------------------------------------------------
 menuPageSetup2Keys:
+;-------------------------------------------------------------------------------
 		CMP	#'0'
 		BMI	@exit
 		
@@ -8720,7 +8814,9 @@ menuPageSetup2Keys:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuPageSetup2Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<menuWindowSetup2
 		STA	$FD
 		LDA	#>menuWindowSetup2
@@ -8731,6 +8827,7 @@ menuPageSetup2Draw:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 menuWindowSetup3:	
 			.byte	$90, $01, $07
 			.word	     strHeaderSetup3
@@ -8749,7 +8846,9 @@ menuWindowSetup3:
 			.byte	$00
 
 		
+;-------------------------------------------------------------------------------
 menuPageSetup3Keys:
+;-------------------------------------------------------------------------------
 		LDX	#$00
 		STX	menuTemp0
 
@@ -8794,7 +8893,9 @@ menuPageSetup3Keys:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 menuPageSetup3Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<menuWindowSetup3
 		STA	$FD
 		LDA	#>menuWindowSetup3
@@ -8805,12 +8906,26 @@ menuPageSetup3Draw:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 strSetup4Roll0:		.byte	$03, $A0, $A0, $A0
 strSetup4Roll1:		.byte	$03, $A0, $A0, $A0
 strSetup4Roll2:		.byte	$03, $A0, $A0, $A0
 strSetup4Roll3:		.byte	$03, $A0, $A0, $A0
 strSetup4Roll4:		.byte	$03, $A0, $A0, $A0
 strSetup4Roll5:		.byte	$03, $A0, $A0, $A0
+
+strSetup4Roll0Ref:
+			.word	strSetup4Roll0
+strSetup4Roll1Ref:
+			.word	strSetup4Roll1
+strSetup4Roll2Ref:
+			.word	strSetup4Roll2
+strSetup4Roll3Ref:
+			.word	strSetup4Roll3
+strSetup4Roll4Ref:
+			.word	strSetup4Roll4
+strSetup4Roll5Ref:
+			.word	strSetup4Roll5
 
 strsSetup4RollLo:
 		.byte	<(strSetup4Roll0 + 1), <(strSetup4Roll1 + 1) 
@@ -8828,29 +8943,29 @@ menuWindowSetup4:
 			.byte	$90, $01, $08
 			.word        strDescSetup4
 			.byte	$90, $02, $0A
-			.word	     (plr0 + PLAYER::name)
+			.word	     plrName0Ref
 			.byte	$90, $0D, $0A
-			.word		strSetup4Roll0
+			.word		strSetup4Roll0Ref
 			.byte	$90, $02, $0B
-			.word	     (plr1 + PLAYER::name)
+			.word	     plrName1Ref
 			.byte	$90, $0D, $0B
-			.word		strSetup4Roll1
+			.word		strSetup4Roll1Ref
 			.byte	$90, $02, $0C
-			.word	     (plr2 + PLAYER::name)
+			.word	     plrName2Ref
 			.byte	$90, $0D, $0C
-			.word		strSetup4Roll2
+			.word		strSetup4Roll2Ref
 			.byte	$90, $02, $0D
-			.word	     (plr3 + PLAYER::name)
+			.word	     plrName3Ref
 			.byte	$90, $0D, $0D
-			.word		strSetup4Roll3
+			.word		strSetup4Roll3Ref
 			.byte	$90, $02, $0E
-			.word	     (plr4 + PLAYER::name)
+			.word	     plrName4Ref
 			.byte	$90, $0D, $0E
-			.word		strSetup4Roll4
+			.word		strSetup4Roll4Ref
 			.byte	$90, $02, $0F
-			.word	     (plr5 + PLAYER::name)
+			.word	     plrName5Ref
 			.byte	$90, $0D, $0F
-			.word		strSetup4Roll5
+			.word		strSetup4Roll5Ref
 			
 			.byte	$A1, $11, $01, $12
 menuWindowSetup4K:
@@ -8859,8 +8974,11 @@ menuWindowSetup4O:
 			.word	     strOptn0Play0
 			
 			.byte	$00
-			
+
+
+;-------------------------------------------------------------------------------
 menuPageSetup4Keys:
+;-------------------------------------------------------------------------------
 		LDX	menuTemp0
 		CPX	game + GAME::pCount
 		BNE	@tstR
@@ -8871,9 +8989,6 @@ menuPageSetup4Keys:
 		JMP	@exit
 		
 @begin:
-		LDA	#musTuneStart
-		JSR	SNDBASE + 0	
-
 ;	Set both shuffles
 		LDA	game + GAME::dirty
 		ORA	#(GAME_DRT_SHF0 | GAME_DRT_SHF1)
@@ -8967,7 +9082,9 @@ menuPageSetup4Keys:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 menuDoSetup4Highest:
+;-------------------------------------------------------------------------------
 		LDX	#$00
 		STX	menuTemp0 + 1
 		STX	menuTempF
@@ -9001,7 +9118,9 @@ menuDoSetup4Highest:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 menuPageSetup4Draw:
+;-------------------------------------------------------------------------------
 		LDX	#$00
 @loop0:
 		LDA	strsSetup4RollLo, X
@@ -9072,6 +9191,7 @@ menuPageSetup4Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuWindowSetup5:	
 			.byte	$90, $01, $07
 			.word	     strHeaderSetup3
@@ -9090,7 +9210,9 @@ menuWindowSetup5:
 			.byte	$00
 
 		
+;-------------------------------------------------------------------------------
 menuPageSetup5Keys:
+;-------------------------------------------------------------------------------
 		LDX	#$00
 		STX	menuTemp0
 
@@ -9133,7 +9255,9 @@ menuPageSetup5Keys:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 menuPageSetup5Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<menuWindowSetup5
 		STA	$FD
 		LDA	#>menuWindowSetup5
@@ -9144,6 +9268,7 @@ menuPageSetup5Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuWindowSetup6:	
 			.byte	$90, $01, $07
 			.word	     strHeaderSetup0
@@ -9157,34 +9282,47 @@ menuWindowSetup6:
 			.byte	$00
 			
 menuWindowSetup6FP:
-			.byte	$90, $04, $0D
+menuWindowSetup6FPN:
+			.byte	$6E, $04, $0D, $FF
+			
+			.byte	$90, $06, $0D
 			.word		strText0Setup6
-			.byte	$90, $04, $0E
+
+menuWindowSetup6FPY:
+			.byte	$64, $04, $0E, $FF
+
+			.byte	$90, $06, $0E
 			.word		strText1Setup6
 			.byte	$00
 
 
+;-------------------------------------------------------------------------------
 menuPageSetup6SetTog:
+;-------------------------------------------------------------------------------
 		CMP	#$00
 		BEQ	@off
 		
-		LDA	#$DA
-		STA	strText1Setup6 + 1
-		LDA	#$A0
-		STA	strText0Setup6 + 1
+		LDA	#$64
+		STA	menuWindowSetup6FPN
+		
+		LDA	#$6E
+		STA	menuWindowSetup6FPY
 		
 		RTS
 		
 @off:
-		LDA	#$DA
-		STA	strText0Setup6 + 1
-		LDA	#$A0
-		STA	strText1Setup6 + 1
+		LDA	#$6E
+		STA	menuWindowSetup6FPN
+		
+		LDA	#$64
+		STA	menuWindowSetup6FPY
 		
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuPageSetup6DispFP:
+;-------------------------------------------------------------------------------
 		LDA	#<menuWindowSetup6FP
 		STA	$FD
 		LDA	#>menuWindowSetup6FP
@@ -9195,7 +9333,9 @@ menuPageSetup6DispFP:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 menuPageSetup6Keys:
+;-------------------------------------------------------------------------------
 		CMP	#'F'
 		BNE	@keysC
 		
@@ -9238,7 +9378,9 @@ menuPageSetup6Keys:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuPageSetup6Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<menuWindowSetup6
 		STA	$FD
 		LDA	#>menuWindowSetup6
@@ -9251,6 +9393,8 @@ menuPageSetup6Draw:
 		
 		RTS
 
+
+;-------------------------------------------------------------------------------
 menuWindowSetup7:	
 			.byte	$90, $01, $07
 			.word	     strHeaderSetup7
@@ -9267,7 +9411,9 @@ menuWindowSetup7:
 			.byte	$00
 
 
+;-------------------------------------------------------------------------------
 menuPageSetup7Keys:
+;-------------------------------------------------------------------------------
 @tstK:
 		CMP	#'K'
 		BNE	@tstM
@@ -9361,7 +9507,9 @@ menuPageSetup7Keys:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuPageSetup7Draw:
+;-------------------------------------------------------------------------------
 		LDA	#$00
 		STA	JoyUsed
 		STA	MouseUsed
@@ -9379,6 +9527,7 @@ menuPageSetup7Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuWindowSetup8:	
 			.byte	$90, $01, $07
 			.word	     strHeaderSetup7
@@ -9395,7 +9544,9 @@ menuWindowSetup8:
 			.byte	$00
 
 
+;-------------------------------------------------------------------------------
 menuPageSetup8Keys:
+;-------------------------------------------------------------------------------
 		CMP	#'L'
 		BNE	@keysM
 		
@@ -9437,7 +9588,9 @@ menuPageSetup8Keys:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 menuPageSetup8Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<menuWindowSetup8
 		STA	$FD
 		LDA	#>menuWindowSetup8
@@ -9448,6 +9601,7 @@ menuPageSetup8Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuWindowSetup9BN:
 		.byte	(menuWindowSetup9B0 - menuWindowSetup9)
 		.byte	(menuWindowSetup9B1 - menuWindowSetup9)
@@ -9482,8 +9636,11 @@ menuWindowSetup9B5:
 			.word	     strOptn3Setup0
 			
 			.byte	$00
-			
+
+
+;-------------------------------------------------------------------------------
 menuPageSetup9Keys:
+;-------------------------------------------------------------------------------
 		CMP	#'0'
 		BPL	@tstupper
 		
@@ -9580,7 +9737,9 @@ menuPageSetup9Keys:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuPageSetup9Draw:
+;-------------------------------------------------------------------------------
 		LDX	#$02
 @loop0:
 		LDA	menuWindowSetup9BN, X
@@ -9616,6 +9775,7 @@ menuPageSetup9Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuWindowPlay0:	
 			.byte	$90, $01, $07
 			.word	     	strHeaderPlay0
@@ -9656,7 +9816,9 @@ menuFooterGame0:
 			.byte	$00
 
 
+;-------------------------------------------------------------------------------
 menuPagePlay0DefKeys:
+;-------------------------------------------------------------------------------
 @keys1:
 		CMP	#keyF1
 		BNE	@keys2
@@ -9780,7 +9942,9 @@ menuPagePlay0DefKeys:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuPagePlay0StdKeys:
+;-------------------------------------------------------------------------------
 		CMP	#'A'
 		BNE	@keysQ
 		
@@ -10074,6 +10238,7 @@ menuPagePlay0Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuWindowPlay1:
 			.byte	$90, $01, $07
 			.word	     	strHeaderPlay1
@@ -10096,7 +10261,9 @@ menuWindowPlay1Trd:
 			.byte	$00
 		
 
+;-------------------------------------------------------------------------------
 menuPagePlay1Keys:
+;-------------------------------------------------------------------------------
 @keysB:
 		CMP	#'B'
 		BNE	@keysP
@@ -10154,7 +10321,9 @@ menuPagePlay1Keys:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 menuPagePlay1Draw:
+;-------------------------------------------------------------------------------
 		LDA	#$A1
 		STA	menuWindowPlay1BuyB
 		
@@ -10210,7 +10379,7 @@ menuPagePlay1Draw:
 		RTS
 
 
-
+;-------------------------------------------------------------------------------
 menuWindowPlay2:	
 			.byte	$90, $01, $07
 			.word	     	strHeaderPlay0
@@ -10268,7 +10437,9 @@ menuPagePlay2Keys:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuPagePlay2Draw:
+;-------------------------------------------------------------------------------
 		LDA	game + GAME::dieDbl
 		BEQ	@nodesc
 		
@@ -10296,6 +10467,7 @@ menuPagePlay2Draw:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 menuPageAuctnAmt0:
 			.byte	$06, $00, $00, $00, $00, $00, $00, $00
 menuPageAuctnPage0:
@@ -10351,7 +10523,9 @@ menuWindowAuctn0Amt:
 			.byte	$00
 
 
+;-------------------------------------------------------------------------------
 menuPageAuctn0Inc:
+;-------------------------------------------------------------------------------
 		CLC
 		ADC	game + GAME::mACurr
 		STA	game + GAME::mACurr
@@ -10369,7 +10543,10 @@ menuPageAuctn0Inc:
 @exit:
 		RTS
 
+
+;-------------------------------------------------------------------------------
 menuPageAuctn0Dec:
+;-------------------------------------------------------------------------------
 		STA	game + GAME::varA
 		
 		LDA	game + GAME::mACurr
@@ -10391,7 +10568,10 @@ menuPageAuctn0Dec:
 		
 		RTS
 		
+
+;-------------------------------------------------------------------------------
 menuPageAuctn0Bid:
+;-------------------------------------------------------------------------------
 		LDA	game + GAME::mACurr	;Make bid amount current amount
 		STA	game + GAME::mAuctn
 		LDA	game + GAME::mACurr + 1
@@ -10406,7 +10586,10 @@ menuPageAuctn0Bid:
 
 		RTS
 		
+
+;-------------------------------------------------------------------------------
 menuPageAuctn0Pass:
+;-------------------------------------------------------------------------------
 		LDX	game + GAME::pActive	;This player passed
 		LDA	plrFlags, X
 		ORA	game + GAME::fAPass
@@ -10414,7 +10597,10 @@ menuPageAuctn0Pass:
 		
 		RTS
 
+
+;-------------------------------------------------------------------------------
 menuPageAuctn0Forf:
+;-------------------------------------------------------------------------------
 		LDX	game + GAME::pActive	;This player forfeited
 		LDA	plrFlags, X
 		ORA	game + GAME::fAForf
@@ -10427,7 +10613,9 @@ menuPageAuctn0Forf:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuPageAuctnDefKeys:
+;-------------------------------------------------------------------------------
 		CMP	#'U'
 		BNE	@keysJ
 		
@@ -10633,7 +10821,9 @@ menuPageAuctnDefKeys:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuPageAuctn0Keys:
+;-------------------------------------------------------------------------------
 		CMP	#'.'
 		BNE	@keysDefault
 		
@@ -10658,7 +10848,9 @@ menuPageAuctn0Keys:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuPageAuctn0SetAmt:
+;-------------------------------------------------------------------------------
 		LDA	game + GAME::mACurr
 		STA	Z:numConvVALUE
 		LDA	game + GAME::mACurr + 1
@@ -10684,7 +10876,9 @@ menuPageAuctn0SetAmt:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuPageAuctn0Draw:
+;-------------------------------------------------------------------------------
 		LDA	#$00
 		STA	menuPageAuctnPage0
 		
@@ -10716,6 +10910,8 @@ menuPageAuctn0Draw:
 		
 		RTS
 		
+
+;-------------------------------------------------------------------------------
 menuWindowAuctn1:	
 			.byte	$90, $01, $07
 			.word	     	strHeaderAuctn0
@@ -10736,7 +10932,9 @@ menuWindowAuctn1Trd:
 			.byte	$00
 			
 		
+;-------------------------------------------------------------------------------
 menuPageAuctn1Keys:
+;-------------------------------------------------------------------------------
 		CMP	#'.'
 		BNE	@keysOther
 
@@ -10761,7 +10959,9 @@ menuPageAuctn1Keys:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 menuPageAuctn1Draw:
+;-------------------------------------------------------------------------------
 		LDA	#$01
 		STA	menuPageAuctnPage0
 		
@@ -10793,6 +10993,7 @@ menuPageAuctn1Draw:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 menuGaol0Dbls:
 		.byte 	$00
 
@@ -10809,7 +11010,9 @@ menuWindowGaol0D:
 			.byte	$00
 
 
+;-------------------------------------------------------------------------------
 menuPageGaol0Keys:
+;-------------------------------------------------------------------------------
 		CMP	#'N'
 		BNE	@keysDone
 		
@@ -10825,7 +11028,9 @@ menuPageGaol0Keys:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 menuPageGaol0Draw:
+;-------------------------------------------------------------------------------
 		LDA	menuGaol0Dbls
 		BEQ	@nodesc
 		
@@ -10857,7 +11062,9 @@ menuPageGaol0Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuPageGaol1DefKeys:				
+;-------------------------------------------------------------------------------
 @keysP:
 		CMP	#'P'
 		BNE	@keysF
@@ -10928,7 +11135,9 @@ menuPageGaol1DefKeys:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 menuPageGaol1Keys:
+;-------------------------------------------------------------------------------
 @keysNext:
 		CMP	#'.'
 		BNE	@keysOther
@@ -10954,6 +11163,7 @@ menuPageGaol1Keys:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuWindowGaol1:	
 			.byte	$90, $01, $07
 			.word	     	strHeaderGaol1
@@ -10977,7 +11187,9 @@ menuWindowGaol1FreeB:
 			.byte	$00
 
 	
+;-------------------------------------------------------------------------------
 menuPageGaol1Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<menuWindowGaol1
 		STA	$FD
 		LDA	#>menuWindowGaol1
@@ -11033,6 +11245,7 @@ menuPageGaol1Draw:
 		RTS
 
 		
+;-------------------------------------------------------------------------------
 menuWindowGaol2:	
 			.byte	$90, $01, $07
 			.word	     	strHeaderGaol1
@@ -11053,7 +11266,9 @@ menuWindowGaol2Trd:
 			.byte	$00
 			
 		
+;-------------------------------------------------------------------------------
 menuPageGaol2Keys:
+;-------------------------------------------------------------------------------
 		CMP	#'.'
 		BNE	@keysOther
 
@@ -11074,7 +11289,9 @@ menuPageGaol2Keys:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 menuPageGaol2Draw:
+;-------------------------------------------------------------------------------
 		LDA	#$A0
 		STA	menuWindowGaol2Trd
 		
@@ -11103,6 +11320,7 @@ menuPageGaol2Draw:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 menuWindowGaol3:	
 			.byte	$90, $01, $07
 			.word	     	strHeaderGaol3
@@ -11112,7 +11330,9 @@ menuWindowGaol3:
 			
 			.byte	$00
 
+;-------------------------------------------------------------------------------
 menuPageGaol3Keys:
+;-------------------------------------------------------------------------------
 @keysP:
 		CMP	#'P'
 		BNE	@keysOther
@@ -11142,7 +11362,9 @@ menuPageGaol3Keys:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 menuPageGaol3Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<menuWindowGaol3
 		STA	$FD
 		LDA	#>menuWindowGaol3
@@ -11153,6 +11375,7 @@ menuPageGaol3Draw:
 		RTS
 	
 
+;-------------------------------------------------------------------------------
 menuWindowMustPay0:	
 			.byte	$90, $01, $07
 			.word	     	strHeaderMustPay0
@@ -11171,7 +11394,9 @@ menuWindowMustPay0ContB:
 			.byte	$00
 			
 			
+;-------------------------------------------------------------------------------
 menuPageMustPay0Keys:
+;-------------------------------------------------------------------------------
 		LDX	menuWindowMustPay0ContB
 		CPX	#$A1
 		BNE	@keysOther
@@ -11202,7 +11427,9 @@ menuPageMustPay0Keys:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 menuPageMustPay0Draw:
+;-------------------------------------------------------------------------------
 		LDY	#PLAYER::money + 1
 		LDA	($8B), Y
 		BPL	@havecash
@@ -11234,6 +11461,7 @@ menuPageMustPay0Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuManage0CheckTrade:
 		.byte	$00
 
@@ -11459,7 +11687,9 @@ menuPageManage0Keys:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuPageManage0Draw:
+;-------------------------------------------------------------------------------
 		LDA	#$A1
 		STA	menuWindowManage0C
 
@@ -11485,6 +11715,7 @@ menuPageManage0Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuWindowTradeCanConf:
 		.byte	$00
 		
@@ -11497,7 +11728,9 @@ menuTrade0RemCash:
 		.word	$0000
 
 
+;-------------------------------------------------------------------------------
 menuTrade0RWealthRecalc:
+;-------------------------------------------------------------------------------
 		LDY	#PLAYER::money
 		LDA	($8B), Y
 		STA	menuTrade0RemWealth
@@ -11668,6 +11901,7 @@ menuTrade0RWealthRecalc:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuTrade0Recalc:
 		.byte	$00
 
@@ -11886,6 +12120,7 @@ menuPageTrade0Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuTrade1RemWealth:
 		.byte	$00
 		.byte	$00
@@ -11896,7 +12131,9 @@ menuTrade1Warn0:
 		.byte	$00
 		
 
+;-------------------------------------------------------------------------------
 menuTrade1RWealthRecalc:
+;-------------------------------------------------------------------------------
 		LDA	#$00
 		STA	menuTrade1Warn0
 
@@ -12104,6 +12341,7 @@ menuTrade1RWealthRecalc:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuTrade1Recalc:
 		.byte	$00
 
@@ -12284,6 +12522,7 @@ menuPageTrade1Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuWindowTrade6:	
 			.byte	$90, $01, $07
 menuWindowTrade6Hdr:
@@ -12484,13 +12723,16 @@ menuPageTrade8Draw:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 menuElimin0HaveOffer:
 		.byte	$00
 menuElimin0Recalc:
 		.byte	$00
 
 
+;-------------------------------------------------------------------------------
 menuElimin0RemWlthRecalc:
+;-------------------------------------------------------------------------------
 		LDY	#PLAYER::money
 		LDA	($8B), Y
 		STA	menuTrade0RemWealth
@@ -12565,6 +12807,7 @@ menuElimin0RemWlthRecalc:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuWindowElimin0:
 			.byte	$90, $01, $07
 			.word	     strHeaderElimin0
@@ -12581,7 +12824,9 @@ menuWindowElimin0:
 			.byte	$00
 		
 		
+;-------------------------------------------------------------------------------
 menuPageElimin0SetAuctn:
+;-------------------------------------------------------------------------------
 		LDY	#TRADE::player
 		LDA	trade1, Y
 		STA	game + GAME::varA
@@ -12645,7 +12890,9 @@ menuPageElimin0SetAuctn:
 		RTS
 			
 		
+;-------------------------------------------------------------------------------
 menuPageElimin0DefKeys:
+;-------------------------------------------------------------------------------
 	.if	DEBUG_EXTRAS
 		CMP	#'A'
 		BNE	@keysM
@@ -12812,7 +13059,9 @@ menuPageElimin0DefKeys:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuPageElimin0Keys:
+;-------------------------------------------------------------------------------
 		CMP	#'.'
 		BNE	@keysOther
 		
@@ -12831,7 +13080,9 @@ menuPageElimin0Keys:
 		JMP	menuPageElimin0DefKeys
 
 
+;-------------------------------------------------------------------------------
 menuPageElimin0Draw:
+;-------------------------------------------------------------------------------
 		LDA	menuElimin0Recalc
 		BEQ	@disp
 		
@@ -12898,6 +13149,7 @@ menuPageElimin1Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuPlyrSelCallProc:
 		.word	$0000
 menuPlyrSelAllowCur:
@@ -12934,43 +13186,45 @@ menuWindowPlyrSelP0:
 			.word	     	strOptn0PSel0
 			.byte	$90, $06, $0A
 menuWindowPlyrSelN0:
-			.word		plr0 + PLAYER::name
+			.word		plrName0Ref
 menuWindowPlyrSelP1:
 			.byte	$A2, $0C, $01, $12, $32, $02, $0C
 			.word	     	strOptn1PSel0
 			.byte	$90, $06, $0C
 menuWindowPlyrSelN1:
-			.word		plr1 + PLAYER::name
+			.word		plrName1Ref
 menuWindowPlyrSelP2:
 			.byte	$A2, $0E, $01, $12, $33, $02, $0E
 			.word	     	strOptn2PSel0
 			.byte	$90, $06, $0E
 menuWindowPlyrSelN2:
-			.word		plr2 + PLAYER::name
+			.word		plrName2Ref
 menuWindowPlyrSelP3:
 			.byte	$A2, $10, $01, $12, $34, $02, $10
 			.word	     	strOptn3PSel0
 			.byte	$90, $06, $10
 menuWindowPlyrSelN3:
-			.word		plr3 + PLAYER::name
+			.word		plrName3Ref
 menuWindowPlyrSelP4:
 			.byte	$A2, $12, $01, $12, $35, $02, $12
 			.word	     	strOptn4PSel0
 			.byte	$90, $06, $12
 menuWindowPlyrSelN4:
-			.word		plr4 + PLAYER::name
+			.word		plrName4Ref
 menuWindowPlyrSelP5:
 			.byte	$A2, $14, $01, $12, $36, $02, $14
 			.word	     	strOptn5PSel0
 			.byte	$90, $06, $14
 menuWindowPlyrSelN5:
-			.word		plr5 + PLAYER::name
+			.word		plrName5Ref
 
 			.byte	$00
 	.assert	(* - PLYRSEL_P)  < $FE, error, "WindowPlyrSel must be on one page!"
 			
 			
+;-------------------------------------------------------------------------------
 menuPagePlyrSel0Keys:
+;-------------------------------------------------------------------------------
 		CMP	#'7'
 		BPL	@keysExit
 		
@@ -13027,7 +13281,9 @@ menuPagePlyrSel0Keys:
 		JMP	(menuPlyrSelCallProc)
 		
 
+;-------------------------------------------------------------------------------
 menuPagePlyrSel0Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<menuWindowPlyrSel0
 		STA	$A3
 		LDA	#>menuWindowPlyrSel0
@@ -13053,10 +13309,11 @@ menuPagePlyrSel0Draw:
 		
 		LDA	menuWindowPlyrSelNN, X
 		TAY
-		LDA	plrNameLo, X
+		
+		LDA	plrNameRefLo, X
 		STA	($A3), Y
 		INY
-		LDA	plrNameHi, X
+		LDA	plrNameRefHi, X
 		STA	($A3), Y
 
 		JMP	@next
@@ -13110,7 +13367,9 @@ menuPagePlyrSel0Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuWindowJump0:
+;-------------------------------------------------------------------------------
 			.byte	$90, $01, $07
 			.word	     	strHeaderJump0
 ;			.byte	$90, $01, $08
@@ -13122,12 +13381,14 @@ menuWindowJump0:
 			.word		strText1Jump0
 
 			.byte	$AF, $0D, $01, $12, $20, $02, $0D
-			.word	     	strDesc7Titles0
+			.word	     	strText7Titles0
 
 			.byte	$00
 
 
+;-------------------------------------------------------------------------------
 menuPageJump0Keys:
+;-------------------------------------------------------------------------------
 		LDA	#<SFXNUDGE
 		LDY	#>SFXNUDGE
 		LDX	#$07
@@ -13182,7 +13443,9 @@ menuPageJump0Keys:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 menuPageJump0Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<menuWindowJump0
 		STA	$FD
 		LDA	#>menuWindowJump0
@@ -13192,6 +13455,7 @@ menuPageJump0Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuWindowJump1:
 			.byte	$90, $01, $07
 			.word	     	strHeaderJump1
@@ -13202,12 +13466,14 @@ menuWindowJump1:
 			.word		strText1Jump1
 
 			.byte	$AF, $0D, $01, $12, $20, $02, $0D
-			.word	     	strDesc7Titles0
+			.word	     	strText7Titles0
 
 			.byte	$00
 
 
+;-------------------------------------------------------------------------------
 menuPageJump1Keys:
+;-------------------------------------------------------------------------------
 		LDA	game + GAME::fTrdTyp
 		BEQ	@proc
 		
@@ -13228,7 +13494,9 @@ menuPageJump1Keys:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 menuPageJump1Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<menuWindowJump1
 		STA	$FD
 		LDA	#>menuWindowJump1
@@ -13238,6 +13506,7 @@ menuPageJump1Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuWindowQuit0:	
 			.byte	$90, $01, $07
 			.word	     strHeaderQuit0
@@ -13255,7 +13524,9 @@ menuWindowQuit0:
 			
 			.byte	$00
 
+;-------------------------------------------------------------------------------
 menuPageQuit0Keys:
+;-------------------------------------------------------------------------------
 		CMP	#'N'
 		BNE	@tstY
 		
@@ -13287,7 +13558,9 @@ menuPageQuit0Keys:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 menuPageQuit0Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<menuWindowQuit0
 		STA	$FD
 		LDA	#>menuWindowQuit0
@@ -13298,6 +13571,7 @@ menuPageQuit0Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuWindowQuit1:	
 			.byte	$90, $01, $07
 			.word	     strHeaderQuit0
@@ -13313,7 +13587,10 @@ menuWindowQuit1:
 			
 			.byte	$00
 
+
+;-------------------------------------------------------------------------------
 menuPageQuit1Keys:
+;-------------------------------------------------------------------------------
 		CMP	#'N'
 		BNE	@tstY
 		
@@ -13344,7 +13621,9 @@ menuPageQuit1Keys:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 menuPageQuit1Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<menuWindowQuit1
 		STA	$FD
 		LDA	#>menuWindowQuit1
@@ -13355,6 +13634,7 @@ menuPageQuit1Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 menuWindowQuit2:	
 			.byte	$90, $01, $07
 			.word	     strHeaderQuit2
@@ -13372,7 +13652,9 @@ menuWindowQuit2:
 			
 			.byte	$00
 
+;-------------------------------------------------------------------------------
 menuPageQuit2Keys:
+;-------------------------------------------------------------------------------
 		CMP	#'N'
 		BNE	@tstY
 		
@@ -13406,7 +13688,9 @@ menuPageQuit2Keys:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 menuPageQuit2Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<menuWindowQuit2
 		STA	$FD
 		LDA	#>menuWindowQuit2
@@ -13421,6 +13705,7 @@ menuPageQuit2Draw:
 ;FOR GAME.S
 ;===============================================================================
 
+;-------------------------------------------------------------------------------
 gameStateStack:
 	.repeat	10, I
 		.byte	$00, $00, $00, $00
@@ -13468,15 +13753,17 @@ gamePopState:
 		LDA	gameStateIdx
 		ASL
 		ASL
-		TAX
+		TAY
 		
-		LDA	gameStateStack, X
+		LDA	gameStateStack, Y
 		STA	game + GAME::gMode
 		
-		LDA	gameStateStack + 1, X
+		LDA	gameStateStack + 1, Y
 		STA	game + GAME::pActive
 
-		LDA	gameStateStack + 2, X
+		JSR	gameDeselect
+
+		LDA	gameStateStack + 2, Y
 		STA	game + GAME::sSelect
 		
 		JSR	gamePlayerChanged
@@ -13570,7 +13857,9 @@ gameCheckCPUDecline:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 gameClearTrdWanted:
+;-------------------------------------------------------------------------------
 		LDX	#.sizeof(TRADE) - 1		;Clear the wanted data
 		LDA	#$00
 @loop0:
@@ -13590,8 +13879,10 @@ gameClearTrdWanted:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 gameClearTrdOffer:
-		LDX	#.sizeof(TRADE) - 1		;Clear the wanted data
+;-------------------------------------------------------------------------------
+		LDX	#.sizeof(TRADE) - 1		;Clear the offer data
 		LDA	#$00
 @loop0:
 		STA 	trade1, X
@@ -13610,7 +13901,9 @@ gameClearTrdOffer:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 gameRemWlth0AddEquity:		
+;-------------------------------------------------------------------------------
 		LDY	#PLAYER::equity
 		CLC
 		LDA	($8B), Y
@@ -13627,7 +13920,9 @@ gameRemWlth0AddEquity:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 gameRemWlth0SubFee:		
+;-------------------------------------------------------------------------------
 		LDY	#DEED::mFee		;At least a fee for mrtg
 		LDA	($FD), Y
 		STA	game + GAME::varD
@@ -13657,7 +13952,9 @@ gameRemWlth0SubFee:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 gameRemWlth1SubValue:
+;-------------------------------------------------------------------------------
 		SEC
 		LDA	menuTrade1RemWealth
 		SBC	game + GAME::varD
@@ -13680,7 +13977,9 @@ gameRemWlth1SubValue:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 gameRemWlth0SubValue:
+;-------------------------------------------------------------------------------
 		SEC
 		LDA	menuTrade0RemWealth
 		SBC	game + GAME::varD
@@ -13695,7 +13994,9 @@ gameRemWlth0SubValue:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 gamePerformQuit:
+;-------------------------------------------------------------------------------
 		LDX	game + GAME::pFirst
 		STX	game + GAME::varF
 		STX	game + GAME::varG
@@ -13774,7 +14075,9 @@ gamePerformQuit:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 doGameAddScoreElement:
+;-------------------------------------------------------------------------------
 		CLC
 		LDA	game + GAME::varO
 		ADC	game + GAME::varM
@@ -13786,7 +14089,9 @@ doGameAddScoreElement:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 doGameScoreEquity:
+;-------------------------------------------------------------------------------
 		LDY	#PLAYER::equity
 		LDA	($FB), Y
 		STA	game + GAME::varD
@@ -13827,7 +14132,10 @@ doGameScoreEquity:
 		
 		RTS
 
+
+;-------------------------------------------------------------------------------
 doGameScoreCntDeeds:
+;-------------------------------------------------------------------------------
 		LDA	#$00
 		STA	game + GAME::varM
 		STA	game + GAME::varN
@@ -13849,7 +14157,9 @@ doGameScoreCntDeeds:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 doGameScoreCntGOFree:
+;-------------------------------------------------------------------------------
 		LDA	#$00
 		STA	game + GAME::varM
 		STA	game + GAME::varN
@@ -13870,7 +14180,9 @@ doGameScoreCntGOFree:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 doGameScoreCntGroups:
+;-------------------------------------------------------------------------------
 ;***TODO:	Isn't this supposed to be groups that are wholy owned?
 
 		LDA	#$00
@@ -13908,7 +14220,9 @@ doGameScoreCntGroups:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 doGameScoreImprvBonus:
+;-------------------------------------------------------------------------------
 		LDA	#$00
 		STA	game + GAME::varM
 		STA	game + GAME::varN
@@ -13987,7 +14301,9 @@ doGameScoreImprvBonus:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 doGameScoreStationBonus:
+;-------------------------------------------------------------------------------
 		LDA	#$00
 		STA	game + GAME::varM
 		STA	game + GAME::varN
@@ -14012,7 +14328,9 @@ doGameScoreStationBonus:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 doGameScoreUtilityBonus:
+;-------------------------------------------------------------------------------
 		LDA	#$00
 		STA	game + GAME::varN
 		
@@ -14244,6 +14562,7 @@ gameGetCardPtrForSquare:
 		ASL
 		TAX
 		
+;-------------------------------------------------------------------------------
 gameGetCardPtrForSquareImmed:
 		LDA	rulesSqr0 + 1, X
 		STA	game + GAME::varC	;index
@@ -14777,6 +15096,7 @@ gameMovePlyrBck:
 		STA	($8B), Y
 		
 		RTS
+;-------------------------------------------------------------------------------
 	.endif
 
 
@@ -15347,6 +15667,7 @@ gameInitTrdIntrpt:
 		RTS
 		
 @initiate:
+;-------------------------------------------------------------------------------
 gameInitTrdIntrptDirect:
 		LDY 	#PLAYER::colour
 		LDA	($8B), Y
@@ -15987,6 +16308,7 @@ gameAmountIsLess:
 		STA	game + GAME::varO
 		STY	game + GAME::varP
 		
+;-------------------------------------------------------------------------------
 gameAmountIsLessDirect:
                 SEC
 		LDA	game + GAME::varD
@@ -16129,6 +16451,7 @@ gameIncMoney:
 		STA	game + GAME::dirty
 
 		RTS
+;-------------------------------------------------------------------------------
 	.endif
 		
 		
@@ -16556,6 +16879,7 @@ gameCheckChanceShuffle:
 ;FOR DIALOG.S
 ;===============================================================================
 
+;-------------------------------------------------------------------------------
 dialogKeyHandler:
 			.word	dialogDefKeys
 dialogDrawHandler:
@@ -16583,7 +16907,7 @@ dialogDefWindow0:
 			.byte	$23, $08, $07, $18
 
 			.byte 	$AF, $0F, $08, $20, $20, $0D, $0F
-			.word		strDesc7Titles0
+			.word		strText7Titles0
 			
 			.byte	$00
 
@@ -16878,6 +17202,7 @@ dialogDefKeys:
 
 
 ;***	106 bytes
+;-------------------------------------------------------------------------------
 dialogWindowTitles0:
 			.byte	$13, $0B, $01, $12, $17
 			
@@ -16896,24 +17221,24 @@ dialogWindowTitles0:
 			.byte	$90, $0C, $02
 			.word        	strHeaderTitles0
 			.byte	$90, $12, $05
-			.word		strDesc0Titles0
+			.word		strText0Titles0
 			.byte	$90, $0D, $07
-			.word		strDesc1Titles0
+			.word		strText1Titles0
 			.byte	$90, $12, $09
-			.word		strDesc2Titles0
+			.word		strText2Titles0
 			.byte	$90, $0C, $0B
-			.word		strDesc3Titles0
+			.word		strText3Titles0
 			.byte	$90, $13, $0C
-			.word		strDesc4Titles0
+			.word		strText4Titles0
 			.byte	$90, $0C, $0F
-			.word		strDesc8Titles0
+			.word		strText8Titles0
 			.byte	$90, $0D, $12
-			.word		strDesc5Titles0
+			.word		strText5Titles0
 			.byte	$90, $11, $13
-			.word		strDesc6Titles0
+			.word		strText6Titles0
 			
 			.byte	$AF, $16, $0B, $1D, $20, $0D, $16
-			.word		strDesc7Titles0
+			.word		strText7Titles0
 			
 			.byte	$21, $0B, $02, $12
 			.byte	$23, $0B, $03, $12
@@ -16966,7 +17291,10 @@ dialogDlgTitles0Keys:
 
 		RTS
 
+
+;-------------------------------------------------------------------------------
 dialogDlgTitles0Draw:
+;-------------------------------------------------------------------------------
 		JSR	screenBeginButtons
 
 		LDA	#$00
@@ -16983,6 +17311,7 @@ dialogDlgTitles0Draw:
 		RTS
 		
 	
+;-------------------------------------------------------------------------------
 dialogCCCCardTemp0:					;Card values
 			.byte	$00, $00
 dialogCCCCardTemp2:					;Routine to use for keys
@@ -16995,6 +17324,12 @@ dialogCCCCardTempA:					;Cash value 0
 			.byte	$04, $A0, $A0, $A0, $A0
 dialogCCCCardTempF:					;Pointer to str data
 			.word	$0000
+
+dialogCCCCard4Ref:
+			.word	dialogCCCCardTemp4
+dialogCCCCardARef:
+			.word	dialogCCCCardTempA
+
 
 dialogWindowCCCCard0:		
 			.byte	$90, $09, $06
@@ -17015,14 +17350,14 @@ dialogWindowCCCCardC1:
 			.word		strDummyDummy0
 
 			.byte	$90, $1B, $0C
-			.word		dialogCCCCardTemp4
+			.word		dialogCCCCard4Ref
 			
 			.byte	$90, $13, $0D
 dialogWindowCCCCardC0:
 			.word		strDummyDummy0
 
 			.byte	$90, $1B, $0D
-			.word		dialogCCCCardTempA
+			.word		dialogCCCCardARef
 
 			.byte	$00
 		
@@ -17211,6 +17546,7 @@ dialogDlgCCCCard0Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 dialogWaitFor0Keys:
 			.word	$0000
 dialogWaitFor0Draw:
@@ -17226,7 +17562,13 @@ dialogWaitFor0KeyWai:
 dialogWindowWaitFor0:
 			.byte	$90, $09, $06
 			.word		strHeaderWaitFor0
+
+
 			.byte	$90, $09, $09
+dialogWindowWaitFor0P0:
+			.word		strDummyDummy0
+			
+			.byte	$90, $11, $09
 			.word		strText0WaitFor0
 			.byte	$90, $09, $0A
 			.word		strText1WaitFor0
@@ -17288,7 +17630,9 @@ doDialogDlgWaitFor0Restore:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 dialogDlgWaitFor0Keys:
+;-------------------------------------------------------------------------------
 		LDA	#<SFXDONG
 		LDY	#>SFXDONG
 		LDX	#$07
@@ -17318,17 +17662,16 @@ dialogDlgWaitFor0Keys:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 dialogDlgWaitFor0Draw:
-		LDY	#PLAYER::name + $08
+;-------------------------------------------------------------------------------
+		LDX	game + GAME::pActive
 		
-		LDX	#$07
-@loop:
-		LDA	($8B), Y
-		ORA	#$80
-		STA	strText0WaitFor0 + 1, X
-		DEY
-		DEX
-		BPL	@loop
+		LDA	plrNameRefLo, X
+		STA	dialogWindowWaitFor0P0
+		
+		LDA	plrNameRefHi, X
+		STA	dialogWindowWaitFor0P0 + 1
 
 		LDA	#<dialogWindowWaitFor0
 		STA	$FD
@@ -17342,17 +17685,24 @@ dialogDlgWaitFor0Draw:
 
 
 ;***	11 bytes
+;-------------------------------------------------------------------------------
 dialogWindowStart0:
 			.byte	$90, $09, $06
 			.word		strHeaderStart0
 			
 			.byte	$90, $09, $09
+dialogWindowStart0P0:
+			.word		strDummyDummy0
+			
+			.byte	$90, $12, $09
 			.word		strText0Start0
 
 			.byte	$00
 
 
+;-------------------------------------------------------------------------------
 dialogDlgStart0Keys:
+;-------------------------------------------------------------------------------
 		JSR	dialogDefKeys
 
 		LDA	#<$DBA9
@@ -17366,24 +17716,20 @@ dialogDlgStart0Keys:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 dialogDlgStart0Draw:
+;-------------------------------------------------------------------------------
 		LDX	game + GAME::pFirst
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
-		
-		LDY	#PLAYER::name + $08
-		
-		LDX	#$07
-@loop:
-		LDA	($FB), Y
-		ORA	#$80
-		STA	strText0Start0 + 1, X
-		DEY
-		DEX
-		BPL	@loop
 
+		LDA	plrNameRefLo, X
+		STA	dialogWindowStart0P0
+		
+		LDA	plrNameRefHi, X
+		STA	dialogWindowStart0P0 + 1
+		
+		LDA	#musTuneStart
+		JSR	SNDBASE + 0	
+		
 		LDA	#<dialogWindowStart0
 		STA	$FD
 		LDA	#>dialogWindowStart0
@@ -17395,6 +17741,7 @@ dialogDlgStart0Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 dialogWindowTrade2:
 			.byte	$90, $09, $06
 			.word		strHeaderTrade2
@@ -17409,7 +17756,9 @@ dialogWindowTrade2:
 			.byte	$00
 
 
+;-------------------------------------------------------------------------------
 dialogDlgTrade2Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<dialogWindowTrade2
 		STA	$FD
 		LDA	#>dialogWindowTrade2
@@ -17420,6 +17769,7 @@ dialogDlgTrade2Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 dialogWindowTrade3:
 			.byte	$90, $09, $06
 			.word		strHeaderTrade2
@@ -17434,7 +17784,9 @@ dialogWindowTrade3:
 			.byte	$00
 
 
+;-------------------------------------------------------------------------------
 dialogDlgTrade3Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<dialogWindowTrade3
 		STA	$FD
 		LDA	#>dialogWindowTrade3
@@ -17445,6 +17797,7 @@ dialogDlgTrade3Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 dialogWindowTrade4:
 			.byte	$90, $09, $06
 			.word		strHeaderTrade2
@@ -17459,7 +17812,9 @@ dialogWindowTrade4:
 			.byte	$00
 
 
+;-------------------------------------------------------------------------------
 dialogDlgTrade4Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<dialogWindowTrade4
 		STA	$FD
 		LDA	#>dialogWindowTrade4
@@ -17470,6 +17825,7 @@ dialogDlgTrade4Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 dialogWindowTrade5:
 			.byte	$90, $09, $06
 			.word		strHeaderTrade5
@@ -17486,7 +17842,9 @@ dialogWindowTrade5:
 			.byte	$00
 
 
+;-------------------------------------------------------------------------------
 dialogDlgTrade5Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<dialogWindowTrade5
 		STA	$FD
 		LDA	#>dialogWindowTrade5
@@ -17497,6 +17855,7 @@ dialogDlgTrade5Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 dialogTempTrade7P:
 		.byte	$00
 
@@ -17513,11 +17872,15 @@ dialogWindowTrade7N:
 			.byte	$00
 
 
+;-------------------------------------------------------------------------------
 dialogDlgTrade7Draw:
+;-------------------------------------------------------------------------------
 		LDX	game + GAME::pActive
-		LDA	plrNameLo, X
+				
+		LDA	plrNameRefLo, X
 		STA	dialogWindowTrade7N
-		LDA	plrNameHi, X
+		
+		LDA	plrNameRefHi, X
 		STA	dialogWindowTrade7N + 1
 
 		LDA	#<dialogWindowTrade7
@@ -17531,18 +17894,27 @@ dialogDlgTrade7Draw:
 		RTS
 		
 	
+;-------------------------------------------------------------------------------
 dialogTempElimin0P:
 		.byte	$00
 
 dialogWindowElimin0:		
 			.byte	$90, $09, $06
 			.word		strHeaderElimin0
+			
 			.byte	$90, $09, $09
+dialogWindowElimin0P0:
+			.word		strDummyDummy0
+			
+			.byte	$90, $12, $09
 			.word		strText0Elimin0
 			
 			.byte	$00
-			
+
+
+;-------------------------------------------------------------------------------
 dialogDlgElimin0Keys:
+;-------------------------------------------------------------------------------
 		LDA	#<SFXDONG
 		LDY	#>SFXDONG
 		LDX	#$07
@@ -17565,26 +17937,19 @@ dialogDlgElimin0Keys:
 
 		RTS
 		
+;-------------------------------------------------------------------------------
 dialogDlgElimin0Draw:
+;-------------------------------------------------------------------------------
 ;***TODO:	Make this message more informative - did they lose
 ;		to another player (which) or to the bank?
 
 		LDX	dialogTempElimin0P
-		LDA	plrLo, X
-		STA	$FB
-		LDA	plrHi, X
-		STA	$FC
 		
-		LDY	#PLAYER::name + $08
+		LDA	plrNameRefLo, X
+		STA	dialogWindowElimin0P0
 		
-		LDX	#$07
-@loop:
-		LDA	($FB), Y
-		ORA	#$80
-		STA	strText0Elimin0 + 1, X
-		DEY
-		DEX
-		BPL	@loop
+		LDA	plrNameRefHi, X
+		STA	dialogWindowElimin0P0 + 1
 
 		LDA	#<dialogWindowElimin0
 		STA	$FD
@@ -17598,6 +17963,7 @@ dialogDlgElimin0Draw:
 
 
 ;***	21 bytes
+;-------------------------------------------------------------------------------
 dialogWindowElimin1:
 			.byte	$90, $09, $06
 			.word		strHeaderElimin1
@@ -17612,7 +17978,9 @@ dialogWindowElimin1:
 			.byte	$00
 
 
+;-------------------------------------------------------------------------------
 dialogDlgElimin1Draw:
+;-------------------------------------------------------------------------------
 		LDA	#<dialogWindowElimin1
 		STA	$FD
 		LDA	#>dialogWindowElimin1
@@ -17624,15 +17992,24 @@ dialogDlgElimin1Draw:
 
 
 ;***	11 bytes
+;-------------------------------------------------------------------------------
 dialogWindowGameOver0:		
 			.byte	$90, $09, $06
 			.word		strHeaderGameOver0
+
 			.byte	$90, $09, $09
+dialogWindowGameOver0P0:			
+			.word		strDummyDummy0
+			
+			.byte	$90, $12, $09
 			.word		strText0GameOver0
 			
 			.byte	$00
-			
+
+
+;-------------------------------------------------------------------------------
 dialogDlgGameOver0Keys:
+;-------------------------------------------------------------------------------
 		JSR	initBoard
 
 		JSR	initSprites		
@@ -17651,18 +18028,18 @@ dialogDlgGameOver0Keys:
 		JSR	SNDBASE + 0
 		
 		RTS
-		
+
+
+;-------------------------------------------------------------------------------
 dialogDlgGameOver0Draw:
-		LDY	#PLAYER::name + $08
+;-------------------------------------------------------------------------------
+		LDX	game + GAME::pActive
 		
-		LDX	#$07
-@loop:
-		LDA	($8B), Y
-		ORA	#$80
-		STA	strText0GameOver0 + 1, X
-		DEY
-		DEX
-		BPL	@loop
+		LDA	plrNameRefLo, X
+		STA	dialogWindowGameOver0P0
+		
+		LDA	plrNameRefHi, X
+		STA	dialogWindowGameOver0P0 + 1
 
 		LDA	#<dialogWindowGameOver0
 		STA	$FD
@@ -17675,6 +18052,7 @@ dialogDlgGameOver0Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 dialogOvervwFiltOwn:
 		.byte	$00
 dialogOvervwPlr0:
@@ -17806,7 +18184,9 @@ dialogWindowOvervw1:
 			.byte 	$00
 		
 		
+;-------------------------------------------------------------------------------
 doDialogOvervwColOwnFilt:
+;-------------------------------------------------------------------------------
 ;		Set carry if want player
 
 		LDA	dialogOvervwFiltOwn	;Filtering at all?
@@ -17837,7 +18217,9 @@ doDialogOvervwColOwnFilt:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 dialogOvervwUpdHeap:
+;-------------------------------------------------------------------------------
 		CLC
 		LDA	$A3
 		ADC	game + GAME::varH
@@ -17852,7 +18234,9 @@ dialogOvervwUpdHeap:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 dialogOvervwColOwnT:
+;-------------------------------------------------------------------------------
 		LDA	#$0F
 		STA	game + GAME::varA
 ;		LDA	#$05
@@ -17906,7 +18290,9 @@ dialogOvervwColOwnT:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 dialogOvervwColOwnR:
+;-------------------------------------------------------------------------------
 		LDA	#$08
 		STA	game + GAME::varA
 ;		LDA	#$1A
@@ -17959,7 +18345,10 @@ dialogOvervwColOwnR:
 
 		RTS
 
+
+;-------------------------------------------------------------------------------
 dialogOvervwColOwnL:
+;-------------------------------------------------------------------------------
 		LDA	#$10
 		STA	game + GAME::varA
 ;		LDA	#$0B
@@ -18016,7 +18405,10 @@ dialogOvervwColOwnL:
 
 		RTS
 
+
+;-------------------------------------------------------------------------------
 dialogOvervwColOwnB:
+;-------------------------------------------------------------------------------
 		LDA	#$17
 		STA	game + GAME::varA
 ;		LDA	#$13
@@ -18073,7 +18465,10 @@ dialogOvervwColOwnB:
 
 		RTS
 
+
+;-------------------------------------------------------------------------------
 dialogOvervwColOwn:
+;-------------------------------------------------------------------------------
 		JSR	dialogOvervwColOwnT
 		JSR	dialogOvervwColOwnR
 		JSR	dialogOvervwColOwnL
@@ -18202,7 +18597,9 @@ dialogOvervwColPlrs:
 		RTS
 			
 			
+;-------------------------------------------------------------------------------
 dialogOvervwCollateState:
+;-------------------------------------------------------------------------------
 		TXA
 		PHA
 		
@@ -18228,7 +18625,9 @@ dialogOvervwCollateState:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 dialogDlgOvervw0Draw:
+;-------------------------------------------------------------------------------
 		JSR	screenBeginButtons
 
 		LDA	#<dialogWindowOvervw0
@@ -18271,6 +18670,7 @@ dialogDlgOvervw0Draw:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 dialogWindowTrdSel0:
 			.byte	$11, $05, $04, $1E, $11	;chr empty space
 
@@ -20384,7 +20784,9 @@ dialogDlgTrdSel0Draw:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 dialogTrdSel0CollateState:
+;-------------------------------------------------------------------------------
 		LDA	#$01
 		STA	dialogOvervwFiltOwn
 		
@@ -20408,6 +20810,7 @@ dialogTrdSel0CollateState:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 dialogWindowSqrInfo0:		
 			.byte	$13, $0A, $02, $14, $14
 			.byte	$46, $09, $01, $15
@@ -20429,7 +20832,7 @@ dialogWindowSqrInfoT1:
 			.word		strDummyDummy0
 			
 			.byte 	$AF, $14, $0A, $1E, $20, $0D, $14
-			.word		strDesc7Titles0
+			.word		strText7Titles0
 
 dialogWindowSqrInfoC0:
 			.byte	$21, $0A, $02, $14
@@ -20460,80 +20863,103 @@ dialogStrSqrInfo8:
 			.byte	$04, $A0, $A0, $A0, $A0
 dialogStrSqrInfo9:
 			.byte	$04, $A0, $A0, $A0, $A0
+			
+dialogStrRefSInfo0:
+			.word 	dialogStrSqrInfo0
+dialogStrRefSInfo1:
+			.word 	dialogStrSqrInfo1
+dialogStrRefSInfo2:
+			.word 	dialogStrSqrInfo2
+dialogStrRefSInfo3:
+			.word 	dialogStrSqrInfo3
+dialogStrRefSInfo4:
+			.word 	dialogStrSqrInfo4
+dialogStrRefSInfo5:
+			.word 	dialogStrSqrInfo5
+dialogStrRefSInfo6:
+			.word 	dialogStrSqrInfo6
+dialogStrRefSInfo7:
+			.word 	dialogStrSqrInfo7
+dialogStrRefSInfo8:
+			.word 	dialogStrSqrInfo8
+dialogStrRefSInfo9:
+			.word 	dialogStrSqrInfo9
+			
 		
 dialogWindowSqrInfo1:
 			.byte 	$90, $0B, $06
 			.word		strText0Street0
 			.byte 	$90, $19, $06
-			.word		dialogStrSqrInfo0
+			.word		dialogStrRefSInfo0
 			.byte 	$90, $0B, $08
 			.word		strText1Street0
 			.byte 	$90, $19, $08
-			.word		dialogStrSqrInfo1
+			.word		dialogStrRefSInfo1
 			.byte 	$90, $0B, $09
 			.word		strText2Street0
 			.byte 	$90, $19, $09
-			.word		dialogStrSqrInfo2
+			.word		dialogStrRefSInfo2
 			.byte 	$90, $0B, $0A
 			.word		strText3Street0
 			.byte 	$90, $19, $0A
-			.word		dialogStrSqrInfo3
+			.word		dialogStrRefSInfo3
 			.byte 	$90, $0B, $0B
 			.word		strText4Street0
 			.byte 	$90, $19, $0B
-			.word		dialogStrSqrInfo4
+			.word		dialogStrRefSInfo4
 			.byte 	$90, $0B, $0C
 			.word		strText5Street0
 			.byte 	$90, $19, $0C
-			.word		dialogStrSqrInfo5
+			.word		dialogStrRefSInfo5
 			.byte 	$90, $0B, $0E
 			.word		strText6Street0
 			.byte 	$90, $19, $0E
-			.word		dialogStrSqrInfo6
+			.word		dialogStrRefSInfo6
 			.byte 	$90, $0B, $0F
 			.word		strText7Street0
 			.byte 	$90, $19, $0F
-			.word		dialogStrSqrInfo7
+			.word		dialogStrRefSInfo7
 			.byte 	$90, $0B, $10
 			.word		strText8Street0
 			.byte 	$90, $19, $10
-			.word		dialogStrSqrInfo8
+			.word		dialogStrRefSInfo8
 			.byte 	$90, $0B, $12
 			.word		strText9Street0
 			.byte 	$90, $19, $12
-			.word		dialogStrSqrInfo9
+			.word		dialogStrRefSInfo9
 
 			.byte 	$00
+
 
 dialogWindowSqrInfo2:
 			.byte 	$90, $0B, $06
 			.word		strText0Street0
 			.byte 	$90, $19, $06
-			.word		dialogStrSqrInfo0
+			.word		dialogStrRefSInfo0
 			.byte 	$90, $0B, $08
 			.word		strText0Stn0
 			.byte 	$90, $19, $08
-			.word		dialogStrSqrInfo1
+			.word		dialogStrRefSInfo1
 			.byte 	$90, $0B, $09
 			.word		strText1Stn0
 			.byte 	$90, $19, $09
-			.word		dialogStrSqrInfo2
+			.word		dialogStrRefSInfo2
 			.byte 	$90, $0B, $0A
 			.word		strText2Stn0
 			.byte 	$90, $19, $0A
-			.word		dialogStrSqrInfo3
+			.word		dialogStrRefSInfo3
 			.byte 	$90, $0B, $0E
 			.word		strText6Street0
 			.byte 	$90, $19, $0E
-			.word		dialogStrSqrInfo6
+			.word		dialogStrRefSInfo6
 			.byte 	$90, $0B, $0F
 			.word		strText7Street0
 			.byte 	$90, $19, $0F
-			.word		dialogStrSqrInfo7
+			.word		dialogStrRefSInfo7
 			.byte 	$90, $0B, $10
 			.word		strText8Street0
 			.byte 	$90, $19, $10
-			.word		dialogStrSqrInfo8
+			.word		dialogStrRefSInfo8
 
 			.byte 	$00
 			
@@ -20550,15 +20976,15 @@ dialogWindowSqrInfo3:
 			.byte 	$90, $0B, $0E
 			.word		strText6Street0
 			.byte 	$90, $19, $0E
-			.word		dialogStrSqrInfo6
+			.word		dialogStrRefSInfo6
 			.byte 	$90, $0B, $0F
 			.word		strText7Street0
 			.byte 	$90, $19, $0F
-			.word		dialogStrSqrInfo7
+			.word		dialogStrRefSInfo7
 			.byte 	$90, $0B, $10
 			.word		strText8Street0
 			.byte 	$90, $19, $10
-			.word		dialogStrSqrInfo8
+			.word		dialogStrRefSInfo8
 			
 			.byte 	$00
 			
@@ -20583,7 +21009,9 @@ dialogWindowSqrInfo44:
 			.byte 	$00
 			
 
+;-------------------------------------------------------------------------------
 doDialogSqrInfoGenTxt:
+;-------------------------------------------------------------------------------
 		LDY	#$00
 		LDA	($A3), Y
 		STA	dialogWindowSqrInfo40
@@ -20623,7 +21051,9 @@ doDialogSqrInfoGenTxt:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 doDialogSqrInfoCrnr:
+;-------------------------------------------------------------------------------
 		LDX	game + GAME::varC
 		LDA	rulesSqrStrsLo, X
 		STA	$A3
@@ -20635,7 +21065,9 @@ doDialogSqrInfoCrnr:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 doDialogSqrInfoChest:
+;-------------------------------------------------------------------------------
 		LDA	rulesSqrStrsLo + 4
 		STA	$A3
 		LDA	rulesSqrStrsHi + 4
@@ -20646,7 +21078,9 @@ doDialogSqrInfoChest:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 doDialogSqrInfoChance:
+;-------------------------------------------------------------------------------
 		LDA	rulesSqrStrsLo + 5
 		STA	$A3
 		LDA	rulesSqrStrsHi + 5
@@ -20657,7 +21091,9 @@ doDialogSqrInfoChance:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 doDialogSqrInfoTax:
+;-------------------------------------------------------------------------------
 		LDX	game + GAME::varC
 		LDA	rulesSqrStrsLo + 6, X
 		STA	$A3
@@ -20669,7 +21105,9 @@ doDialogSqrInfoTax:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 doDialogSqrInfoGetVal:
+;-------------------------------------------------------------------------------
 		LDA	($FD), Y		;next value
 		STA	Z:numConvVALUE
 		INY
@@ -20688,7 +21126,9 @@ doDialogSqrInfoGetVal:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 doDialogSqrInfoGetRepay:
+;-------------------------------------------------------------------------------
 		DEY
 		DEY
 		LDA	($FD), Y		;mMrtg
@@ -20719,7 +21159,9 @@ doDialogSqrInfoGetRepay:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 doDialogSqrInfoUtil:
+;-------------------------------------------------------------------------------
 		LDY	#UTILITY::mPurch
 		
 		JSR	doDialogSqrInfoGetVal	;market purchase
@@ -20760,8 +21202,9 @@ doDialogSqrInfoUtil:
 		RTS
 		
 		
-		
+;-------------------------------------------------------------------------------
 doDialogSqrInfoStn:
+;-------------------------------------------------------------------------------
 		LDY	#STREET::mRent		;rent
 		LDA	($FD), Y
 		STA	game + GAME::varD
@@ -20874,7 +21317,9 @@ doDialogSqrInfoStn:
 		RTS
 		
 		
+;-------------------------------------------------------------------------------
 doDialogSqrInfoStreet:
+;-------------------------------------------------------------------------------
 		LDY	#STREET::mRent
 		
 		JSR	doDialogSqrInfoGetVal	;rent
@@ -20991,7 +21436,9 @@ doDialogSqrInfoStreet:
 		RTS
 		
 
+;-------------------------------------------------------------------------------
 dialogDlgSqrInfo0Draw:
+;-------------------------------------------------------------------------------
 		JSR	screenBeginButtons
 		
 		LDA	game + GAME::sSelect
@@ -21111,6 +21558,7 @@ dialogDlgSqrInfo0Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 dialogTempPStats0:
 			.byte	$00
 
@@ -21134,53 +21582,76 @@ dialogStrPStats8:
 			.byte	$06, $A0, $A0, $A0, $A0, $A0, $A0
 dialogStrPStats9:
 			.byte	$06, $A0, $A0, $A0, $A0, $A0, $A0
+			
+dialogStrRefPStats0:
+			.word	dialogStrPStats0
+dialogStrRefPStats1:
+			.word	dialogStrPStats1
+dialogStrRefPStats2:
+			.word	dialogStrPStats2
+dialogStrRefPStats3:
+			.word	dialogStrPStats3
+dialogStrRefPStats4:
+			.word	dialogStrPStats4
+dialogStrRefPStats5:
+			.word	dialogStrPStats5
+dialogStrRefPStats6:
+			.word	dialogStrPStats6
+dialogStrRefPStats7:
+			.word	dialogStrPStats7
+dialogStrRefPStats8:
+			.word	dialogStrPStats8
+dialogStrRefPStats9:
+			.word	dialogStrPStats9
 		
 dialogWindowPStats0:
 			.byte 	$90, $0B, $06
 			.word		strText0PStats0
 			.byte 	$90, $17, $06
-			.word		dialogStrPStats0
+			.word		dialogStrRefPStats0
 			.byte 	$90, $0B, $07
 			.word		strText1PStats0
 			.byte 	$90, $17, $07
-			.word		dialogStrPStats1
+			.word		dialogStrRefPStats1
 			.byte 	$90, $0B, $09
 			.word		strText2PStats0
 			.byte 	$90, $17, $09
-			.word		dialogStrPStats2
+			.word		dialogStrRefPStats2
 			.byte 	$90, $0B, $0A
 			.word		strText3PStats0
 			.byte 	$90, $17, $0A
-			.word		dialogStrPStats3
+			.word		dialogStrRefPStats3
 			.byte 	$90, $0B, $0B
 			.word		strText4PStats0
 			.byte 	$90, $17, $0B
-			.word		dialogStrPStats4
+			.word		dialogStrRefPStats4
 			.byte 	$90, $0B, $0C
 			.word		strText5PStats0
 			.byte 	$90, $17, $0C
-			.word		dialogStrPStats5
+			.word		dialogStrRefPStats5
 			.byte 	$90, $0B, $0E
 			.word		strText6PStats0
 			.byte 	$90, $17, $0E
-			.word		dialogStrPStats6
+			.word		dialogStrRefPStats6
 			.byte 	$90, $0B, $0F
 			.word		strText7PStats0
 			.byte 	$90, $17, $0F
-			.word		dialogStrPStats7
+			.word		dialogStrRefPStats7
 			.byte 	$90, $0B, $10
 			.word		strText8PStats0
 			.byte 	$90, $17, $10
-			.word		dialogStrPStats8
+			.word		dialogStrRefPStats8
 			.byte 	$90, $0B, $12
 			.word		strText9PStats0
 			.byte 	$90, $17, $12
-			.word		dialogStrPStats9
+			.word		dialogStrRefPStats9
 
 			.byte 	$00
 
 
+;-------------------------------------------------------------------------------
 dialogDlgPStats0Draw:
+;-------------------------------------------------------------------------------
 		JSR	screenBeginButtons
 		
 		LDA	#$2F
@@ -21193,9 +21664,9 @@ dialogDlgPStats0Draw:
 		
 		LDX	menuPlyrSelSelect
 		
-		LDA	plrNameLo, X
+		LDA	plrNameRefLo, X
 		STA	dialogWindowSqrInfoT0
-		LDA	plrNameHi, X
+		LDA	plrNameRefHi, X
 		STA	dialogWindowSqrInfoT0 + 1
 		
 		LDA	#<strDummyDummy0
@@ -21472,6 +21943,7 @@ dialogDlgPStats0Draw:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 dialogWindowNullP:
 			.byte	$02, $90, $A0
 			
@@ -21494,7 +21966,9 @@ dialogWindowNull0:
 			.byte	$00
 
 
+;-------------------------------------------------------------------------------
 dialogDlgNull0Draw:
+;-------------------------------------------------------------------------------
 		LDA	cpuFaultPlayer
 		CLC
 		ADC	#$B0
@@ -22934,6 +23408,7 @@ boardGenImprvPerf:
 ;FOR RULES.S
 ;===============================================================================
 
+;-------------------------------------------------------------------------------
 rulesCCCrdProcsLo:
 			.byte	<rulesCCCrdProcDummy	;none
 			.byte	<rulesCCCrdProcInc	;get cash
@@ -24273,8 +24748,9 @@ rulesLandStreet:
 		RTS
 		
 		
-		
+;-------------------------------------------------------------------------------
 rulesLandStatn:		
+;-------------------------------------------------------------------------------
 		TAX
 		LDA	rulesGrpLo, X
 		STA	$FD
@@ -24360,7 +24836,9 @@ rulesLandStatn:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 rulesLandUtil:
+;-------------------------------------------------------------------------------
 		TAX
 		LDA	rulesGrpLo, X
 		STA	$FD
@@ -24434,11 +24912,15 @@ rulesLandUtil:
 		RTS
 
 
+;-------------------------------------------------------------------------------
 rulesCCCrdProcDummy:				;none
+;-------------------------------------------------------------------------------
 		RTS
 
 
+;-------------------------------------------------------------------------------
 rulesCCCrdProcInc:				;get cash
+;-------------------------------------------------------------------------------
 		LDA	dialogCCCCardTemp0 + 1
 		STA	game + GAME::varD
 		LDA	#$00
@@ -31716,7 +32198,7 @@ numConvPRTSGN:
 
 ;de	I'm pretty sure we have a problem below and this will help fix it
 ;		STX 	numConvLEAD0       	;INIT LEAD0 TO NON-NEG
-		LDA	%10000000
+		LDA	#%10000000
 		STA	numConvLEAD0
 		
 ;
@@ -32271,6 +32753,7 @@ v_plus_1:        .word 0
 ;FOR INIT.S
 ;===============================================================================
 
+;-------------------------------------------------------------------------------
 plrDefName:
 			.byte 	$08, $90, $8C, $81, $99, $85, $92, $E4, $B0
 cpuDefName:
@@ -32582,7 +33065,9 @@ initDialog:
 ;==============================================================================
 ;FOR DEBUG.S
 ;==============================================================================
+
 	.if	DEBUG_HEAP
+;-------------------------------------------------------------------------------
 debugHeapHigh:
 	.word	$0000
 debugHeapSize:
@@ -32759,7 +33244,9 @@ debugCheckKeyEnqueue:
 		RTS
 	.endif
 
+
 	.if	DEBUG_DICE
+;-------------------------------------------------------------------------------
 debugDiceTotal:
 	.word	$0000
 debugDiceDoubles:
@@ -32834,7 +33321,9 @@ debugTallyDie:
 		RTS
 	.endif
 
+
 	.if	DEBUG_EQUITY
+;-------------------------------------------------------------------------------
 debugEquityEntry:
 	.byte	$00
 debugEquityTally:
@@ -33021,6 +33510,114 @@ debugCheckEquity:
 	.endif
 
 
+strText0Ref0:		;SELECT LANGUAGE:	$10
+			.byte $13, $05, $0C, $05, $03, $14, $20
+			.byte $0C, $01, $0E, $07, $15, $01, $07, $05
+			.byte $3A
+strText1Ref0:		;  A - ENGLISH (AMERICAN) $18
+			.byte $20, $20, $01, $20, $2D, $20, $05
+			.byte $0E, $07, $0C, $09, $13, $08, $20, $28
+			.byte $01, $0D, $05, $12, $09, $03, $01, $0E
+			.byte $29
+strText2Ref0:		;  B - ENGLISH (UK) $12
+			.byte $20, $20, $02, $20, $2D, $20, $05
+			.byte $0E, $07, $0C, $09, $13, $08, $20, $28
+			.byte $15, $0B, $29
+
+
+;-------------------------------------------------------------------------------
+initGetLanguage:
+;-------------------------------------------------------------------------------
+		LDA	#$00
+		STA	$A3
+		
+		LDA	#<(1024 + 40)
+		STA	$FB
+		LDA	#>(1024 + 40)
+		STA	$FC
+		
+		LDA	#<strText0Ref0
+		STA	$FD
+		LDA	#>strText0Ref0
+		STA	$FE
+		
+		LDY	#$0F
+		JSR	initOutString		
+
+		LDA	#<(1024 + 80)
+		STA	$FB
+		LDA	#>(1024 + 80)
+		STA	$FC
+		
+		LDA	#<strText1Ref0
+		STA	$FD
+		LDA	#>strText1Ref0
+		STA	$FE
+		
+		LDY	#$17
+		JSR	initOutString		
+
+		LDA	#<(1024 + 120)
+		STA	$FB
+		LDA	#>(1024 + 120)
+		STA	$FC
+		
+		LDA	#<strText2Ref0
+		STA	$FD
+		LDA	#>strText2Ref0
+		STA	$FE
+		
+		LDY	#$11
+		JSR	initOutString		
+
+@loop:
+		JSR	$FFE4
+		BEQ	@loop
+
+		CMP	#'A'
+		BEQ	@exit
+		
+		CMP	#'B'
+		BNE	@loop
+		
+		LDA	#$01
+		STA	$A3
+		
+		LDA	#'E'
+		STA	REFFILE_2 - 1
+		STA	FILENAME_2 - 1
+
+@exit:
+		LDA	#$93			;clear screen
+		JSR	krnlOutChr
+		
+		RTS
+
+
+REFFILE:
+		.byte	"STRREFSU"
+REFFILE_2:
+
+;-------------------------------------------------------------------------------
+initCheckStrRefs:
+;-------------------------------------------------------------------------------
+		LDA	$A3
+		BEQ	@exit
+		
+		LDA	#REFFILE_2 - REFFILE
+		STA	$A3
+		LDA	#<REFFILE
+		STA	$A4
+		LDA	#>REFFILE
+		STA	$A5
+
+		JSR	initLoadFile
+		
+@exit:
+		RTS
+		
+
+
 ;===============================================================================
 ;HEAP
 ;===============================================================================
@@ -33032,16 +33629,6 @@ heap0:
 ;DISCARD.S
 ;===============================================================================
 
-;screenLoad0:
-;			.byte	$11, $00, $00, $28, $19
-;			.byte	$90, $00, $01
-;			.word	strText0Load0
-;			.byte	$00
-;screenLoad1:
-;			.byte	$90, $00, $02
-;			.word	strText0Load1
-;			.byte	$00
-;			
 strText0Load0:		;LOADING RESOURCES...
 			.byte $0C, $0F, $01, $04, $09, $0E, $07
 			.byte $20, $12, $05, $13, $0F, $15, $12, $03
@@ -33052,7 +33639,7 @@ strText0Load1:		;LOADING RULES...
 			.byte $2E
 
 FILENAME:
-		.byte	"STRINGS"
+		.byte	"STRINGSU"
 FILENAME_2:
 		.byte	"RULES"
 FILENAME_3:
@@ -33093,6 +33680,29 @@ initOutString:
 
 
 ;-------------------------------------------------------------------------------
+initLoadFile:
+;-------------------------------------------------------------------------------
+		LDA	#$01
+		LDX	#$08
+		LDY	#$01
+		
+		JSR	krnlSetLFS
+		
+		LDA	$A3
+		LDX	$A4
+		LDY	$A5
+		
+		JSR	krnlSetNam
+		
+		LDA	#$00
+		JSR	krnlLoad
+		
+		JSR	knrlClAll
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
 initDataLoad:
 ;-------------------------------------------------------------------------------
 		LDA	#$8E			;go to uppercase characters
@@ -33101,6 +33711,8 @@ initDataLoad:
 		JSR	krnlOutChr
 		LDA	#$93			;clear screen
 		JSR	krnlOutChr
+		
+		JSR	initGetLanguage
 		
 		LDA	#<(1024 + 40)
 		STA	$FB
@@ -33115,42 +33727,28 @@ initDataLoad:
 		LDY	#$13
 		JSR	initOutString
 
-		LDA	#$01
-		LDX	#$08
-		LDY	#$01
-		
-		JSR	krnlSetLFS
-		
+		JSR	initCheckStrRefs
+
 		LDA	#FILENAME_2 - FILENAME
-		LDX	#<FILENAME
-		LDY	#>FILENAME
+		STA	$A3
+		LDA	#<FILENAME
+		STA	$A4
+		LDA	#>FILENAME
+		STA	$A5
+		
+		JSR	initLoadFile
 
-		JSR	krnlSetNam
-		
-		LDA	#$00
-		
-		JSR	krnlLoad
-		
-		JSR	knrlClAll
-
-		LDA	#$01
-		LDX	#$08
-		LDY	#$01
-		
-		JSR	krnlSetLFS
-		
 		LDA	#FILENAME_4 - FILENAME_3
-		LDX	#<FILENAME_3
-		LDY	#>FILENAME_3
+		STA	$A3
+		LDA	#<FILENAME_3
+		STA	$A4
+		LDA	#>FILENAME_3
+		STA	$A5
+		
+		JSR	initLoadFile
 
 		JSR	krnlSetNam
 		
-		LDA	#$00
-		
-		JSR	krnlLoad
-		
-		JSR	knrlClAll
-
 		LDA	#<(1024 + 80)
 		STA	$FB
 		LDA	#>(1024 + 80)
@@ -33164,23 +33762,14 @@ initDataLoad:
 		LDY	#$0F
 		JSR	initOutString
 
-		LDA	#$01
-		LDX	#$08
-		LDY	#$01
-		
-		JSR	krnlSetLFS
-		
 		LDA	#FILENAME_3 - FILENAME_2
-		LDX	#<FILENAME_2
-		LDY	#>FILENAME_2
+		STA	$A3
+		LDA	#<FILENAME_2
+		STA	$A4
+		LDA	#>FILENAME_2
+		STA	$A5
 
-		JSR	krnlSetNam
-		
-		LDA	#$00
-	
-		JSR	krnlLoad
-		
-		JSR	knrlClAll
+		JSR	initLoadFile
 
 		RTS
 
@@ -33396,6 +33985,6 @@ sprPointer:
 ;			.byte 	%00000000, %00000000, %00000000
 ;			.byte	$00
 
-	.assert		(* - heap0) <= 512, error, "Discard too large!"
+	.assert		(* - heap0) <= 512, error, .concat("Discard too large! ", .string(* - heap0))
 
 	.assert         * <= $D000, error, "Program too large!"

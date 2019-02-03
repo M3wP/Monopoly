@@ -5,41 +5,39 @@
 	.code
 	.org	$E000
 
+strDummyDummy0:
+			.byte	$00
+
 strHeaderTitles0:	;M O N O P O L Y
 			.byte $0F, $8D, $A0, $8F, $A0, $8E, $A0, $8F
 			.byte $A0, $90, $A0, $8F, $A0, $8C, $A0, $99
 			
-;***These should be strTextNTitles0, doh...
-
-strDesc0Titles0:	;BY
+strText0Titles0:	;BY
 			.byte $02, $82, $99			
-strDesc1Titles0:	;DANIEL ENGLAND
+strText1Titles0:	;DANIEL ENGLAND
 			.byte $0E, $84, $81, $8E, $89, $85, $8C, $A0
 			.byte $85, $8E, $87, $8C, $81, $8E, $84
-strDesc2Titles0:	;FOR
+strText2Titles0:	;FOR
 			.byte $03, $86, $8F, $92
-strDesc3Titles0:	;ECCLESTIAL
+strText3Titles0:	;ECCLESTIAL
 			.byte $0A, $85, $83, $83, $8C, $85, $93, $94
 			.byte $89, $81, $8C
-strDesc4Titles0:	;SOLUTIONS
+strText4Titles0:	;SOLUTIONS
 			.byte $09, $93, $8F, $8C, $95, $94, $89, $8F
 			.byte $8E, $93	
-strDesc8Titles0:	;VERSION 0.02.68B
+strText8Titles0:	;VERSION 0.02.74B
 			.byte $10, $96, $85, $92, $93, $89, $8F, $8E
-			.byte $A0, $B0, $AE, $B0, $B2, $AE, $B6, $B8
+			.byte $A0, $B0, $AE, $B0, $B2, $AE, $B7, $B4
 			.byte $82			
-strDesc5Titles0:	;(C) 1935, 2016
+strText5Titles0:	;(C) 1935, 2016
 			.byte $0E, $A8, $83, $A9, $A0, $B1, $B9, $B3
 			.byte $B5, $AC, $A0, $B2, $B0, $B1, $B6			
-strDesc6Titles0:	;HASBRO
+strText6Titles0:	;HASBRO
 			.byte $06, $88, $81, $93, $82, $92, $8F
-strDesc7Titles0:	;PRESS ANY KEY
+strText7Titles0:	;PRESS ANY KEY
 			.byte $0D, $90, $92, $85, $93, $93, $A0, $81
 			.byte $8E, $99, $A0, $8B, $85, $99
 
-
-strDummyDummy0:
-			.byte	$00
 
 strText0NumConv0:	;INTERNAL ERROR (OVERFLOW)
 			.byte $19, $09, $0E, $14, $05, $12, $0E, $01
@@ -189,10 +187,10 @@ strOptn2Setup6:		;M - LMTD MONEY
 			.byte $0E, $8D, $A0, $AD, $A0, $8C, $8D, $94
 			.byte $84, $A0, $8D, $8F, $8E, $85, $99
 		
-strText0Setup6:		;  NO
-			.byte $04, $A0, $A0, $8E, $8F
-strText1Setup6:		;  YES
-			.byte $05, $A0, $A0, $99, $85, $93
+strText0Setup6:		;NO
+			.byte $02, $8E, $8F
+strText1Setup6:		;YES
+			.byte $03, $99, $85, $93
 			
 
 strHeaderSetup7:	;INPUT CONFIG
@@ -242,19 +240,17 @@ strHeaderStart0:	;GAME STARTING
 			.byte $0D, $87, $81, $8D, $85, $A0, $93, $94
 			.byte $81, $92, $94, $89, $8E, $87
 			
-strText0Start0:		;PLAYER_1 GOES FIRST
-			.byte $13, $90, $8C, $81, $99, $85, $92, $E4
-			.byte $B1, $A0, $87, $8F, $85, $93, $A0, $86
-			.byte $89, $92, $93, $94
+strText0Start0:		;GOES FIRST
+			.byte $0A, $87, $8F, $85, $93, $A0, $86, $89
+			.byte $92, $93, $94
 			
 
 strHeaderWaitFor0:	;PLAYER CHANGED
 			.byte $0E, $90, $8C, $81, $99, $85, $92, $A0
 			.byte $83, $88, $81, $8E, $87, $85, $84
 
-strText0WaitFor0:	;PLAYER_1, IT IS NOW
-			.byte $13, $90, $8C, $81, $99, $85, $92, $E4
-			.byte $B1, $AC, $A0, $89, $94, $A0, $89, $93
+strText0WaitFor0:	;, IT IS NOW
+			.byte $0B, $AC, $A0, $89, $94, $A0, $89, $93
 			.byte $A0, $8E, $8F, $97
 strText1WaitFor0:	;YOUR TURN!
 			.byte $0A, $99, $8F, $95, $92, $A0, $94, $95
@@ -623,15 +619,13 @@ strHeaderElimin0:	;PLAYER ELIMINATED
 			.byte $85, $8C, $89, $8D, $89, $8E, $81, $94
 			.byte $85, $84
 			
-strDescElimin0:		;DEFEATED BY PLAYER 1
-			.byte $14, $84, $85, $86, $85, $81, $94, $85
-			.byte $84, $A0, $82, $99, $A0, $90, $8C, $81
-			.byte $99, $85, $92, $A0, $B1
+strDescElimin0:		;DEFEATED BY
+			.byte $0B, $84, $85, $86, $85, $81, $94, $85
+			.byte $84, $A0, $82, $99
 			
-strText0Elimin0:	;PLAYER_1 ELIMINATED!
-			.byte $14, $90, $8C, $81, $99, $85, $92, $E4
-			.byte $B1, $A0, $85, $8C, $89, $8D, $89, $8E
-			.byte $81, $94, $85, $84, $A1
+strText0Elimin0:	;ELIMINATED!
+			.byte $0B, $85, $8C, $89, $8D, $89, $8E, $81
+			.byte $94, $85, $84, $A1
 			
 strHeaderElimin1:	;ERROR!
 			.byte $06, $85, $92, $92, $8F, $92, $A1
@@ -654,9 +648,8 @@ strHeaderGameOver0:	;GAME OVER
 			.byte $09, $87, $81, $8D, $85, $A0, $8F, $96
 			.byte $85, $92
 
-strText0GameOver0:	;PLAYER_1 WINS!
-			.byte $0E, $90, $8C, $81, $99, $85, $92, $E4
-			.byte $B1, $A0, $97, $89, $8E, $93, $A1
+strText0GameOver0:	;WINS!
+			.byte $05, $97, $89, $8E, $93, $A1
 
 
 strHeaderQuit0:		;QUIT INITIATION
@@ -710,194 +703,187 @@ strHeaderCCCCard1:	;CHANCE
 			.byte $06, $83, $88, $81, $8E, $83, $85
 
 
-;***dengland		These should actually be strTextNChestN... doh
-
-strDesc0Chest0:		;BANK ERROR
+strText0Chest0:		;BANK ERROR
 			.byte $0A, $82, $81, $8E, $8B, $A0, $85, $92
 			.byte $92, $8F, $92
-strDesc1Chest0:		;IN YOUR FAVOUR.
+strText1Chest0:		;IN YOUR FAVOUR.
 			.byte $0F, $89, $8E, $A0, $99, $8F, $95, $92
 			.byte $A0, $86, $81, $96, $8F, $95, $92, $AE
-strDesc0Chest1:		;ADVANCE TO GO
+strText0Chest1:		;ADVANCE TO GO
 			.byte $0D, $81, $84, $96, $81, $8E, $83, $85
 			.byte $A0, $94, $8F, $A0, $87, $8F
-strDesc1Chest1:		;(COLLECT $200)
+strText1Chest1:		;(COLLECT $200)
 			.byte $0E, $A8, $83, $8F, $8C, $8C, $85, $83
 			.byte $94, $A0, $A4, $B2, $B0, $B0, $A9
-strDesc0Chest2:		;YOU ARE ASSESSED
+strText0Chest2:		;YOU ARE ASSESSED
 			.byte $10, $99, $8F, $95, $A0, $81, $92, $85
 			.byte $A0, $81, $93, $93, $85, $93, $93, $85
 			.byte $84
-strDesc1Chest2:		;FOR STREET REPAIRS:
+strText1Chest2:		;FOR STREET REPAIRS:
 			.byte $13, $86, $8F, $92, $A0, $93, $94, $92
 			.byte $85, $85, $94, $A0, $92, $85, $90, $81
 			.byte $89, $92, $93, $BA
-strDesc0Chest3:		;YOU HAVE WON SECOND
+strText0Chest3:		;YOU HAVE WON SECOND
 			.byte $13, $99, $8F, $95, $A0, $88, $81, $96
 			.byte $85, $A0, $97, $8F, $8E, $A0, $93, $85
 			.byte $83, $8F, $8E, $84
-strDesc1Chest3:		;PRIZE IN A BEAUTY
+strText1Chest3:		;PRIZE IN A BEAUTY
 			.byte $11, $90, $92, $89, $9A, $85, $A0, $89
 			.byte $8E, $A0, $81, $A0, $82, $85, $81, $95
 			.byte $94, $99
-strDesc2Chest3:		;CONTEST.
+strText2Chest3:		;CONTEST.
 			.byte $08, $83, $8F, $8E, $94, $85, $93, $94
 			.byte $AE
-strDesc0Chest4:		;SALE OF STOCK.
+strText0Chest4:		;SALE OF STOCK.
 			.byte $0E, $93, $81, $8C, $85, $A0, $8F, $86
 			.byte $A0, $93, $94, $8F, $83, $8B, $AE
-strDesc0Chest5:		;INHERITANCE.
+strText0Chest5:		;INHERITANCE.
 			.byte $0C, $89, $8E, $88, $85, $92, $89, $94
 			.byte $81, $8E, $83, $85, $AE
-strDesc0Chest6:		;ITS YOUR BIRTHDAY.
+strText0Chest6:		;ITS YOUR BIRTHDAY.
 			.byte $12, $89, $94, $93, $A0, $99, $8F, $95
 			.byte $92, $A0, $82, $89, $92, $94, $88, $84
 			.byte $81, $99, $AE
-strDesc0Chest7:		;CONSULTANCY FEE.
+strText0Chest7:		;CONSULTANCY FEE.
 			.byte $10, $83, $8F, $8E, $93, $95, $8C, $94
 			.byte $81, $8E, $83, $99, $A0, $86, $85, $85
 			.byte $AE
-strDesc0Chest8:		;GO DIRECTLY TO GAOL.
+strText0Chest8:		;GO DIRECTLY TO GAOL.
 			.byte $14, $87, $8F, $A0, $84, $89, $92, $85
 			.byte $83, $94, $8C, $99, $A0, $94, $8F, $A0
 			.byte $87, $81, $8F, $8C, $AE
-strDesc1Chest8:		;DO NOT PASS GO.
+strText1Chest8:		;DO NOT PASS GO.
 			.byte $0F, $84, $8F, $A0, $8E, $8F, $94, $A0
 			.byte $90, $81, $93, $93, $A0, $87, $8F, $AE
-strDesc2Chest8:		;DO NOT COLLECT $200.
+strText2Chest8:		;DO NOT COLLECT $200.
 			.byte $14, $84, $8F, $A0, $8E, $8F, $94, $A0
 			.byte $83, $8F, $8C, $8C, $85, $83, $94, $A0
 			.byte $A4, $B2, $B0, $B0, $AE
-strDesc0Chest9:		;HOSPITAL FEES.
+strText0Chest9:		;HOSPITAL FEES.
 			.byte $0E, $88, $8F, $93, $90, $89, $94, $81
 			.byte $8C, $A0, $86, $85, $85, $93, $AE
-strDesc0ChestA:		;INCOME TAX REFUND.
+strText0ChestA:		;INCOME TAX REFUND.
 			.byte $12, $89, $8E, $83, $8F, $8D, $85, $A0
 			.byte $94, $81, $98, $A0, $92, $85, $86, $95
 			.byte $8E, $84, $AE
-strDesc0ChestB:		;SCHOOL FEES.
+strText0ChestB:		;SCHOOL FEES.
 			.byte $0C, $93, $83, $88, $8F, $8F, $8C, $A0
 			.byte $86, $85, $85, $93, $AE
-strDesc0ChestC:		;LIFE INSURANCE MATURES.
+strText0ChestC:		;LIFE INSURANCE MATURES.
 			.byte $17, $8C, $89, $86, $85, $A0, $89, $8E
 			.byte $93, $95, $92, $81, $8E, $83, $85, $A0
 			.byte $8D, $81, $94, $95, $92, $85, $93, $AE
-strDesc1ChestC	=	strDummyDummy0
-strDesc0ChestD:		;HOLIDAY FUND MATURES.
+;strText1ChestC	=	strDummyDummy0
+strText0ChestD:		;HOLIDAY FUND MATURES.
 			.byte $15, $88, $8F, $8C, $89, $84, $81, $99
 			.byte $A0, $86, $95, $8E, $84, $A0, $8D, $81
 			.byte $94, $95, $92, $85, $93, $AE
-strDesc1ChestD	=	strDummyDummy0
-strDesc0ChestE:		;DOCTORS'S FEES.
+;strText1ChestD	=	strDummyDummy0
+strText0ChestE:		;DOCTORS'S FEES.
 			.byte $0F, $84, $8F, $83, $94, $8F, $92, $93
 			.byte $A7, $93, $A0, $86, $85, $85, $93, $AE
-strDesc0ChestF:		;GET OUT OF GAOL FREE.
+strText0ChestF:		;GET OUT OF GAOL FREE.
 			.byte $15, $87, $85, $94, $A0, $8F, $95, $94
 			.byte $A0, $8F, $86, $A0, $87, $81, $8F, $8C
 			.byte $A0, $86, $92, $85, $85, $AE
-strDesc1ChestF:		;MAY BE KEPT UNTIL
+strText1ChestF:		;MAY BE KEPT UNTIL
 			.byte $11, $8D, $81, $99, $A0, $82, $85, $A0
 			.byte $8B, $85, $90, $94, $A0, $95, $8E, $94
 			.byte $89, $8C
-strDesc2ChestF:		;NEEDED OR TRADED.
+strText2ChestF:		;NEEDED OR TRADED.
 			.byte $11, $8E, $85, $85, $84, $85, $84, $A0
 			.byte $8F, $92, $A0, $94, $92, $81, $84, $85
 			.byte $84, $AE
 
 
-;***dengland		These should actually be strTextNChanceN... doh
-
-strDesc0Chance0:	;ADVANCE TO THE
+strText0Chance0:	;ADVANCE TO THE
 			.byte $0E, $81, $84, $96, $81, $8E, $83, $85
 			.byte $A0, $94, $8F, $A0, $94, $88, $85
-strDesc1Chance0:	;NEAREST STATION.
+strText1Chance0:	;NEAREST STATION.
 			.byte $10, $8E, $85, $81, $92, $85, $93, $94
 			.byte $A0, $93, $94, $81, $94, $89, $8F, $8E
 			.byte $AE			
-strDesc2Chance0:	;IF OWNED, PAY DOUBLE.
+strText2Chance0:	;IF OWNED, PAY DOUBLE.
 			.byte $15, $89, $86, $A0, $8F, $97, $8E, $85
 			.byte $84, $AC, $A0, $90, $81, $99, $A0, $84
 			.byte $8F, $95, $82, $8C, $85, $AE
-strDesc0Chance1 =	strDesc0Chance0
-strDesc1Chance1 =	strDesc1Chance0
-strDesc2Chance1 =	strDesc2Chance0
-strDesc0Chance2:	;SPEEDING FINE.
+strText0Chance1 =	strText0Chance0
+strText1Chance1 =	strText1Chance0
+strText2Chance1 =	strText2Chance0
+strText0Chance2:	;SPEEDING FINE.
 			.byte $0E, $93, $90, $85, $85, $84, $89, $8E
 			.byte $87, $A0, $86, $89, $8E, $85, $AE
-strDesc0Chance3:	;GO BACK THREE SPACES.
+strText0Chance3:	;GO BACK THREE SPACES.
 			.byte $15, $87, $8F, $A0, $82, $81, $83, $8B
 			.byte $A0, $94, $88, $92, $85, $85, $A0, $93
 			.byte $90, $81, $83, $85, $93, $AE
-strDesc1Chance3	=	strDummyDummy0
-strDesc0Chance4:	;YOU HAVE BEEN ELECTED
+strText0Chance4:	;YOU HAVE BEEN ELECTED
 			.byte $15, $99, $8F, $95, $A0, $88, $81, $96
 			.byte $85, $A0, $82, $85, $85, $8E, $A0, $85
 			.byte $8C, $85, $83, $94, $85, $84
-strDesc1Chance4:	;CHAIRMAN OF THE BOARD.
+strText1Chance4:	;CHAIRMAN OF THE BOARD.
 			.byte $16, $83, $88, $81, $89, $92, $8D, $81
 			.byte $8E, $A0, $8F, $86, $A0, $94, $88, $85
 			.byte $A0, $82, $8F, $81, $92, $84, $AE
-strDesc0Chance5:	;ADVANCE TO:
+strText0Chance5:	;ADVANCE TO:
 			.byte $0B, $81, $84, $96, $81, $8E, $83, $85
 			.byte $A0, $94, $8F, $BA
-strDesc1Chance5:	;  PALL MALL.
+strText1Chance5:	;  PALL MALL.
 			.byte $0C, $A0, $A0, $90, $81, $8C, $8C, $A0
 			.byte $8D, $81, $8C, $8C, $AE
-;strDesc2Chance5:	;YOU MAY COLLECT SALARY.
+;strText2Chance5:	;YOU MAY COLLECT SALARY.
 ;			.byte $17, $99, $8F, $95, $A0, $8D, $81, $99
 ;			.byte $A0, $83, $8F, $8C, $8C, $85, $83, $94
 ;			.byte $A0, $93, $81, $8C, $81, $92, $99, $AE
-strDesc0Chance6	=	strDesc0ChestF
-strDesc1Chance6	=	strDesc1ChestF
-strDesc2Chance6	=	strDesc2ChestF
-strDesc0Chance7:	;MAKE GENERAL REPAIRS
+strText0Chance6	=	strText0ChestF
+strText1Chance6	=	strText1ChestF
+strText2Chance6	=	strText2ChestF
+strText0Chance7:	;MAKE GENERAL REPAIRS
 			.byte $14, $8D, $81, $8B, $85, $A0, $87, $85
 			.byte $8E, $85, $92, $81, $8C, $A0, $92, $85
 			.byte $90, $81, $89, $92, $93
-strDesc1Chance7:	;ON ALL YOUR PROPERTY:
+strText1Chance7:	;ON ALL YOUR PROPERTY:
 			.byte $15, $8F, $8E, $A0, $81, $8C, $8C, $A0
 			.byte $99, $8F, $95, $92, $A0, $90, $92, $8F
 			.byte $90, $85, $92, $94, $99, $BA
-strDesc0Chance8:	;BANK DIVIDEND.
+strText0Chance8:	;BANK DIVIDEND.
 			.byte $0E, $82, $81, $8E, $8B, $A0, $84, $89
 			.byte $96, $89, $84, $85, $8E, $84, $AE
-strDesc0Chance9	=	strDesc0Chest1
-strDesc1Chance9 =	strDesc1Chest1
-strDesc0ChanceA	=	strDesc0Chest8
-strDesc1ChanceA	=	strDesc1Chest8
-strDesc2ChanceA	=	strDesc2Chest8
-strDesc0ChanceB	=	strDesc0Chance0
-strDesc1ChanceB:	;NEAREST UTILITY.
+strText0Chance9	=	strText0Chest1
+strText1Chance9 =	strText1Chest1
+strText0ChanceA	=	strText0Chest8
+strText1ChanceA	=	strText1Chest8
+strText2ChanceA	=	strText2Chest8
+strText0ChanceB	=	strText0Chance0
+strText1ChanceB:	;NEAREST UTILITY.
 			.byte $10, $8E, $85, $81, $92, $85, $93, $94
 			.byte $A0, $95, $94, $89, $8C, $89, $94, $99
 			.byte $AE
-strDesc2ChanceB:	;IF OWNED, PAY 10* DICE.
+strText2ChanceB:	;IF OWNED, PAY 10* DICE.
 			.byte $17, $89, $86, $A0, $8F, $97, $8E, $85
 			.byte $84, $AC, $A0, $90, $81, $99, $A0, $B1
 			.byte $B0, $AA, $A0, $84, $89, $83, $85, $AE
-strDesc0ChanceC =	strDesc0Chance5
-strDesc1ChanceC:	;  TRAFALGAR SQUARE.
+strText0ChanceC =	strText0Chance5
+strText1ChanceC:	;  TRAFALGAR SQUARE.
 			.byte $13, $A0, $A0, $94, $92, $81, $86, $81
 			.byte $8C, $87, $81, $92, $A0, $93, $91, $95
 			.byte $81, $92, $85, $AE
-;strDesc2ChanceC = 	strDesc2Chance5
-strDesc0ChanceD:	;YOUR BUILDING LOAN
+strText0ChanceD:	;YOUR BUILDING LOAN
 			.byte $12, $99, $8F, $95, $92, $A0, $82, $95
 			.byte $89, $8C, $84, $89, $8E, $87, $A0, $8C
 			.byte $8F, $81, $8E
-strDesc1ChanceD:	;MATURES.
+strText1ChanceD:	;MATURES.
 			.byte $08, $8D, $81, $94, $95, $92, $85, $93
 			.byte $AE
-strDesc0ChanceE:	;TAKE A TRIP TO
+strText0ChanceE:	;TAKE A TRIP TO
 			.byte $0E, $94, $81, $8B, $85, $A0, $81, $A0
 			.byte $94, $92, $89, $90, $A0, $94, $8F
-strDesc1ChanceE:	;KINGS CROSS STATION.
+strText1ChanceE:	;KINGS CROSS STATION.
 			.byte $14, $8B, $89, $8E, $87, $93, $A0, $83
 			.byte $92, $8F, $93, $93, $A0, $93, $94, $81
 			.byte $94, $89, $8F, $8E, $AE
-;strDesc2ChanceE = 	strDesc2Chance5
-strDesc0ChanceF =	strDesc0Chance5
-strDesc1ChanceF:	;  MAYFAIR.
+strText0ChanceF =	strText0Chance5
+strText1ChanceF:	;  MAYFAIR.
 			.byte $0A, $A0, $A0, $8D, $81, $99, $86, $81
 			.byte $89, $92, $AE
 
@@ -1150,39 +1136,35 @@ strText4Crnr3:		;YOUR NEXT TURN.
 			.byte $98, $94, $A0, $94, $95, $92, $8E, $AE
 
 
-;***dengland		These should actually be strTextNChest10... doh
-
-strText0Chest0:		;A TREASURE TROVE
+strText0Chest10:	;A TREASURE TROVE
 			.byte $10, $81, $A0, $94, $92, $85, $81, $93
 			.byte $95, $92, $85, $A0, $94, $92, $8F, $96
 			.byte $85
-strText1Chest0:		;BUT BEWARE!
+strText1Chest10:	;BUT BEWARE!
 			.byte $0B, $82, $95, $94, $A0, $82, $85, $97
 			.byte $81, $92, $85, $A1
-strText2Chest0	=	strDummyDummy0
-strText3Chest0:		;A DECK OF 16 CARDS
+strText2Chest10	=	strDummyDummy0
+strText3Chest10:	;A DECK OF 16 CARDS
 			.byte $12, $81, $A0, $84, $85, $83, $8B, $A0
 			.byte $8F, $86, $A0, $B1, $B6, $A0, $83, $81
 			.byte $92, $84, $93
-strText4Chest0:		;RANDOMLY SHUFFLED.
+strText4Chest10:	;RANDOMLY SHUFFLED.
 			.byte $12, $92, $81, $8E, $84, $8F, $8D, $8C
 			.byte $99, $A0, $93, $88, $95, $86, $86, $8C
 			.byte $85, $84, $AE
 
 
-;***dengland		These should actually be strTextNChance10... doh
-
-strText0Chance0:	;A MYSTERY BOX OF
+strText0Chance10:	;A MYSTERY BOX OF
 			.byte $10, $81, $A0, $8D, $99, $93, $94, $85
 			.byte $92, $99, $A0, $82, $8F, $98, $A0, $8F
 			.byte $86
-strText1Chance0:	;DIFFERENT EVENTS.
+strText1Chance10:	;DIFFERENT EVENTS.
 			.byte $11, $84, $89, $86, $86, $85, $92, $85
 			.byte $8E, $94, $A0, $85, $96, $85, $8E, $94
 			.byte $93, $AE
-strText2Chance0	=	strDummyDummy0
-strText3Chance0	=	strText3Chest0
-strText4Chance0	=	strText4Chest0
+strText2Chance10 = 	strDummyDummy0
+strText3Chance10 = 	strText3Chest10
+strText4Chance10 = 	strText4Chest10
 
 
 strText0Tax0:		;YOU MUST PAY THE

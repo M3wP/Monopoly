@@ -1,6 +1,6 @@
 # MONOPOLY 
 
-VERSION 0.02.68 BETA
+VERSION 0.02.74 BETA
 
 
 FOR THE COMMODORE 64
@@ -23,6 +23,15 @@ this.  *\*ugh\**
 
 
 ## TODO
+
+* After starting a new game with keys only input, the menu options flash.
+* Trade approval phase wanted selection repay toggling doesn't work.
+
+* Notification of defeating player on elimination dialog required.
+
+* Management construct should auto construct when constructing on highest improved
+  deed.
+* Confirm menu from trade approval confirm (modify quit confirm menu).
 
 * There is a bug managing improvements causing house count to go negative and
   not be corrected?
@@ -52,7 +61,7 @@ this.  *\*ugh\**
 * Properly divide game and rule routines.  Hmm...
 * CPU player personalities?  Not enough memory unless I do something radical in
   optimisation?
-* Fix ZPage variable use, in particular active player pointer and IRQ.
+* Fix ZPage variable use, IRQ.
 * Fix IRQ handler -- its gotten hacked to death.
 * Game save/load?  Difficult now that the Kernal program and data space is used.
   May not have enough memory.
@@ -66,8 +75,8 @@ this.  *\*ugh\**
 * The trdsel0 dialog currently uses some 3KB of memory on top of the overview 
   dialog's nearly 1.5KB.  This is massive.  It should be optimised somehow.
 * Zero page utilisation (IRQ!)
-* I have used BPL/BMI for unsigned values.  This should be fixed to use BCS/BCC
-  where appropriate.
+* I have accidentally used BPL (BMI?) for unsigned values.  This should be fixed to 
+  use BCS/BCC where appropriate (I think I got them all?).
 
 
 ## For Testing (Needs Confirmation):
@@ -79,7 +88,6 @@ this.  *\*ugh\**
 * Must pay works after elimination?
 * Elimination works from must pay?
 * Multiple eliminations in one turn works?
-* In elimination auctions, auctioned square keeps selection?
 * Check not overflowing action cache???  Debug?  256 actions should be enough??
   What about CPU from trade from auction from elimination?  Still have same maximum
   number of deeds...
@@ -90,9 +98,42 @@ this.  *\*ugh\**
 
 ## Change History 
 
+### Since Version 0.02.74B
+	
+* 03JAN2019
+	* Translate into English (American) with American place names.
+	* String reference loading in boot strap initialisation.
+	* Language select in boot strap initialisation.
+	* Use string references in dialogDlgCCCCard0.
+	* Use string references in prmptShuffle, prmptThinking.
+	* Use player name references in menuPageSetup4, menuPagePlyrSel0,
+	  dialogDlgWaitFor0, dialogDlgStart0, dialogDlgTrade7, dialogDlgElimin0, 
+	  dialogDlgGameOver0, dialogDlgPStats0.
+	* Add player name references.
+	* Use string references in dialogDlgSqrInfo0, dialogDlgPStats0.
+	* Use string references in menuPageSetup4.
+	* Change menuPageSetup6 to use pointcodes for bullets.
+	* Add pointcode for bullet.
+	* Change prmptDisplay to use string references.
+	* Change screenFillTextM to use string references.
+	* Implement strrefs.
+
+### Since Version 0.02.69B
+
+* 03JAN2019
+	* Prepare for string translations.
+	* Game start music now triggered in game start dialog.
+	* Fix modify of player name in some strings.  All high strings now constant.
+	* Rename some string declarations for uniformness.
+
 ### Since Version 0.02.68B
 
+* 09AUG2018
+	* Fix non-obvious bug in NumConvPRTINT (immediate mode!)
+* 04AUG2018
+	* Code tidy
 * 01AUG2018
+	* Fix gamePopState handling of selection.
 	* Keep/restore current selection with game state stack push/pop.
 	* Recolour stats with dialog rebuilds after they are displayed.
 	* Fix colouring trdsel0 frame.
