@@ -100,7 +100,9 @@ this.  *\*ugh\**
 
 ### Since Version 0.02.74B
 	
-* 03JAN2019
+* 03FEB2019
+	* Fix regression in rulesNextImprv, rulesPriorImprv using rulesDoCollateImprv.
+	* Correct spelling of "favour" in English (American).
 	* Translate into English (American) with American place names.
 	* String reference loading in boot strap initialisation.
 	* Language select in boot strap initialisation.
@@ -120,7 +122,7 @@ this.  *\*ugh\**
 
 ### Since Version 0.02.69B
 
-* 03JAN2019
+* 03FEB2019
 	* Prepare for string translations.
 	* Game start music now triggered in game start dialog.
 	* Fix modify of player name in some strings.  All high strings now constant.

@@ -79,22 +79,21 @@
 ;	0100 -	01FF	* System stack (256 bytes)
 ;	0200 - 	03FF	+ Global state data (495 bytes used, 17 bytes free)
 ;	0400 - 	07FF	* System screen and sprite pointer data (1KB)
-;	0800 - 	08FF	= Bootstrap/sprite data (256 bytes)
-;	0900 - 	0CFF	> String translation references (1KB)
-;	0D00 -  7FFF	. Program code and data (~29KB)
+;	0800 - 	08FF	- Bootstrap/sprite data (256 bytes)
+;	0900 - 	0BFF	> String translation references (0.75KB)
+;	0C00 -  7FFF	. Program code and data (~29KB)
 ;	8000 -	9FFF	. Program code and data (8KB)
-;	A000 -	C60C	. Program code and data (~9.75KB)
-;	C60D -	C806	- Discard/display heap (506 bytes, 6 discard free)
-;	C807 -	CDFF	? Free (~1.5KB)
+;	A000 -	C67C	. Program code and data (~9.75KB)
+;	C67D -	C87C	- Discard/display heap (510 bytes, 2 discard free)
+;	C87D -	CDFF	? Free (~1.25KB)
 ;	CE00 - 	CFFF	! Reserved (discard/display heap, 512 bytes)
 ;	D000 - 	DFFF	* System I/O (4KB)
-;	E000 -	F240	> Strings const data (4639 bytes)
-;	F21F - 	F2FF    ? Free (strings, 225 bytes)
-;	F300 - 	F45D	> Screen const data (350 bytes)
-;	F45E - 	FA8B	> Rules const data (1582 bytes)
-;	FA8C - 	FAFF	? Free (116 bytes)
-;	FB00 - 	FEFF	- Action heap (1KB)
-;	FF00 -  FFF9	> Trade global data (233 bytes used, 17 bytes free)
+;	E000 -	F2FF	> Strings const data (varies, up to 4864 bytes)
+;	F300 - 	F45E	> Screen const data (351 bytes)
+;	F45F - 	FA8C	> Rules const data (1582 bytes)
+;	FA8D - 	FAFF	? Free (115 bytes)
+;	FB00 - 	FEFF	= Action heap (1KB)
+;	FF00 -  FFF9	> Trade/CPU global data (233 bytes used, 17 bytes free)
 ;	FFFA -	FFFF	* System vectors (6 bytes)
 ;
 ;
@@ -26073,7 +26072,7 @@ rulesNextImprv:
 
 		JSR 	rulesDoCollateImprv
 		
-		LDA	game + GAME::varD
+		LDA	game + GAME::varQ
 		BEQ	@tstdist
 		
 		JMP	@buzzbreak
@@ -26231,7 +26230,7 @@ rulesPriorImprv:
 		
 		JSR 	rulesDoCollateImprv
 		
-		LDA	game + GAME::varD
+		LDA	game + GAME::varQ
 		BEQ	@tstdist
 		
 @buzzbreak:

@@ -706,9 +706,9 @@ strHeaderCCCCard1:	;CHANCE
 strText0Chest0:		;BANK ERROR
 			.byte $0A, $82, $81, $8E, $8B, $A0, $85, $92
 			.byte $92, $8F, $92
-strText1Chest0:		;IN YOUR FAVOUR.
-			.byte $0F, $89, $8E, $A0, $99, $8F, $95, $92
-			.byte $A0, $86, $81, $96, $8F, $95, $92, $AE
+strText1Chest0:		;IN YOUR FAVOR.
+			.byte $0E, $89, $8E, $A0, $99, $8F, $95, $92
+			.byte $A0, $86, $81, $96, $8F, $92, $AE
 strText0Chest1:		;ADVANCE TO GO
 			.byte $0D, $81, $84, $96, $81, $8E, $83, $85
 			.byte $A0, $94, $8F, $A0, $87, $8F
