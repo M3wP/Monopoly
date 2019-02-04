@@ -176,9 +176,10 @@ strDescSetup6:		;HOUSE RULES
 			.byte $0B, $88, $8F, $95, $93, $85, $A0, $92
 			.byte $95, $8C, $85, $93
 		
-strOptn0Setup6:		;F - FPRKING TAX
-			.byte $0F, $86, $A0, $AD, $A0, $86, $90, $92
-			.byte $8B, $89, $8E, $87, $A0, $94, $81, $98
+strOptn0Setup6:		;F - FREE PARKING
+			.byte $10, $86, $A0, $AD, $A0, $86, $92, $85
+			.byte $85, $A0, $90, $81, $92, $8B, $89, $8E
+			.byte $87
 strOptn1Setup6:		;G - LAND DBLS GO
 			.byte $10, $87, $A0, $AD, $A0, $8C, $81, $8E
 			.byte $84, $A0, $84, $82, $8C, $93, $A0, $87
@@ -191,6 +192,14 @@ strText0Setup6:		;NO
 			.byte $02, $8E, $8F
 strText1Setup6:		;YES
 			.byte $03, $99, $85, $93
+			
+strText2Setup6:		;NOTHING
+			.byte $07, $8E, $8F, $94, $88, $89, $8E, $87
+strText3Setup6:		;TAXES
+			.byte $05, $94, $81, $98, $85, $93
+strText4Setup6:		;TAX + CCCCRD
+			.byte $0C, $94, $81, $98, $A0, $AB, $A0, $83
+			.byte $83, $83, $83, $92, $84
 			
 
 strHeaderSetup7:	;INPUT CONFIG

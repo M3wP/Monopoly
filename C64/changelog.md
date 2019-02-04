@@ -97,6 +97,13 @@ this.  *\*ugh\**
 
 ### Since Version 0.02.74B
 	
+* 05FEB2019
+	* Change Free Parking to none, taxes or taxes and CCCCards.
+	* Add strings for free parking to be made none, taxes or taxes and CCCCards.
+	* Fix bug in CCCCard AdvanceTo.
+	* Fix potential bug in gameContinueAfterPost.
+	* Add Land On Go Doubles Salary house rule toggling to setup6 menu.
+	* Add Land On Go Doubles Salary house rule.
 * 04FEB2019
 	* More "jail" spelling fixes.
 	* CCCCard for "Boardwalk" spelling fix in English (USA).
@@ -104,7 +111,6 @@ this.  *\*ugh\**
 	* Change language name from "English (American)" to "English (USA)".
 	* Correct spelling of "Boardwalk" in English (American).
 	* Fix menuPageAuctn0 to use string references.
-	
 * 03FEB2019
 	* Fix regression in rulesNextImprv, rulesPriorImprv using rulesDoCollateImprv.
 	* Correct spelling of "favour" in English (American).

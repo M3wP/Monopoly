@@ -2,7 +2,7 @@
 ;M O N O P O L Y 
 ;-------------------------------------------------------------------------------
 ;
-;VERSION 0.02.68 BETA
+;VERSION 0.02.74 BETA
 ;
 ;
 ;FOR THE COMMODORE 64
@@ -38,6 +38,7 @@
 ;	  15 tunes (2 voice)
 ;	  19 sfx (1 voice)
 ;	 350 constant strings (more than 4.5KB and 23 pages of source)
+;	   2 Board place name locales and language translations
 ;	   3 threads equivalent (raster IRQ, signal managed; system, main, game)
 ;	   2 sprite zones (by raster split)
 ;
@@ -55,7 +56,7 @@
 ;	 2-6 players
 ;	  8+ years
 ;
-;	   3 house rules (one always enabled:  reshuffle CCCCards)
+;	   4 house rules (one always enabled:  reshuffle CCCCards)
 ;	     strictly turn-based (with interrupts and flexible management)
 ;
 ;	  an estimated 19.75KB data, 36KB code, 1.5KB heap, 5.25KB system
@@ -66,12 +67,12 @@
 ;Free memory information (as of last update):
 ;	* Most of the zero page is unused (still need break-down/rework) except 
 ;	  for possible reservation of Kernal data for compatibility (load/save?)
-;	* Free in global state, 18 bytes (free for globals)
-;	* Between end of program and reserved, 3808 bytes (free for program)
-;	* Free in discard, 6 bytes (free for discard)
+;	* Free in global state, 17 bytes (free for globals)
+;	* Between end of program and reserved, 1411 bytes (free for program)
+;	* Free in discard, 2 bytes (free for discard)
 ;	* Reserved area, 512 bytes (reserved for discard/display heap)
-;	* Between rules data and action heap, 307 bytes (free for constant data)
-;	* Free in trade data, 17 bytes (free for CPU trade processing)
+;	* Between rules data and action heap, 115 bytes (free for constant data)
+;	* Free in trade/CPU data, 17 bytes (free for CPU trade processing)
 ;
 ;
 ;Memory map (as of last update):
@@ -509,8 +510,10 @@ GAME_DRT_SHF0	=	$80
 		fGF1Out .byte
 		fMBuy	.byte
 		
-		fFPTax	.byte
+		fFPPays	.byte
 		mFPTax	.word
+		
+		fLGDbl	.byte
 
 		pWAuctn	.byte
 		pAFirst .byte
@@ -8799,7 +8802,7 @@ menuPageSetup2Keys:
 		LDY	#>SFXDING
 		LDX	#$07
 		JSR	SNDBASE + 6
-		
+
 		LDA 	#<menuPageSetup6
 		LDY	#>menuPageSetup6
 		
@@ -9275,46 +9278,104 @@ menuWindowSetup6:
 			.word        strDescSetup6
 			.byte	$A1, $0A, $01, $12, $43, $02, $0A
 			.word	     strOptn0MustPay0
+			
 			.byte	$A1, $0C, $01, $12, $46, $02, $0C
 			.word	     strOptn0Setup6
+			
+			.byte	$A1, $11, $01, $12, $47, $02, $11
+			.word	     strOptn1Setup6
 			
 			.byte	$00
 			
 menuWindowSetup6FP:
 menuWindowSetup6FPN:
 			.byte	$6E, $04, $0D, $FF
-			
 			.byte	$90, $06, $0D
+			.word		strText2Setup6
+
+menuWindowSetup6FPT:
+			.byte	$64, $04, $0E, $FF
+			.byte	$90, $06, $0E
+			.word		strText3Setup6
+
+menuWindowSetup6FPA:
+			.byte	$64, $04, $0F, $FF
+			.byte	$90, $06, $0F
+			.word		strText4Setup6
+
+			.byte	$00
+
+menuWindowSetup6LG:
+menuWindowSetup6LGN:
+			.byte	$6E, $04, $12, $FF
+			
+			.byte	$90, $06, $12
 			.word		strText0Setup6
 
-menuWindowSetup6FPY:
-			.byte	$64, $04, $0E, $FF
+menuWindowSetup6LGY:
+			.byte	$64, $04, $13, $FF
 
-			.byte	$90, $06, $0E
+			.byte	$90, $06, $13
 			.word		strText1Setup6
 			.byte	$00
 
 
+
 ;-------------------------------------------------------------------------------
-menuPageSetup6SetTog:
+menuPageSetup6TogFP:
 ;-------------------------------------------------------------------------------
+		INC	game + GAME::fFPPays
+		LDA	game + GAME::fFPPays
+		CMP	#$03
+		BNE	@cont1
+		
+		LDA	#$00
+		STA	game + GAME::fFPPays
+		
+		JMP	menuPageSetup6SetFP
+		
+@cont1:
+			
+					
+menuPageSetup6SetFP:
 		CMP	#$00
-		BEQ	@off
+		BEQ	@none
+	
+		CMP	#$01
+		BEQ	@tax
 		
 		LDA	#$64
 		STA	menuWindowSetup6FPN
 		
+		LDA	#$64
+		STA	menuWindowSetup6FPT
+		
 		LDA	#$6E
-		STA	menuWindowSetup6FPY
+		STA	menuWindowSetup6FPA
 		
 		RTS
 		
-@off:
+@tax:
+		LDA	#$64
+		STA	menuWindowSetup6FPN
+		
+		LDA	#$6E
+		STA	menuWindowSetup6FPT
+		
+		LDA	#$64
+		STA	menuWindowSetup6FPA
+		
+		RTS
+		
+@none:
 		LDA	#$6E
 		STA	menuWindowSetup6FPN
 		
 		LDA	#$64
-		STA	menuWindowSetup6FPY
+		STA	menuWindowSetup6FPT
+		
+		LDA	#$64
+		STA	menuWindowSetup6FPA
 		
 		RTS
 
@@ -9333,20 +9394,68 @@ menuPageSetup6DispFP:
 		
 
 ;-------------------------------------------------------------------------------
+menuPageSetup6TogLG:
+;-------------------------------------------------------------------------------
+		LDA	game + GAME::fLGDbl
+		EOR	#$01
+		STA	game + GAME::fLGDbl
+
+menuPageSetup6SetLG:
+		CMP	#$00
+		BEQ	@off
+		
+		LDA	#$64
+		STA	menuWindowSetup6LGN
+		
+		LDA	#$6E
+		STA	menuWindowSetup6LGY
+		
+		RTS
+		
+@off:
+		LDA	#$6E
+		STA	menuWindowSetup6LGN
+		
+		LDA	#$64
+		STA	menuWindowSetup6LGY
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
+menuPageSetup6DispLG:
+;-------------------------------------------------------------------------------
+		LDA	#<menuWindowSetup6LG
+		STA	$FD
+		LDA	#>menuWindowSetup6LG
+		STA	$FE
+		
+		JSR	screenPerformList
+		
+		RTS
+
+
+;-------------------------------------------------------------------------------
 menuPageSetup6Keys:
 ;-------------------------------------------------------------------------------
 		CMP	#'F'
-		BNE	@keysC
+		BNE	@keysG
 		
-		LDA	game + GAME::fFPTax
-		EOR	#$01
-		STA	game + GAME::fFPTax
-		
-		JSR	menuPageSetup6SetTog
+		JSR	menuPageSetup6TogFP
 		JSR	menuPageSetup6DispFP
 		
 		JMP	@keysDing
 		
+@keysG:
+		CMP	#'G'
+		BNE	@keysC
+		
+		JSR	menuPageSetup6TogLG
+		JSR	menuPageSetup6DispLG
+		
+		JMP	@keysDing
+		
+
 @keysC:
 		CMP	#'C'
 		BNE	@keysExit
@@ -9387,8 +9496,13 @@ menuPageSetup6Draw:
 		
 		JSR	screenPerformList
 
-		JSR	menuPageSetup6SetTog
+		LDA	game + GAME::fFPPays
+		JSR	menuPageSetup6SetFP
 		JSR	menuPageSetup6DispFP
+		
+		LDA	game + GAME::fLGDbl
+		JSR	menuPageSetup6SetLG
+		JSR	menuPageSetup6DispLG
 		
 		RTS
 
@@ -10067,7 +10181,7 @@ menuPagePlay0StdKeys:
 		BNE	@keysI
 		
 		JSR	prmptClear2
-		
+
 		JSR	rulesLandOnSquare
 
 		LDA	game + GAME::dirty
@@ -13404,6 +13518,7 @@ menuPageJump0Keys:
 		LDA	#$00
 		STA	($8B), Y
 		STA	game + GAME::fStpPsG
+		STA	game + GAME::varG
 		
 		JSR	rulesLandOnSquare
 
@@ -13431,9 +13546,20 @@ menuPageJump0Keys:
 		JSR	prmptClear2
 		
 @skipclr:
+		LDA	game + GAME::fPayDbl	
+		
+		LDX	game + GAME::sStpDst
+		BNE	@notgo
+		
+		ORA	game + GAME::fLGDbl
+
+@notgo:
+		TAY				;if we do something special
+		
 		LDA	game + GAME::sStpDst	;dest square
 		LDX	#$00			;if passed go
-		LDY	game + GAME::fPayDbl	;if we do something special
+		
+		
 		JSR	rulesMoveToSquare
 
 		LDA	game + GAME::dirty
@@ -14487,6 +14613,7 @@ gamePerfStepping:
 		
 		LDA	#$00
 		STA	game + GAME::fStpPsG
+		STA	game + GAME::varG
 		
 		JSR	rulesLandOnSquare
 
@@ -14523,9 +14650,19 @@ gamePerfStepping:
 		JSR	prmptClear2
 		
 @skipclr:
+		LDA	game + GAME::fPayDbl	
+		
+		LDX	game + GAME::sStpDst
+		BNE	@notgo
+		
+		ORA	game + GAME::fLGDbl
+
+@notgo:
+		TAY				;if we do something special
+		
 		LDA	game + GAME::sStpDst	;dest square
 		LDX	#$00			;if passed go
-		LDY	game + GAME::fPayDbl	;if we do something special
+
 		JSR	rulesMoveToSquare
 
 		LDA	game + GAME::dirty
@@ -14634,17 +14771,24 @@ gameContinueAfterPost:
 		RTS
 		
 @doJump:
-		LDY	#>SFXSPLAT		;In case there are no other sfx
-		LDA	#<SFXSPLAT
-		LDX	#$07
-		JSR	SNDBASE + 6
-		
 		PLA
+		
+		BNE	@notgo
+			
+		LDY	game + GAME::fLGDbl
+	
+@notgo:
+		
 		JSR	rulesMoveToSquare
 		
 ;***dengland	This is going to call back into gameUpdateMenu but it should be
 ;		fine.
 		JSR	gameUpdateMenu
+		
+		LDY	#>SFXSPLAT		;In case there are no other sfx
+		LDA	#<SFXSPLAT
+		LDX	#$07
+		JSR	SNDBASE + 6
 		
 		LDA	game + GAME::dirty	
 		ORA	#GAME_DRT_ALLD
@@ -16685,6 +16829,12 @@ gameRollDice:
 		
 @skipclr:
 		PLA
+		
+		BNE	@notgo
+
+		LDY	game + GAME::fLGDbl
+
+@notgo:
 		JSR	rulesMoveToSquare
 		
 		LDA	game + GAME::dirty
@@ -23834,17 +23984,24 @@ rulesMoveToSquare:
 
 		LDY	#PLAYER::square
 
-		LDA	game + GAME::varK
-		CMP	#$01
+;		LDA	game + GAME::varK
+		CPX	#$01
 		BNE	@cont
 	
 		LDA	game + GAME::varJ	;sanity check
 		CMP	#$00
 		BEQ	@cont
-		
+
+		LDA	game + GAME::varG
+		PHA
+
 		LDA	#$00			;"Pass" Go
 		STA	($8B), Y
+		STA	game + GAME::varG
 		JSR	rulesLandOnSquare
+		
+		PLA
+		STA	game + GAME::varG
 
 @cont:
 		LDA	game + GAME::varJ
@@ -23880,6 +24037,7 @@ rulesLandOnSquare:
 		BNE	@test1
 		
 		JSR	rulesLandCrnr
+		
 		JMP	@exit
 		
 @test1:
@@ -24208,7 +24366,7 @@ rulesAddCash:
 		LDA	game + GAME::varN
 		STA	($AB), Y
 
-		LDA	game + GAME::fFPTax
+		LDA	game + GAME::fFPPays
 		BEQ	@done0
 		
 		SEC
@@ -24229,7 +24387,7 @@ rulesAddCash:
 		LDA	#$00
 		STA	($AB), Y
 
-		LDA	game + GAME::fFPTax
+		LDA	game + GAME::fFPPays
 		BEQ	@done0
 		
 		SEC
@@ -24288,7 +24446,7 @@ rulesCreditAcc:
 		CMP	#$06
 		BNE	@begin
 		
-		LDA	game + GAME::fFPTax
+		LDA	game + GAME::fFPPays
 		BEQ	@skipFP
 		
 		CLC
@@ -24576,6 +24734,14 @@ rulesLandCrnr:
 		LDA	#$00
 		STA	game + GAME::varE
 		
+		LDA	game + GAME::varG
+		BEQ	@paylg
+		
+		CLC
+		ROL	game + GAME::varD
+		ROL	game + GAME::varE
+		
+@paylg:
 		JSR	rulesAddCash
 
 		LDY	#PLAYER::colour
@@ -24594,7 +24760,7 @@ rulesLandCrnr:
 		CMP	#$14
 		BNE	@test1
 		
-		LDA	game + GAME::fFPTax
+		LDA	game + GAME::fFPPays
 		BEQ	@exit
 		
 		LDA	game + GAME::mFPTax
@@ -24815,9 +24981,8 @@ rulesLandStatn:
 		JMP 	@loop
 		
 @cont:
-		LDA	#$01
-		CMP	game + GAME::varG
-		BNE	@pay
+		LDA	game + GAME::varG
+		BEQ	@pay
 		
 		CLC
 		ROL	game + GAME::varD
@@ -24978,15 +25143,21 @@ rulesCCCrdProcAdv:				;adv to
 		RTS
 		
 @doJump:
+		PLA
+		
+		BNE	@notgo
+		
+		LDY	game + GAME::fLGDbl
+		
+@notgo:
+		JSR	rulesMoveToSquare
+		
+		JSR	gameUpdateMenu
+		
 		LDY	#>SFXSPLAT		;In case there are no other sfx
 		LDA	#<SFXSPLAT
 		LDX	#$07
 		JSR	SNDBASE + 6
-		
-		PLA
-		JSR	rulesMoveToSquare
-		
-		JSR	gameUpdateMenu
 		
 		RTS
 		
@@ -25088,7 +25259,20 @@ rulesCCCrdProcRep:				;street/gen repairs
 @proc:
 		LDX	game + GAME::pActive
 		JSR	rulesSubCash
+	
+		LDA	game + GAME::fFPPays
+		CMP	#$02
+		BNE	@finish
 		
+		CLC
+		LDA	game + GAME::mFPTax
+		ADC	game + GAME::varD
+		STA	game + GAME::mFPTax
+		LDA	game + GAME::mFPTax + 1
+		ADC	game + GAME::varE
+		STA	game + GAME::mFPTax + 1
+
+@finish:
 		LDY	#PLAYER::colour
 		LDA	($8B), Y
 		TAX
@@ -25277,6 +25461,15 @@ rulesCCCrdProcPay:				;pay cash
 		LDX	game + GAME::pActive
 		JSR	rulesSubCash
 
+		CLC
+		LDA	game + GAME::mFPTax
+		ADC	game + GAME::varD
+		STA	game + GAME::mFPTax
+		LDA	game + GAME::mFPTax + 1
+		ADC	game + GAME::varE
+		STA	game + GAME::mFPTax + 1
+
+@finish:
 		LDY	#PLAYER::colour
 		LDA	($8B), Y
 		TAX
@@ -32981,9 +33174,10 @@ initNew:
 		STA	game + GAME::gMode
 		STA	game + GAME::fGF0Out
 		STA	game + GAME::fGF1Out
-		STA	game + GAME::fFPTax
+		STA	game + GAME::fFPPays
 		STA	game + GAME::mFPTax
 		STA	game + GAME::mFPTax + 1
+		STA	game + GAME::fLGDbl
 		
 		JSR	gamePlayerChanged
 		

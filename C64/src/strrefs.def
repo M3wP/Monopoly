@@ -104,6 +104,12 @@ strText0Setup6:
 			.word _strText0Setup6
 strText1Setup6:
 			.word _strText1Setup6
+strText2Setup6:
+			.word _strText2Setup6
+strText3Setup6:
+			.word _strText3Setup6
+strText4Setup6:
+			.word _strText4Setup6
 strHeaderSetup7:
 			.word _strHeaderSetup7
 strDescSetup7:
