@@ -98,6 +98,7 @@ this.  *\*ugh\**
 ### Since Version 0.02.75B
 
 * 05FEB2019
+	* Fix Free Parking CCCCard transactions to use Bank Taxes account.
 	* Change Free Parking to none, taxes or taxes and CCCCards.
 	* Add strings for free parking to be made none, taxes or taxes and CCCCards.
 	* Fix bug in CCCCard AdvanceTo.

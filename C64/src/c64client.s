@@ -2,7 +2,7 @@
 ;M O N O P O L Y 
 ;-------------------------------------------------------------------------------
 ;
-;VERSION 0.02.74 BETA
+;VERSION 0.02.75 BETA
 ;
 ;
 ;FOR THE COMMODORE 64
@@ -25258,21 +25258,15 @@ rulesCCCrdProcRep:				;street/gen repairs
 
 @proc:
 		LDX	game + GAME::pActive
+		
+		LDA	game + GAME::fFPPays
+		BEQ	@dosub
+		
+		LDX	#$06
+
+@dosub:
 		JSR	rulesSubCash
 	
-		LDA	game + GAME::fFPPays
-		CMP	#$02
-		BNE	@finish
-		
-		CLC
-		LDA	game + GAME::mFPTax
-		ADC	game + GAME::varD
-		STA	game + GAME::mFPTax
-		LDA	game + GAME::mFPTax + 1
-		ADC	game + GAME::varE
-		STA	game + GAME::mFPTax + 1
-
-@finish:
 		LDY	#PLAYER::colour
 		LDA	($8B), Y
 		TAX
@@ -25459,17 +25453,15 @@ rulesCCCrdProcPay:				;pay cash
 		STA	game + GAME::varE
 		
 		LDX	game + GAME::pActive
+		
+		LDA	game + GAME::fFPPays
+		BEQ	@dosub
+		
+		LDX	#$06
+
+@dosub:
 		JSR	rulesSubCash
 
-		CLC
-		LDA	game + GAME::mFPTax
-		ADC	game + GAME::varD
-		STA	game + GAME::mFPTax
-		LDA	game + GAME::mFPTax + 1
-		ADC	game + GAME::varE
-		STA	game + GAME::mFPTax + 1
-
-@finish:
 		LDY	#PLAYER::colour
 		LDA	($8B), Y
 		TAX
