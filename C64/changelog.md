@@ -25,33 +25,28 @@ this.  *\*ugh\**
 ## TODO
 
 * After starting a new game with keys only input, the menu options flash.
-* Trade approval phase wanted selection repay toggling doesn't work.
+* Trade approval phase selection repay toggling doesn't work or is wrong for 
+  wanted?
 
-* Notification of defeating player on elimination dialog required.
+* Make dialog elimin0 more informative about the elimination (to player/bank)?
 
 * Management construct should auto construct when constructing on highest improved
   deed.
 * Confirm menu from trade approval confirm (modify quit confirm menu).
-
-* There is a bug managing improvements causing house count to go negative and
-  not be corrected?
 
 * rulesSuggestDeedValue should tap values based on group significance.
 * AutoTradeApprove could tally "half points" for prime targets, getting almost and
   all of a group and require that they be accounted for in other deeds or money 
   (convert extra points too?).
 
-* Optimise trade calculations -- too large!
+* Optimise trade calculations -- too large!  24bit math!
 
 * Change "all" dirty to be just board dirty and req. individual flags.
-* Player sprites on overview dialog?  Would look pretty.  IRQ is a mess.
 * Get exomiser working.
-* Allow construct from manage menu in trade if not doing so for group in trade?
-* Make dialog elimin0 more informative about the elimination (to player/bank)?
-* Could now instead of copy name on elimin and gameover dialogs, just refer.
 
 * Should be able to do release state after above and all testing items passed.
 
+* Player sprites on overview dialog?  Would look pretty.  IRQ is a mess.
 * Mode chain integrity checks?  
 * Is checking must pay after normal (non-elimination) action processing required 
   now?
@@ -91,6 +86,8 @@ this.  *\*ugh\**
 * Check not overflowing action cache???  Debug?  256 actions should be enough??
   What about CPU from trade from auction from elimination?  Still have same maximum
   number of deeds...
+* Correct managing improvement behaviour (house/hotel count can't go negative and
+  not be corrected by CPU?)
 * Do not overflow heap??  Only 512 bytes in current allocation.  Should gather 
   statistics in order to check actual maximum requirements.  Should be fine, fine, 
   fine (was only 256 bytes and probably wouldn't overflow).
@@ -99,6 +96,11 @@ this.  *\*ugh\**
 ## Change History 
 
 ### Since Version 0.02.74B
+	
+* 04FEB2019
+	* Change language name from "English (American)" to "English (USA)"
+	* Correct spelling of "Boardwalk" in English (American)
+	* Fix menuPageAuctn0 to use string references.
 	
 * 03FEB2019
 	* Fix regression in rulesNextImprv, rulesPriorImprv using rulesDoCollateImprv.

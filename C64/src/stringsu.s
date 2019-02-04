@@ -958,9 +958,9 @@ strTitle0Green2:	;PENNSYLVANIA AV
 			.byte $96, $81, $8E, $89, $81, $A0, $81, $96
 strTitle0Blue0:		;PARK PL
 			.byte $07, $90, $81, $92, $8B, $A0, $90, $8C
-strTitle0Blue1:		;BOADWALK
-			.byte $08, $82, $8F, $81, $84, $97, $81, $8C
-			.byte $8B
+strTitle0Blue1:		;BOARDWALK
+			.byte $09, $82, $8F, $81, $92, $84, $97, $81
+			.byte $8C, $8B
 strTitle0Stn0:		;READING RAIL
 			.byte $0C, $92, $85, $81, $84, $89, $8E, $87
 			.byte $A0, $92, $81, $89, $8C

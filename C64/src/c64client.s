@@ -10472,6 +10472,9 @@ menuPageAuctnAmt0:
 menuPageAuctnPage0:
 		.byte	$00
 
+menuPageAuctnAmt0Ref:
+			.word	menuPageAuctnAmt0
+
 menuWindowAuctn0:
 			.byte	$90, $01, $07
 			.word	     	strHeaderAuctn0
@@ -10518,7 +10521,7 @@ menuWindowAuctn0Bid:
 
 menuWindowAuctn0Amt:
 			.byte	$90, $0B, $0A
-			.word		menuPageAuctnAmt0
+			.word		menuPageAuctnAmt0Ref
 			.byte	$00
 
 
@@ -33513,11 +33516,10 @@ strText0Ref0:		;SELECT LANGUAGE:	$10
 			.byte $13, $05, $0C, $05, $03, $14, $20
 			.byte $0C, $01, $0E, $07, $15, $01, $07, $05
 			.byte $3A
-strText1Ref0:		;  A - ENGLISH (AMERICAN) $18
+strText1Ref0:		;  A - ENGLISH (USA) $13, 
 			.byte $20, $20, $01, $20, $2D, $20, $05
 			.byte $0E, $07, $0C, $09, $13, $08, $20, $28
-			.byte $01, $0D, $05, $12, $09, $03, $01, $0E
-			.byte $29
+			.byte $15, $13, $01, $29
 strText2Ref0:		;  B - ENGLISH (UK) $12
 			.byte $20, $20, $02, $20, $2D, $20, $05
 			.byte $0E, $07, $0C, $09, $13, $08, $20, $28
@@ -33553,7 +33555,7 @@ initGetLanguage:
 		LDA	#>strText1Ref0
 		STA	$FE
 		
-		LDY	#$17
+		LDY	#$12
 		JSR	initOutString		
 
 		LDA	#<(1024 + 120)
