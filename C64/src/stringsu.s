@@ -25,9 +25,9 @@ strText3Titles0:	;ECCLESTIAL
 strText4Titles0:	;SOLUTIONS
 			.byte $09, $93, $8F, $8C, $95, $94, $89, $8F
 			.byte $8E, $93	
-strText8Titles0:	;VERSION 0.02.74B
+strText8Titles0:	;VERSION 0.02.75B
 			.byte $10, $96, $85, $92, $93, $89, $8F, $8E
-			.byte $A0, $B0, $AE, $B0, $B2, $AE, $B7, $B4
+			.byte $A0, $B0, $AE, $B0, $B2, $AE, $B7, $B5
 			.byte $82			
 strText5Titles0:	;(C) 1935, 2016
 			.byte $0E, $A8, $83, $A9, $A0, $B1, $B9, $B3

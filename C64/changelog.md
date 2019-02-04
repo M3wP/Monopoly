@@ -1,6 +1,6 @@
 # MONOPOLY 
 
-VERSION 0.02.74 BETA
+VERSION 0.02.75 BETA
 
 
 FOR THE COMMODORE 64
@@ -95,8 +95,8 @@ this.  *\*ugh\**
 
 ## Change History 
 
-### Since Version 0.02.74B
-	
+### Since Version 0.02.75B
+
 * 05FEB2019
 	* Change Free Parking to none, taxes or taxes and CCCCards.
 	* Add strings for free parking to be made none, taxes or taxes and CCCCards.
@@ -104,6 +104,9 @@ this.  *\*ugh\**
 	* Fix potential bug in gameContinueAfterPost.
 	* Add Land On Go Doubles Salary house rule toggling to setup6 menu.
 	* Add Land On Go Doubles Salary house rule.
+
+### Since Version 0.02.74B
+	
 * 04FEB2019
 	* More "jail" spelling fixes.
 	* CCCCard for "Boardwalk" spelling fix in English (USA).
