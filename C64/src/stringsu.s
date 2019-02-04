@@ -348,16 +348,16 @@ strOptn5Auctn0:		;F - FORFEIT
 			.byte $86, $85, $89, $94
 
 			
-strHeaderGaol0:		;GONE TO GAOL
+strHeaderGaol0:		;GONE TO JAIL
 			.byte $0C, $87, $8F, $8E, $85, $A0, $94, $8F
-			.byte $A0, $87, $81, $8F, $8C
+			.byte $A0, $8A, $81, $89, $8C
 
 strDescGaol0:		;THREE DOUBLES
 			.byte $0D, $94, $88, $92, $85, $85, $A0, $84
 			.byte $8F, $95, $82, $8C, $85, $93
 						
-strHeaderGaol1:		;IN GAOL
-			.byte $07, $89, $8E, $A0, $87, $81, $8F, $8C
+strHeaderGaol1:		;IN JAIL
+			.byte $07, $89, $8E, $A0, $8A, $81, $89, $8C
 strDescGaol1:		;PG 1/2
 			.byte $06, $90, $87, $A0, $B1, $AF, $B2
 

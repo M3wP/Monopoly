@@ -98,6 +98,7 @@ this.  *\*ugh\**
 ### Since Version 0.02.74B
 	
 * 04FEB2019
+	* More "jail" spelling fixes.
 	* CCCCard for "Boardwalk" spelling fix in English (USA).
 	* Prompt for "Gone to Jail" in English (USA) not reversed.
 	* Change language name from "English (American)" to "English (USA)".
