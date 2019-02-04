@@ -98,8 +98,10 @@ this.  *\*ugh\**
 ### Since Version 0.02.74B
 	
 * 04FEB2019
-	* Change language name from "English (American)" to "English (USA)"
-	* Correct spelling of "Boardwalk" in English (American)
+	* CCCCard for "Boardwalk" spelling fix in English (USA).
+	* Prompt for "Gone to Jail" in English (USA) not reversed.
+	* Change language name from "English (American)" to "English (USA)".
+	* Correct spelling of "Boardwalk" in English (American).
 	* Fix menuPageAuctn0 to use string references.
 	
 * 03FEB2019

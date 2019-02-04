@@ -884,9 +884,9 @@ strText1ChanceE:	;  READING RAILROAD.
 			.byte $8E, $87, $A0, $92, $81, $89, $8C, $92
 			.byte $8F, $81, $84, $AE
 strText0ChanceF =	strText0Chance5
-strText1ChanceF:	;  BOADWALK.
-			.byte $0B, $A0, $A0, $82, $8F, $81, $84, $97
-			.byte $81, $8C, $8B, $AE
+strText1ChanceF:	;  BOARDWALK.
+			.byte $0C, $A0, $A0, $82, $8F, $81, $92, $84
+			.byte $97, $81, $8C, $8B, $AE
 
 
 
@@ -1199,8 +1199,8 @@ tokPrmptTax:		;.TAX     $
 			.byte 	$0A, $51, $14, $01, $18, $20, $20, $20
 			.byte	$20, $20, $24
 tokPrmptGaol:		;.GONE TO JAIL
-			.byte 	$0D, $51, $87, $8F, $8E, $85, $A0, $94
-			.byte 	$8F, $A0, $8A, $81, $89, $8C
+			.byte 	$0D, $51, $07, $0F, $0E, $05, $20, $14
+			.byte 	$0F, $20, $0A, $01, $09, $0C
 tokPrmptManage:		;.HSES+00 HTLS+00
 			.byte 	$10, $51, $08, $13, $05, $13, $2B, $30
 			.byte 	$30, $20, $08, $14, $0C, $13, $2B, $30
