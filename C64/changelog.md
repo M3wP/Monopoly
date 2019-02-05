@@ -25,10 +25,6 @@ this.  *\*ugh\**
 ## TODO
 
 * After starting a new game with keys only input, the menu options flash.
-* Trade approval phase selection repay toggling doesn't work or is wrong for 
-  wanted?
-
-* Make dialog elimin0 more informative about the elimination (to player/bank)?
 
 * Management construct should auto construct when constructing on highest improved
   deed.
@@ -76,8 +72,9 @@ this.  *\*ugh\**
 
 ## For Testing (Needs Confirmation):
 
-* Used GO Free cards prevented from appearing in deck until after 
-  shuffle (and while owned by a player)?
+* Trade approval phase selection repay toggling works?
+* Used GO Free cards prevented from appearing in deck until after shuffle (and while 
+  owned by a player)?
 * Trade correctly calculates remaining cash and enforces positive?
 * Must pay works after trade?  Is it required now?
 * Must pay works after elimination?
@@ -98,6 +95,9 @@ this.  *\*ugh\**
 ### Since Version 0.02.75B
 
 * 05FEB2019
+	* Add house rule for starting with more than no deeds.
+	* Make dialog elimin0 more informative about the elimination.
+	* Fix Free Parking CCCCard detection logic.
 	* Fix Free Parking CCCCard transactions to use Bank Taxes account.
 	* Change Free Parking to none, taxes or taxes and CCCCards.
 	* Add strings for free parking to be made none, taxes or taxes and CCCCards.

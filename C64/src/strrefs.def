@@ -134,6 +134,14 @@ strOptn0Setup9:
 			.word _strOptn0Setup9
 strOptn1Setup9:
 			.word _strOptn1Setup9
+strDescSetupA:
+			.word _strDescSetupA
+strOptn0SetupA:
+			.word _strOptn0SetupA
+strText0SetupA:
+			.word _strText0SetupA
+strText1SetupA:
+			.word _strText1SetupA
 strHeaderStart0:
 			.word _strHeaderStart0
 strText0Start0:

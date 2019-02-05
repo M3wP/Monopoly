@@ -245,6 +245,18 @@ strOptn1Setup9:		;1 - 1 PLAYER
 			.byte $8C, $81, $99, $85, $92
 
 
+strDescSetupA:		;STARTING DEEDS
+			.byte $0E, $93, $94, $81, $92, $94, $89, $8E
+			.byte $87, $A0, $84, $85, $85, $84, $93
+			
+strOptn0SetupA:		;0 - NONE
+			.byte $08, $B0, $A0, $AD, $A0, $8E, $8F, $8E
+			.byte $85
+strText0SetupA:		;DEED
+			.byte $04, $84, $85, $85, $84
+strText1SetupA:		;DEEDS
+			.byte $05, $84, $85, $85, $84, $93
+
 strHeaderStart0:	;GAME STARTING
 			.byte $0D, $87, $81, $8D, $85, $A0, $93, $94
 			.byte $81, $92, $94, $89, $8E, $87

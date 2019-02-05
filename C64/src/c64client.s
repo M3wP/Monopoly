@@ -76,17 +76,17 @@
 ;
 ;
 ;Memory map (as of last update):
-;	0000 -	00FF	* Zero page (256 bytes)
-;	0100 -	01FF	* System stack (256 bytes)
+;	0000 -	00FF	* System Zero Page (256 bytes)
+;	0100 -	01FF	* System Stack (256 bytes)
 ;	0200 - 	03FF	+ Global state data (495 bytes used, 17 bytes free)
 ;	0400 - 	07FF	* System screen and sprite pointer data (1KB)
 ;	0800 - 	08FF	- Bootstrap/sprite data (256 bytes)
 ;	0900 - 	0BFF	> String translation references (0.75KB)
 ;	0C00 -  7FFF	. Program code and data (~29KB)
 ;	8000 -	9FFF	. Program code and data (8KB)
-;	A000 -	C67C	. Program code and data (~9.75KB)
-;	C67D -	C87C	- Discard/display heap (510 bytes, 2 discard free)
-;	C87D -	CDFF	? Free (~1.25KB)
+;	A000 -	C757	. Program code and data (~9.75KB)
+;	C758 -	C955	- Discard/display heap (510 bytes, 2 discard free)
+;	C956 -	CDFF	? Free (~1.25KB)
 ;	CE00 - 	CFFF	! Reserved (discard/display heap, 512 bytes)
 ;	D000 - 	DFFF	* System I/O (4KB)
 ;	E000 -	F2FF	> Strings const data (varies, up to 4864 bytes)
@@ -8168,6 +8168,12 @@ menuPageSetup9:
 		.byte	$01
 		.word	cpuPerformIdle
 		
+menuPageSetupA:
+		.word	menuPageSetupAKeys
+		.word	menuPageSetupADraw
+		.byte	$01
+		.word	cpuPerformIdle
+		
 menuPageMustPay0:
 		.word	menuPageMustPay0Keys
 		.word	menuPageMustPay0Draw
@@ -8475,7 +8481,7 @@ menuPageSetup0Keys:
 			
 		LDA	#$00
 		STA	menuTemp0
-
+		
 		LDA 	#<menuPageSetup9
 		LDY	#>menuPageSetup9
 		
@@ -8484,9 +8490,15 @@ menuPageSetup0Keys:
 		PLA
 
 		STA	game + GAME::pCount
-
+		
+		LDX	#$04
+		STX	menuSetupAMax
+		
 		CMP	#$06
 		BEQ	@done
+		
+		LDX	#$05
+		STX	menuSetupAMax
 		
 		TAX
 		
@@ -8755,7 +8767,23 @@ menuPageSetup2Keys:
 		
 		SEC
 		SBC	#'0'
+	
+		CMP	#$00
+		BNE	@tst1
+
+		LDX	#$04
+		STX	menuSetupAMax
 		
+		JMP	@cont
+
+@tst1:
+		CMP	#$01
+		BNE	@cont
+	
+		LDX	#$02
+		STX	menuSetupAMax
+		
+@cont:		
 		ASL
 		TAX
 		LDA	menuCashStartDef, X
@@ -8979,6 +9007,147 @@ menuWindowSetup4O:
 
 
 ;-------------------------------------------------------------------------------
+menuPageSetup4GenPlr:
+;-------------------------------------------------------------------------------
+		JSR	prmptShuffle
+
+		STX	game + GAME::varA
+		
+		LDX	menuSetupASel
+		DEX
+		
+@loop:
+
+@rnd:
+		LDA 	sidV2EnvOu
+		LSR
+		LSR
+		 
+		CMP	#$28
+		BCS	@rnd
+		
+		TAY
+		LDA	rulesSqrImprv, Y
+		CMP	#$FF
+		BNE	@rnd
+		
+		STY	game + GAME::varB
+		
+		TYA
+		ASL
+		TAY
+		
+		LDA	rulesSqr0, Y
+		BEQ	@rnd
+		
+		CMP	#$0B
+		BCS	@rnd
+		
+		LDY	game + GAME::varB
+		
+		TYA
+		STA	trade0, X
+		LDA	game + GAME::varA
+		STA	rulesSqrImprv, Y
+		
+		DEX
+		BPL	@loop
+		
+		LDX	game + GAME::varA
+		
+		RTS
+		
+		
+;-------------------------------------------------------------------------------
+menuPageSetup4GenAct:
+;-------------------------------------------------------------------------------
+		STX	game + GAME::varA
+		
+		LDX	menuSetupASel
+		DEX
+		
+@loop:		
+		LDA	#UI_ACT_BUYD
+		STA	$68
+		LDA	game + GAME::varA
+		STA	$69
+		LDA	trade0, x
+		STA	$6A
+		
+		JSR	uiEnqueueAction
+		
+		LDA	#UI_ACT_DELY
+		STA	$68
+		LDA	#$03
+		STA	$69
+		LDA	#$00
+		STA	$6A
+		STA	$6B
+		
+		JSR	uiEnqueueAction
+
+		DEX
+		BPL	@loop
+
+		LDX	game + GAME::varA
+
+		RTS
+
+
+;-------------------------------------------------------------------------------
+menuPageSetup4GenDeeds:
+;-------------------------------------------------------------------------------
+		JSR	rulesDoCopyOwn
+		
+		LDA	#$01
+		STA	ui + UI::fActInt
+		LDA	#$00
+		STA	ui + UI::fActTyp
+		
+		JSR	uiProcessMarkStart
+
+		LDX	game + GAME::pActive
+		
+@loop:
+		LDA	plrLo, X
+		STA	$FB
+		LDA	plrHi, X
+		STA	$FC
+
+		LDY	#PLAYER::status
+		LDA	($FB), Y
+		AND	#$01
+		BEQ	@next
+		
+		JSR	menuPageSetup4GenPlr
+		JSR	menuPageSetup4GenAct
+		
+@next:
+		INX	
+		CPX	#$06
+		BNE	@tstend
+		
+		LDX	#$00
+		
+@tstend:
+		CPX	game + GAME::pActive
+		BNE	@loop
+
+		LDA	#UI_ACT_ENDP
+		STA	$68
+		LDA	#$00
+		STA	$69
+		STA	$6A
+		STA	$6B
+		
+		JSR	uiEnqueueAction
+		
+		JSR	uiProcessInit
+		
+		RTS
+		
+
+;-------------------------------------------------------------------------------
 menuPageSetup4Keys:
 ;-------------------------------------------------------------------------------
 		LDX	menuTemp0
@@ -9027,7 +9196,13 @@ menuPageSetup4Keys:
 	.endif
 	
 		JSR	gameUpdateMenu
+	
+		LDA	menuSetupASel
+		BEQ	@finish
 		
+		JSR	menuPageSetup4GenDeeds
+
+@finish:
 		LDA	game + GAME::dirty
 		ORA	#GAME_DRT_BRDQ
 		STA	game + GAME::dirty		
@@ -9460,18 +9635,11 @@ menuPageSetup6Keys:
 		CMP	#'C'
 		BNE	@keysExit
 		
-		LDA	#$00
-		STA	menuTemp0
-		
-		LDA 	#<menuPageSetup4
-		LDY	#>menuPageSetup4
+		LDA 	#<menuPageSetupA
+		LDY	#>menuPageSetupA
 		
 		JSR	menuSetPage
 
-;		LDA	#$01
-;		ORA	game + GAME::dirty
-;		STA	game + GAME::dirty
-		
 		JMP	@keysDing
 		
 @keysExit:
@@ -9885,6 +10053,206 @@ menuPageSetup9Draw:
 		
 		JSR	screenPerformList
 
+		RTS
+
+;-------------------------------------------------------------------------------
+menuSetupAMax:
+		.byte 	$00
+menuSetupASel:
+		.byte	$00
+		
+		
+menuWindowSetupABN:
+		.byte	menuWindowSetupAB3 - menuWindowSetupA
+		.byte	menuWindowSetupAB4 - menuWindowSetupA
+		.byte	menuWindowSetupAB5 - menuWindowSetupA
+		
+menuWindowSetupAPN:
+		.byte	menuWindowSetupAP3 - menuWindowSetupA
+		.byte	menuWindowSetupAP4 - menuWindowSetupA
+		.byte	menuWindowSetupAP5 - menuWindowSetupA
+		
+menuWindowSetupANN:
+		.byte	menuWindowSetupAN3 - menuWindowSetupA
+		.byte	menuWindowSetupAN4 - menuWindowSetupA
+		.byte	menuWindowSetupAN5 - menuWindowSetupA
+
+menuWindowSetupA:
+			.byte	$90, $01, $07
+			.word	     	strHeaderSetup0
+			.byte	$90, $01, $08
+			.word        	strDescSetupA
+			
+			.byte	$A1, $0A, $01, $12, $30, $02, $0A
+			.word	     	strOptn0SetupA
+			
+			.byte	$A1, $0C, $01, $12, $31, $02, $0C
+			.word	     	strOptn0PSel0
+			.byte	$90, $06, $0C
+			.word		strText0SetupA
+
+			.byte	$A1, $0E, $01, $12, $32, $02, $0E
+			.word	     	strOptn1PSel0
+			.byte	$90, $06, $0E
+			.word		strText1SetupA
+
+menuWindowSetupAB3:
+			.byte	$A1, $10, $01, $12, $33, $02, $10
+menuWindowSetupAP3:
+			.word	     	strOptn2PSel0
+			.byte	$90, $06, $10
+menuWindowSetupAN3:
+			.word		strText1SetupA
+menuWindowSetupAB4:
+			.byte	$A1, $12, $01, $12, $34, $02, $12
+menuWindowSetupAP4:
+			.word	     	strOptn3PSel0
+			.byte	$90, $06, $12
+menuWindowSetupAN4:
+			.word		strText1SetupA
+menuWindowSetupAB5:
+			.byte	$A1, $14, $01, $12, $34, $02, $14
+menuWindowSetupAP5:
+			.word	     	strOptn4PSel0
+			.byte	$90, $06, $14
+menuWindowSetupAN5:
+			.word		strText1SetupA
+
+			.byte	$00
+
+;-------------------------------------------------------------------------------
+menuPageSetupAKeys:
+;-------------------------------------------------------------------------------
+		LDX	menuSetupAMax
+		INX
+		STX	menuTemp0
+		
+		SEC
+		SBC	#'0'
+		
+		CMP	menuTemp0
+		BCS	@keysExit
+
+		STA	menuSetupASel
+
+		LDA	#$00
+		STA	menuTemp0
+		
+		LDA 	#<menuPageSetup4
+		LDY	#>menuPageSetup4
+		
+		JSR	menuSetPage
+
+@keysDing:
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
+@keysExit:
+		RTS
+		
+
+;-------------------------------------------------------------------------------
+menuPageSetupADraw:
+;-------------------------------------------------------------------------------
+		LDX	menuSetupAMax
+		DEX
+		DEX
+		STX	menuTemp0
+		
+		LDX	#$02
+
+@loop:
+		CPX	menuTemp0
+		BCS	@clear
+		
+		LDA	#$A1
+		PHA
+		
+		CPX	#$00
+		BNE	@tst1
+		
+		LDA	#>strOptn2PSel0
+		PHA
+		LDA	#<strOptn2PSel0
+		PHA
+		
+		JMP	@updatenc
+
+@tst1:
+		CPX	#$01
+		BNE	@2
+
+		LDA	#>strOptn3PSel0
+		PHA
+		LDA	#<strOptn3PSel0
+		PHA
+		
+		JMP	@updatenc
+
+@2:
+		LDA	#>strOptn4PSel0
+		PHA
+		LDA	#<strOptn4PSel0
+		PHA
+		
+		JMP	@updatenc
+
+@clear:
+		LDA	#$A2
+		PHA
+
+		LDA	#>strDummyDummy0
+		PHA
+		LDA	#<strDummyDummy0
+		PHA
+		LDA	#>strDummyDummy0
+		PHA
+		LDA	#<strDummyDummy0
+		PHA
+		
+		JMP	@update
+		
+
+@updatenc:
+		LDA	#>strText1SetupA
+		PHA
+		LDA	#<strText1SetupA
+		PHA
+
+@update:
+		LDA	menuWindowSetupANN, X
+		TAY
+		PLA	
+		STA	menuWindowSetupA, Y
+		INY
+		PLA
+		STA	menuWindowSetupA, Y
+		
+		LDA	menuWindowSetupAPN, X
+		TAY
+		PLA	
+		STA	menuWindowSetupA, Y
+		INY
+		PLA
+		STA	menuWindowSetupA, Y
+
+		LDA	menuWindowSetupABN, X
+		TAY
+		PLA	
+		STA	menuWindowSetupA, Y
+
+		DEX
+		BPL	@loop
+		
+		LDA	#<menuWindowSetupA
+		STA	$FD
+		LDA	#>menuWindowSetupA
+		STA	$FE
+		
+		JSR	screenPerformList
+		
 		RTS
 
 
@@ -18050,12 +18418,23 @@ dialogDlgTrade7Draw:
 dialogTempElimin0P:
 		.byte	$00
 
+dialogTempElimin0E:
+		.byte	$00, $00, $00, $00, $00, $00
+
 dialogWindowElimin0:		
 			.byte	$90, $09, $06
 			.word		strHeaderElimin0
+				
+			.byte	$90, $09, $0A
+dialogWindowElimin0D0:
+			.word		strDummyDummy0
+			
+			.byte	$90, $15, $0A
+dialogWindowElimin0P0:
+			.word		strDummyDummy0
 			
 			.byte	$90, $09, $09
-dialogWindowElimin0P0:
+dialogWindowElimin0P1:
 			.word		strDummyDummy0
 			
 			.byte	$90, $12, $09
@@ -18092,16 +18471,42 @@ dialogDlgElimin0Keys:
 ;-------------------------------------------------------------------------------
 dialogDlgElimin0Draw:
 ;-------------------------------------------------------------------------------
-;***TODO:	Make this message more informative - did they lose
-;		to another player (which) or to the bank?
-
 		LDX	dialogTempElimin0P
 		
-		LDA	plrNameRefLo, X
+		LDA	dialogTempElimin0E, X
+		TAY
+		CPY	#$FF	
+		BEQ	@bank
+	
+		LDA	#<strDescElimin0
+		STA	dialogWindowElimin0D0
+
+		LDA	#>strDescElimin0
+		STA	dialogWindowElimin0D0 + 1
+		
+		LDA	plrNameRefLo, Y
 		STA	dialogWindowElimin0P0
 		
-		LDA	plrNameRefHi, X
+		LDA	plrNameRefHi, Y
 		STA	dialogWindowElimin0P0 + 1
+
+		JMP	@cont
+
+@bank:
+		LDA	#<strDummyDummy0
+		STA	dialogWindowElimin0D0
+		STA	dialogWindowElimin0P0
+
+		LDA	#>strDummyDummy0
+		STA	dialogWindowElimin0D0 + 1
+		STA	dialogWindowElimin0P0 + 1
+
+@cont:
+		LDA	plrNameRefLo, X
+		STA	dialogWindowElimin0P1
+		
+		LDA	plrNameRefHi, X
+		STA	dialogWindowElimin0P1 + 1
 
 		LDA	#<dialogWindowElimin0
 		STA	$FD
@@ -24558,6 +24963,24 @@ rulesDoCheckPayDebt:
 
 		BPL	@exit
 	
+		LDX	game + GAME::pActive
+		
+		LDA	game + GAME::varL
+		CMP	game + GAME::pActive
+		BEQ	@bank
+		
+		CMP	#$06
+		BEQ	@bank
+		
+		STA	dialogTempElimin0E, X
+		
+		JMP	@lose
+		
+@bank:
+		LDA	#$FF
+		STA	dialogTempElimin0E, X
+		
+@lose:
 		LDY	#PLAYER::status
 		LDA	($8B), Y
 		ORA	#$02
@@ -25260,7 +25683,8 @@ rulesCCCrdProcRep:				;street/gen repairs
 		LDX	game + GAME::pActive
 		
 		LDA	game + GAME::fFPPays
-		BEQ	@dosub
+		CMP	#$02
+		BNE	@dosub
 		
 		LDX	#$06
 
@@ -25455,7 +25879,8 @@ rulesCCCrdProcPay:				;pay cash
 		LDX	game + GAME::pActive
 		
 		LDA	game + GAME::fFPPays
-		BEQ	@dosub
+		CMP	#$02
+		BNE	@dosub
 		
 		LDX	#$06
 
@@ -28185,7 +28610,24 @@ rulesDoCopyImprv:
 		BNE	@loop
 		
 		RTS
+
+
+rulesDoCopyOwn:
+		LDX	#$00
+		LDY	#$00
+@loop:
+		LDA	sqr00, X
+		STA	rulesSqrImprv, Y		
+
+		INX
+		INX
+		INY
 		
+		CPX	#$50
+		BNE	@loop
+		
+		RTS
+
 	
 rulesDoProcRecoverAll:
 ;		For each group in the priority lists do
