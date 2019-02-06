@@ -1,6 +1,6 @@
 # MONOPOLY 
 
-VERSION 0.02.68 BETA
+VERSION 0.02.80 BETA
 
 
 FOR THE COMMODORE 64
@@ -43,7 +43,7 @@ I feel this is how the game **should** be played in this format...
 *  8+ years
 
 
-*   3 house rules (one always enabled:  reshuffle CCCCards)
+*   5 house rules (one always enabled:  reshuffle CCCCards)
 *   strictly turn-based (with interrupts and flexible management)
 
 
@@ -144,17 +144,12 @@ The game is identical to the most recent, standard rules as per my copy
   returned (independently, of course).  The standard rules don't mandate 
   this.  I feel this is a more interesting behaviour.  I may be persuaded 
   to make this a configurable house rule however I strongly prefer it as is.
-* When you are able to use a Get Out Gaol Free card, the standard rules
+* When you are able to use a Get Out Jail (Gaol) Free card, the standard rules
   would allow you to use any that you have but in this implementation, 
   the Community Chest one is used first and then the Chance one, if both 
   are owned.  This is for the sake of simplicity.  I'm happy to take on
   board any valid criticism of this decision but having to select would
   be a disproportionate complication of the mechanisms.
-* Gaol is spelt "G A O L" instead of "J A I L" because that's how it 
-  was on the board I played on as a child and I prefer the old or even
-  correct spelling.  I'm not intending on using American "spelling" and 
-  place names any time soon but perhaps for an NTSC version (see known 
-  issues).
 * The maximum amount of money each player can have in this version is 
   fixed at $32767.  The odd value is due to the implementation.  It is 
   still an extremely high amount of money to have, even for a game by 
@@ -165,33 +160,6 @@ The game is identical to the most recent, standard rules as per my copy
   you can only have the printed money in play but the standard rules do 
   say that the banker is quite free to print more bills (which this 
   version can effectively do to a very large extent).  
-
-
-## House Rules
-
-The following optional house rules are available (or considered):
-	
-* Starting money can be set low ($1000) or high ($2000).  I have
-  done this because I feel that with only two players, the normal
-  starting money ($1500) is too low.  There just isn't enough capital in play
-  in my opinion.  $2000 for three players is questionably high but 
-  still works alright enough.  For four or more you probably want the 
-  normal amount.  I may expand the selection range.  I have been 
-  asked for $3000 but this is definitely too high.
-* Taxes can be sent to and collected from Free Parking.
-  I actually hate this house rule because it is insanely unbalanced and
-  can cause the game to drag on.  It is widely desired, however so I
-  provide it (it has been almost free in the implementation 
-  anyway).  Only tax accumulation is implemented and that's all I'll 
-  allow.  Ever.  Period.
-* I am considering the "double salary for actually landing on Go"
-  house rule but I feel it is largely redundant with a high starting
-  money option.
-* Since I have mentioned it, I will field requests for the printed
-  bills only house rule (since there is always going to be some kind
-  of cap).  It would be implemented such that effectively, a best-fit
-  of bills would be applied (shuffling them about through all accounts).
-  So simply a game-wide, total funds cap.
 
 
 ## Rule Observations and Deductions
@@ -348,9 +316,9 @@ remaining rules unchanged:
   owed player (not the bank as per other cards, except above).  Again,
   just to be clear.  Any number of players may lose to the owed player
   and the owed player may not get all of the money.
-* If you roll for the third time in attempting to get out of gaol, you
-  cannot then use a Get Out of Gaol Free card.  This is due to the fact
-  that the standard rules do not specifically allow it and the gaol 
+* If you roll for the third time in attempting to get out of jail (gaol), you
+  cannot then use a Get Out of Jail (Gaol) Free card.  This is due to the fact
+  that the standard rules do not specifically allow it and the jail (gaol) 
   rules are quite specific.
 * When rolling for first turn, the lowest player wins when there is a 
   tie.  Player one would win over player six.  The standard rules do not 
@@ -380,6 +348,37 @@ remaining rules unchanged:
 
 
 
+## Language Select
+
+You may now select the language and place name set at program launch.  The available
+language/place names are "English (USA)" and "English (UK)".
+
+
+## House Rules
+
+The following optional house rules are available (or considered):
+
+* The Chance/Community Chest cards are always reshuffled when the full deck has 
+  been drawn.
+* Starting money can be set low ($1000) or high ($2000).  I have
+  done this because I feel that with only two players, the normal
+  starting money ($1500) is too low.  There just isn't enough capital in play
+  in my opinion.  $2000 for three players is questionably high but 
+  still works alright enough.  For four or more you probably want the 
+  normal amount.  I may expand the selection range.  I have been 
+  asked for $3000 but this is definitely too high.
+* Taxes (and Bail) can be sent to and collected from Free Parking.
+  I actually hate this house rule because it is insanely unbalanced and
+  can cause the game to drag on.  It is widely desired, however so I
+  provide it (it has been almost free in the implementation 
+  anyway).  Okay, I capitulated.  You may now also collect on Free Parking all of
+  the Chance/Community Chest fees, too.  
+* You may collect double salary for actually landing on Go.
+* You may start with a number of deeds.
+  Depending upon the number of players and starting cash, each player can be 
+  randomly dealt a number of deeds.
+
+
 ## Further Details
 
 I have used a customised version of the GoatTracker 2.73 driver for this game.
@@ -395,6 +394,9 @@ and match real dice closely enough.
 ## Compilation
 
 To compile: 
+
+#### !!! Please note that this is entirely out of date and that the build 
+process is far more complex now.
 
 	ca65 -g -l c64client.lst -o c64client.o c64client.s
 	cl65 -t none c64client.o -Ln c64client.lbl -o c64client.prg
@@ -427,9 +429,6 @@ Insert the disk.
   occurs in my testing.  From what I have been able to see, it seems
   that some IRQ is not being acknowledged correctly when this occurs.  I have
   attempted another fix but I am unsure if I have succeeded.
-* Load times on a real machine will seem extraordinarily long compared with other
-  games due to the fact that I'm currently not using any compression.  I will
-  fix this before release.
 * SFX often get lost and "music" breaks up because of the limited 
   number of channels (two) available to play sounds on.  The third 
   voice is used for random number generation. Even though it is a more 
@@ -438,8 +437,7 @@ Insert the disk.
 * The game was written and designed for a PAL machine.  The audio driver, IRQ
   handler and even input driver are all expecting this. You get slightly strange 
   results on an NTSC machine, from my testing.  The game is playable though.  I may 
-  release an NTSC/PAL-N compatible version in the future and perhaps translate
-  the game for that version, also.
+  release an NTSC/PAL-N compatible version in the future.
 
 
 ### End of Transcript
