@@ -244,6 +244,10 @@ strOptn5Mng0:
 			.word _strOptn5Mng0
 strOptn6Mng0:
 			.word _strOptn6Mng0
+strHeaderMngCns0:
+			.word _strHeaderMngCns0
+strDescMngCns0:
+			.word _strDescMngCns0
 strHeaderTrade0:
 			.word _strHeaderTrade0
 strOptn0Trade0:
@@ -258,6 +262,8 @@ strOptn4Trade0:
 			.word _strOptn4Trade0
 strHeaderTrade1:
 			.word _strHeaderTrade1
+strDesc0Trade1:
+			.word _strDesc0Trade1
 strHeaderTrade2:
 			.word _strHeaderTrade2
 strDescTrade2:

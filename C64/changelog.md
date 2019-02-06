@@ -1,6 +1,6 @@
 # MONOPOLY 
 
-VERSION 0.02.75 BETA
+VERSION 0.02.80 BETA
 
 
 FOR THE COMMODORE 64
@@ -26,9 +26,9 @@ this.  *\*ugh\**
 
 * After starting a new game with keys only input, the menu options flash.
 
-* Management construct should auto construct when constructing on highest improved
-  deed.
-* Confirm menu from trade approval confirm (modify quit confirm menu).
+
+* Change "all" dirty to be just board dirty and req. individual flags.
+
 
 * rulesSuggestDeedValue should tap values based on group significance.
 * AutoTradeApprove could tally "half points" for prime targets, getting almost and
@@ -37,10 +37,10 @@ this.  *\*ugh\**
 
 * Optimise trade calculations -- too large!  24bit math!
 
-* Change "all" dirty to be just board dirty and req. individual flags.
-* Get exomiser working.
 
 * Should be able to do release state after above and all testing items passed.
+
+
 
 * Player sprites on overview dialog?  Would look pretty.  IRQ is a mess.
 * Mode chain integrity checks?  
@@ -49,6 +49,7 @@ this.  *\*ugh\**
 * Put code into separate files as indicated.
 * Is rent3 SFX still a little lame?  Does it matter?  Are the sounds okay on 
   Android (where the emulation is terrible)?
+* Better (2 channel) sound for tax?
 * Properly divide game and rule routines.  Hmm...
 * CPU player personalities?  Not enough memory unless I do something radical in
   optimisation?
@@ -92,10 +93,25 @@ this.  *\*ugh\**
 
 ## Change History 
 
+### Since Version 0.02.80B
+
+* 06FEB2019
+	* Exomizer utilised.
+	* Language select loader.
+
 ### Since Version 0.02.75B
 
+* 06FEB2019
+	* Management construct can auto group construct when constructing on 
+	  highest improved deed.
+	* Confirm menu from trade approval confirm.
+	* Make menuPageQuit1 generic as menuPageConf0.
+	* Fix bug calling menuPageQuit0 in menuPagePlay0StdKeys.
+	* Fix bugs testing keys in menuPageQuit0Keys, menuPageQuit1Keys, 
+	  menuPageQuit2Keys.
+
 * 05FEB2019
-	* Add house rule for starting with more than no deeds.
+	* Add house rule for starting with more than no deeds.  Expensive!
 	* Make dialog elimin0 more informative about the elimination.
 	* Fix Free Parking CCCCard detection logic.
 	* Fix Free Parking CCCCard transactions to use Bank Taxes account.

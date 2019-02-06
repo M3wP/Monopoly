@@ -2,7 +2,7 @@
 ;M O N O P O L Y 
 ;-------------------------------------------------------------------------------
 ;
-;VERSION 0.02.75 BETA
+;VERSION 0.02.80 BETA
 ;
 ;
 ;FOR THE COMMODORE 64
@@ -59,41 +59,41 @@
 ;	   4 house rules (one always enabled:  reshuffle CCCCards)
 ;	     strictly turn-based (with interrupts and flexible management)
 ;
-;	  an estimated 19.75KB data, 36KB code, 1.5KB heap, 5.25KB system
+;	  an estimated 20KB data, 36.25KB code, 1.5KB heap, 5.25KB system
 ;	 650 portrait A4 pages of source code with small font
 ;	1100 A4 pages to print the old landscape list style with normal font
 ;
 ;
 ;Free memory information (as of last update):
-;	* Most of the zero page is unused (still need break-down/rework) except 
+;	* Most of the Zero Page is unused (still need break-down/rework) except 
 ;	  for possible reservation of Kernal data for compatibility (load/save?)
-;	* Free in global state, 17 bytes (free for globals)
-;	* Between end of program and reserved, 1411 bytes (free for program)
-;	* Free in discard, 2 bytes (free for discard)
-;	* Reserved area, 512 bytes (reserved for discard/display heap)
-;	* Between rules data and action heap, 115 bytes (free for constant data)
-;	* Free in trade/CPU data, 17 bytes (free for CPU trade processing)
+;	* Free in Global State, 17 bytes (free for globals)
+;	* Between end of Program and Reserved, 584 bytes (free for Program)
+;	* Free in Discard, 2 bytes (free for Discard)
+;	* Reserved area, 512 bytes (reserved for Discard/Display Heap)
+;	* Between Rules data and Action Heap, 115 bytes (free for constant data)
+;	* Free in Trade/CPU data, 17 bytes (free for CPU trade processing)
 ;
 ;
 ;Memory map (as of last update):
 ;	0000 -	00FF	* System Zero Page (256 bytes)
 ;	0100 -	01FF	* System Stack (256 bytes)
-;	0200 - 	03FF	+ Global state data (495 bytes used, 17 bytes free)
-;	0400 - 	07FF	* System screen and sprite pointer data (1KB)
-;	0800 - 	08FF	- Bootstrap/sprite data (256 bytes)
+;	0200 - 	03FF	+ Global State data (495 bytes used, 17 bytes free)
+;	0400 - 	07FF	* System Screen and Sprite Pointer data (1KB)
+;	0800 - 	08FF	- Bootstrap/Sprite data (256 bytes)
 ;	0900 - 	0BFF	> String translation references (0.75KB)
 ;	0C00 -  7FFF	. Program code and data (~29KB)
 ;	8000 -	9FFF	. Program code and data (8KB)
-;	A000 -	C757	. Program code and data (~9.75KB)
-;	C758 -	C955	- Discard/display heap (510 bytes, 2 discard free)
-;	C956 -	CDFF	? Free (~1.25KB)
-;	CE00 - 	CFFF	! Reserved (discard/display heap, 512 bytes)
+;	A000 -	C757	. Program code and data (~10KB)
+;	C9B5 -	CBB2	- Discard/Display Heap (510 bytes, 2 discard free)
+;	CBB3 -	CDFF	? Free (~0.5KB)
+;	CE00 - 	CFFF	! Reserved (Discard/Display Heap, 512 bytes)
 ;	D000 - 	DFFF	* System I/O (4KB)
 ;	E000 -	F2FF	> Strings const data (varies, up to 4864 bytes)
 ;	F300 - 	F45E	> Screen const data (351 bytes)
 ;	F45F - 	FA8C	> Rules const data (1582 bytes)
 ;	FA8D - 	FAFF	? Free (115 bytes)
-;	FB00 - 	FEFF	= Action heap (1KB)
+;	FB00 - 	FEFF	= Action Heap (1KB)
 ;	FF00 -  FFF9	> Trade/CPU global data (233 bytes used, 17 bytes free)
 ;	FFFA -	FFFF	* System vectors (6 bytes)
 ;
@@ -112,6 +112,12 @@
 ;-------------------------------------------------------------------------------
 ;Compile switch definitions
 ;-------------------------------------------------------------------------------
+;!!!	WARNING
+;	You should take care attempting to use these debug defines due to memory
+;	constraints.  It may be possible to use them independently or in some
+;	combinations.  They have been used extensively and possibly 
+;	exhaustively, so should not be required at this time.
+
 	.define DEBUG_IRQ 	0
 	.define DEBUG_CPU 	0
 	.define DEBUG_CPUCCCC	0
@@ -123,9 +129,11 @@
 	.define DEBUG_KEYS	0
 	.define	DEBUG_DICE	0
 	.define	DEBUG_EQUITY	0
-	
+
+;---	I want to keep these as possible within the main program limits
 	.define DEBUG_DEMO	0
 	.define DEBUG_EXTRAS	0
+	
 	
 	.define	LIST_GLBINF	0
 
@@ -310,6 +318,8 @@ uiActnCache	=	$FB00
 		
 		fInjKey .byte
 		fUsrInp .byte
+		
+		fNoUpdG .byte			;Don't call gameUpdateMenu
 	.endstruct
 	
 	
@@ -6589,6 +6599,13 @@ uiProcessCtxNextPtr:
 	.word	uiProcessContext0
 uiProcessEnqueuePtr:
 	.word	uiActnCache
+	
+	
+uiProcessSaveMenu0:
+		.word	menuPageBlank0Keys
+		.word	menuDefDraw
+		.byte	$00
+		.word	cpuPerformFault
 		
 	.if	DEBUG_ACTIONS
 uiProcessHaveMS:
@@ -6621,6 +6638,7 @@ uiInitQueue:
 		LDA	#$00
 		STA	ui + UI::cActns
 		STA	ui + UI::cLstAct
+		STA	ui + UI::fNoUpdG
 
 		RTS
 
@@ -6810,6 +6828,7 @@ uiProcessMarkStart:
 		
 		LDA	#$00
 		STA	ui + UI::cLstAct
+		STA	ui + UI::fNoUpdG
 		
 		RTS
 		
@@ -6906,8 +6925,27 @@ uiProcessEnd:
 		JSR	rulesFocusOnActive
 
 @update:
+		LDA	ui + UI::fNoUpdG
+		BEQ	@dogameupd
+		
+		LDX	#$06
+@loop:
+		LDA	uiProcessSaveMenu0, X
+		STA	menuActivePage0, X
+		
+		DEX
+		BPL	@loop
+
+		LDA	game + GAME::dirty
+		ORA	#GAME_DRT_MENU
+		STA	game + GAME::dirty
+
+		JMP	@done
+
+@dogameupd:
 		JSR	gameUpdateMenu
 
+@done:
 		LDA	#$01
 		STA	ui + UI::fInjKey
 		
@@ -6979,6 +7017,14 @@ uiProcessInit:
 		STA	ui + UI::fActTyp
 
 @perf:
+		LDX	#$06
+@loop:
+		LDA	menuActivePage0, X
+		STA	uiProcessSaveMenu0, X
+		
+		DEX
+		BPL	@loop
+		
 		JSR	gamePushState
 
 		LDA	#GAME_MDE_ACTS
@@ -7158,6 +7204,27 @@ uiProcessTerminate:
 		STA	game + GAME::fStpSig
 		STA	game + GAME::kWai
 		
+		LDA	ui + UI::fNoUpdG
+		BEQ	@updates
+	
+;		JSR	uiActionDeselect
+;		JSR	rulesFocusOnActive
+		
+		LDX	#$06
+@loop:
+		LDA	uiProcessSaveMenu0, X
+		STA	menuActivePage0, X
+		
+		DEX
+		BPL	@loop
+		
+		LDA	game + GAME::dirty
+		ORA	#GAME_DRT_MENU
+		STA	game + GAME::dirty
+
+		JMP	@exit
+	
+@updates:		
 		LDA	game + GAME::gMode
 		CMP	#GAME_MDE_AUCN
 		BNE	@othermn
@@ -7213,6 +7280,7 @@ uiProcessTerminate:
 @complete:
 		JSR	gameUpdateMenu
 		
+@exit:
 		LDA	#$01
 		STA	ui + UI::fInjKey
 		
@@ -8198,9 +8266,9 @@ menuPageQuit0:
 		.byte	$01
 		.word	cpuPerformFault
 
-menuPageQuit1:
-		.word	menuPageQuit1Keys
-		.word	menuPageQuit1Draw
+menuPageConf0:
+		.word	menuPageConf0Keys
+		.word	menuPageConf0Draw
 		.byte	$01
 		.word	cpuPerformFault
 
@@ -10464,7 +10532,7 @@ menuPagePlay0StdKeys:
 		BNE	@keysN			
 						
 		LDA	#<menuPageQuit0
-		LDY	#>menuPageQuit1
+		LDY	#>menuPageQuit0
 		
 		JSR	menuSetPage
 		
@@ -11973,6 +12041,265 @@ menuWindowManage0C:
 
 
 ;-------------------------------------------------------------------------------
+menuPageManage0CnsConfKeys:
+;-------------------------------------------------------------------------------
+;		if 'N' then
+		CMP	#'N'
+		BNE	@tstY
+		
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
+		JMP	@returnmng		;set page back to management
+		
+@tstY:
+;		if 'Y' then
+		CMP	#'Y'
+		BEQ	@start
+	
+		JMP	@exit
+		
+@start:
+		LDA	#$01			;start action list
+		STA	ui + UI::fActInt
+		LDA	#$00
+		STA	ui + UI::fActTyp
+		
+		JSR	uiProcessMarkStart
+		
+		LDA	#$01
+		STA	ui + UI::fNoUpdG
+
+		LDY	#PLAYER::money		;copy player cash to temp
+		LDA	($8B), Y
+		STA	game + GAME::varD
+		INY
+		
+		LDA	($8B), Y
+		STA	game + GAME::varE
+		
+		LDA	game + GAME::sSelect	;get count of deeds on selected
+		ASL
+		TAX
+		LDA	sqr00 + 1, X
+		
+		AND	#$08
+		BEQ	@houses
+		
+		LDA	#$05
+		JMP	@getcount
+		
+@houses:
+		LDA	sqr00 + 1, X
+		AND	#$07
+		
+@getcount:
+		STA	game + GAME::varA
+
+		LDA	rulesSqr0, X		;get improve cost for group
+		TAY
+		
+		LDA	rulesGrpLo, Y
+		STA 	$FB
+		LDA	rulesGrpHi, Y
+		STA	$FC
+		
+		LDY	#GROUP::vImprv
+		
+		LDA	($FB), Y
+		STA	game + GAME::varO
+		LDA	#$00
+		STA	game + GAME::varP
+
+		LDA	rulesSqr0, X		;for each square in group
+		CLC
+		ADC	#$1C
+		
+		TAX
+		LDY	#$02
+		
+@loop:	
+		STY	game + GAME::varF
+		STX	game + GAME::varB
+		
+		LDA	rulesGrpSqrs0, X	;if not at count
+		CMP	#$FF
+		BEQ	@next
+		
+		STA	game + GAME::varC
+		
+		ASL
+		TAX
+		LDA	sqr00 + 1, X
+		
+		AND	#$08
+		BEQ	@houses1
+		
+		LDA	#$05
+		JMP	@chkcount
+		
+@houses1:
+		LDA	sqr00 + 1, X
+		AND	#$07
+		
+@chkcount:
+		CMP	game + GAME::varA
+		BEQ	@next
+
+		JSR	gameAmountIsLessDirect	;if have cash (from temporary)
+		BCC	@next
+
+		SEC				;decrement temporary cash
+		LDA	game + GAME::varD
+		SBC	game + GAME::varO
+		STA	game + GAME::varD
+		
+		LDA	game + GAME::varE
+		SBC	game + GAME::varP
+		STA	game + GAME::varE
+
+		LDA	#UI_ACT_BUYI		;add improve action
+		STA	$68
+		LDA	game + GAME::pActive
+		STA	$69
+		LDA	game + GAME::varC
+		STA	$6A
+		
+		JSR	uiEnqueueAction
+		
+		LDA	#UI_ACT_DELY
+		STA	$68
+		LDA	#$03
+		STA	$69
+		LDA	#$00
+		STA	$6A
+		STA	$6B
+		
+		JSR	uiEnqueueAction
+
+@next:
+		SEC
+		LDA	game + GAME::varB
+		SBC	#$0E
+		TAX
+
+		LDY	game + GAME::varF
+		DEY
+		BPL	@loop
+
+		LDA	ui + UI::cLstAct	;if check have added actions
+		BEQ	@noactions
+
+		LDA	#UI_ACT_ENDP		;add end of actions action
+		STA	$68
+		LDA	#$00
+		STA	$69
+		STA	$6A
+		STA	$6B
+		
+		JSR	uiEnqueueAction
+		
+		LDA 	#<menuPageManage0	;set page back to management *
+		LDY	#>menuPageManage0
+		
+		JSR	menuSetPage
+		
+		JSR	uiProcessInit		;start action list
+
+		JMP	@exit
+
+@noactions:
+		JSR	uiProcessCancel		;else rollback action list
+		
+		LDA	#$00
+		STA	ui + UI::fNoUpdG
+
+		LDA	#<SFXBUZZ
+		LDY	#>SFXBUZZ
+		LDX	#$07
+		JSR	SNDBASE + 6
+		
+@returnmng:
+		LDA 	#<menuPageManage0
+		LDY	#>menuPageManage0
+		
+		JSR	menuSetPage
+
+@exit:
+		RTS
+		
+
+;-------------------------------------------------------------------------------
+menuPageManage0Cnstrct:
+;-------------------------------------------------------------------------------
+;		Get count of improves for group of selected square
+		LDA	game + GAME::sSelect
+		ASL
+		TAX
+		LDA	sqr00, X
+		CMP	game + GAME::pActive
+		BNE	@buzz
+		
+		LDA	rulesSqr0, X
+		TAX
+		LDY	game + GAME::sSelect
+		
+		JSR	rulesDoCollateImprv
+
+		LDA	game + GAME::varQ
+		BNE	@buzz
+		
+		LDA	game + GAME::varA		;if not gmin >= squarem
+		CMP	game + GAME::varC
+		BMI	@checkall
+
+		LDA	game + GAME::sSelect		;just regular improve
+		JSR	rulesNextImprv
+
+		RTS
+
+							;else
+@checkall:
+		LDA	#<strHeaderMngCns0		;confirm all attempt
+		STA	menuConf0Hdr0
+		
+		LDA	#>strHeaderMngCns0
+		STA	menuConf0Hdr0 + 1
+
+		LDA	#<strDescMngCns0
+		STA	menuConf0Desc0
+		
+		LDA	#>strDescMngCns0
+		STA	menuConf0Desc0+ 1
+
+		LDA	#<(menuPageManage0CnsConfKeys - 1)
+		STA	menuConf0Proc0
+
+		LDA	#>(menuPageManage0CnsConfKeys - 1)
+		STA	menuConf0Proc0 + 1
+
+		LDA	#<menuPageConf0
+		LDY	#>menuPageConf0
+
+		JSR	menuSetPage
+
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+		RTS
+		
+@buzz:
+		LDA	#<SFXBUZZ
+		LDY	#>SFXBUZZ
+		LDX	#$07
+		JSR	SNDBASE + 6
+		RTS
+		
+		
+;-------------------------------------------------------------------------------
 menuPageManage0Keys:
 ;-------------------------------------------------------------------------------
 		CMP	#'D'
@@ -12046,9 +12373,8 @@ menuPageManage0Keys:
 		JMP	@buzz
 		
 @doconstruct:
-		LDA	game + GAME::sSelect
-		JSR	rulesNextImprv
-		
+		JSR	menuPageManage0Cnstrct
+
  		JMP	@exit
 		
 @keysS:
@@ -12852,6 +13178,33 @@ menuWindowTrade1:
 
 
 ;-------------------------------------------------------------------------------
+menuPageTrade1ConfKeys:
+;-------------------------------------------------------------------------------
+		CMP	#'N'
+		BNE	@tstY
+		
+		JSR	gameUpdateMenu
+		
+		JMP	@keysDing
+		
+@tstY:
+		CMP	#'Y'
+		BNE	@keysExit
+		
+		JSR	gameApproveTrade
+
+@keysDing:
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+		RTS
+		
+@keysExit:
+		RTS
+		
+
+;-------------------------------------------------------------------------------
 menuPageTrade1DefKeys:
 ;-------------------------------------------------------------------------------
 		CMP	#'M'
@@ -12949,8 +13302,29 @@ menuPageTrade1DefKeys:
 		CMP	#'C'
 		BNE	@keysOther
 		
-		JSR	gameApproveTrade
+		LDA	#<strHeaderTrade1
+		STA	menuConf0Hdr0
+		
+		LDA	#>strHeaderTrade1
+		STA	menuConf0Hdr0 + 1
 
+		LDA	#<strDesc0Trade1
+		STA	menuConf0Desc0
+		
+		LDA	#>strDesc0Trade1
+		STA	menuConf0Desc0+ 1
+
+		LDA	#<(menuPageTrade1ConfKeys - 1)
+		STA	menuConf0Proc0
+
+		LDA	#>(menuPageTrade1ConfKeys - 1)
+		STA	menuConf0Proc0 + 1
+
+		LDA	#<menuPageConf0
+		LDY	#>menuPageConf0
+
+		JSR	menuSetPage		
+		
 @keysDing:
 		LDA	#<SFXDING
 		LDY	#>SFXDING
@@ -13634,12 +14008,12 @@ menuPageElimin1Draw:
 
 
 ;-------------------------------------------------------------------------------
-menuPlyrSelCallProc:
-		.word	$0000
 menuPlyrSelAllowCur:
 		.byte	$00
 menuPlyrSelSelect:
 		.byte	$00
+menuPlyrSelCallProc:
+		.word	$0000
 
 
 ;***THIS IS VERY NAUGHTY SO THE MENU DATA CAN'T BE MORE THAN ONE PAGE 
@@ -14020,72 +14394,9 @@ menuWindowQuit0:
 			
 			.byte	$00
 
-;-------------------------------------------------------------------------------
-menuPageQuit0Keys:
-;-------------------------------------------------------------------------------
-		CMP	#'N'
-		BNE	@tstY
-		
-		JMP	@update
-
-@tstY:
-		CMP	#'Y'
-		
-		LDA	#<menuPageQuit1
-		LDY	#>menuPageQuit1
-
-		JSR	menuSetPage
-
-;		LDA	#$08
-;		ORA	game + GAME::dirty
-;		STA	game + GAME::dirty
-
-		JMP	@ding
-
-@update:
-		JSR	gameUpdateMenu
-		
-@ding:
-		LDA	#<SFXDING
-		LDY	#>SFXDING
-		LDX	#$07
-		JSR	SNDBASE + 6
-
-		RTS
-		
 
 ;-------------------------------------------------------------------------------
-menuPageQuit0Draw:
-;-------------------------------------------------------------------------------
-		LDA	#<menuWindowQuit0
-		STA	$FD
-		LDA	#>menuWindowQuit0
-		STA	$FE
-		
-		JSR	screenPerformList
-
-		RTS
-
-
-;-------------------------------------------------------------------------------
-menuWindowQuit1:	
-			.byte	$90, $01, $07
-			.word	     strHeaderQuit0
-			.byte	$90, $01, $08
-			.word        strDescQuit1
-			.byte	$90, $02, $0A
-			.word	     strText0Quit1
-			
-			.byte	$A1, $0D, $01, $12, $59, $02, $0D
-			.word	     strOptn0Setup3
-			.byte	$A1, $0F, $01, $12, $4E, $02, $0F
-			.word	     strOptn1Setup3
-			
-			.byte	$00
-
-
-;-------------------------------------------------------------------------------
-menuPageQuit1Keys:
+menuPageQuit0ConfKeys:
 ;-------------------------------------------------------------------------------
 		CMP	#'N'
 		BNE	@tstY
@@ -14094,6 +14405,7 @@ menuPageQuit1Keys:
 
 @tstY:
 		CMP	#'Y'
+		BNE	@exit
 		
 		JSR	gamePushState
 		
@@ -14114,15 +14426,141 @@ menuPageQuit1Keys:
 		LDX	#$07
 		JSR	SNDBASE + 6
 
+@exit:
+		RTS
+
+
+;-------------------------------------------------------------------------------
+menuPageQuit0Keys:
+;-------------------------------------------------------------------------------
+		CMP	#'N'
+		BNE	@tstY
+		
+		JMP	@update
+
+@tstY:
+		CMP	#'Y'
+		BNE	@exit
+		
+		LDA	#<strHeaderQuit0
+		STA	menuConf0Hdr0
+		
+		LDA	#>strHeaderQuit0
+		STA	menuConf0Hdr0 + 1
+
+		LDA	#<strDescQuit1
+		STA	menuConf0Desc0
+		
+		LDA	#>strDescQuit1
+		STA	menuConf0Desc0+ 1
+
+		LDA	#<(menuPageQuit0ConfKeys - 1)
+		STA	menuConf0Proc0
+
+		LDA	#>(menuPageQuit0ConfKeys - 1)
+		STA	menuConf0Proc0 + 1
+
+		LDA	#<menuPageConf0
+		LDY	#>menuPageConf0
+
+		JSR	menuSetPage
+
+		JMP	@ding
+
+@update:
+		JSR	gameUpdateMenu
+		
+@ding:
+		LDA	#<SFXDING
+		LDY	#>SFXDING
+		LDX	#$07
+		JSR	SNDBASE + 6
+
+@exit:
 		RTS
 		
 
 ;-------------------------------------------------------------------------------
-menuPageQuit1Draw:
+menuPageQuit0Draw:
 ;-------------------------------------------------------------------------------
-		LDA	#<menuWindowQuit1
+		LDA	#<menuWindowQuit0
 		STA	$FD
-		LDA	#>menuWindowQuit1
+		LDA	#>menuWindowQuit0
+		STA	$FE
+		
+		JSR	screenPerformList
+
+		RTS
+
+
+;-------------------------------------------------------------------------------
+menuConf0Hdr0:
+			.word 	strHeaderQuit0
+menuConf0Desc0:
+			.word	strDescQuit1
+menuConf0Proc0:
+			.word	$0000
+
+menuWindowConf0:	
+			.byte	$90, $01, $07
+menuWindowConf0Hd0:
+			.word	     strHeaderQuit0
+			.byte	$90, $01, $08
+menuWindowConf0Ds0:
+			.word        strDescQuit1
+			
+			.byte	$90, $02, $0A
+			.word	     strText0Quit1
+			
+			.byte	$A1, $0D, $01, $12, $4E, $02, $0D
+			.word	     strOptn1Setup3
+			.byte	$A1, $0F, $01, $12, $59, $02, $0F
+			.word	     strOptn0Setup3
+			
+			.byte	$00
+
+
+;-------------------------------------------------------------------------------
+menuPageConf0Keys:
+;-------------------------------------------------------------------------------
+		TAX
+		
+		LDA	#>(@farreturn - 1)
+		PHA
+		LDA	#<(@farreturn - 1)
+		PHA
+		
+		LDA	menuConf0Proc0 + 1
+		PHA
+		LDA	menuConf0Proc0
+		PHA
+
+		TXA
+
+		RTS				;Call our routine
+		
+@farreturn:
+		RTS
+		
+
+;-------------------------------------------------------------------------------
+menuPageConf0Draw:
+;-------------------------------------------------------------------------------
+		LDA	menuConf0Hdr0
+		STA	menuWindowConf0Hd0
+		
+		LDA	menuConf0Hdr0 + 1
+		STA	menuWindowConf0Hd0 + 1
+
+		LDA	menuConf0Desc0
+		STA	menuWindowConf0Ds0
+		
+		LDA	menuConf0Desc0 + 1
+		STA	menuWindowConf0Ds0 + 1
+
+		LDA	#<menuWindowConf0
+		STA	$FD
+		LDA	#>menuWindowConf0
 		STA	$FE
 		
 		JSR	screenPerformList
@@ -14160,6 +14598,7 @@ menuPageQuit2Keys:
 
 @tstY:
 		CMP	#'Y'
+		BNE	@exit
 		
 		JSR	rulesDoNextPlyr
 		
@@ -14181,6 +14620,7 @@ menuPageQuit2Keys:
 		LDX	#$07
 		JSR	SNDBASE + 6
 		
+@exit:
 		RTS
 		
 
@@ -26561,14 +27001,14 @@ rulesDoPurchDeed:
 rulesDoCollateImprv:
 ;-------------------------------------------------------------------------------
 		LDA	#$05
-		STA	game + GAME::varA
+		STA	game + GAME::varA	;min improves for group
 		LDA	#$00
-		STA	game + GAME::varB
-		STA	game + GAME::varC
-		STA	game + GAME::varQ
+		STA	game + GAME::varB	;max improves for group
+		STA	game + GAME::varC	;count of improves on square
+		STA	game + GAME::varQ	;count of mortgaged in group
 
-		STY	game + GAME::varF	
-		STX	game + GAME::varR
+		STY	game + GAME::varF	;square
+		STX	game + GAME::varR	;group
 		
 		LDX	#$4E
 @loop0:	
@@ -34140,88 +34580,24 @@ debugCheckEquity:
 	.endif
 
 
-strText0Ref0:		;SELECT LANGUAGE:	$10
-			.byte $13, $05, $0C, $05, $03, $14, $20
-			.byte $0C, $01, $0E, $07, $15, $01, $07, $05
-			.byte $3A
-strText1Ref0:		;  A - ENGLISH (USA) $13, 
-			.byte $20, $20, $01, $20, $2D, $20, $05
-			.byte $0E, $07, $0C, $09, $13, $08, $20, $28
-			.byte $15, $13, $01, $29
-strText2Ref0:		;  B - ENGLISH (UK) $12
-			.byte $20, $20, $02, $20, $2D, $20, $05
-			.byte $0E, $07, $0C, $09, $13, $08, $20, $28
-			.byte $15, $0B, $29
+;===============================================================================
+;HEAP
+;===============================================================================
+heap0:
+	.assert	heap0 <= $CE00, error, "Program too large!"
+	
 
+;===============================================================================
+;DISCARD.S
+;===============================================================================
 
-;-------------------------------------------------------------------------------
-initGetLanguage:
-;-------------------------------------------------------------------------------
-		LDA	#$00
-		STA	$A3
-		
-		LDA	#<(1024 + 40)
-		STA	$FB
-		LDA	#>(1024 + 40)
-		STA	$FC
-		
-		LDA	#<strText0Ref0
-		STA	$FD
-		LDA	#>strText0Ref0
-		STA	$FE
-		
-		LDY	#$0F
-		JSR	initOutString		
+loadLangSelect:
+		.byte	$00
 
-		LDA	#<(1024 + 80)
-		STA	$FB
-		LDA	#>(1024 + 80)
-		STA	$FC
-		
-		LDA	#<strText1Ref0
-		STA	$FD
-		LDA	#>strText1Ref0
-		STA	$FE
-		
-		LDY	#$12
-		JSR	initOutString		
-
-		LDA	#<(1024 + 120)
-		STA	$FB
-		LDA	#>(1024 + 120)
-		STA	$FC
-		
-		LDA	#<strText2Ref0
-		STA	$FD
-		LDA	#>strText2Ref0
-		STA	$FE
-		
-		LDY	#$11
-		JSR	initOutString		
-
-@loop:
-		JSR	$FFE4
-		BEQ	@loop
-
-		CMP	#'A'
-		BEQ	@exit
-		
-		CMP	#'B'
-		BNE	@loop
-		
-		LDA	#$01
-		STA	$A3
-		
-		LDA	#'E'
-		STA	REFFILE_2 - 1
-		STA	FILENAME_2 - 1
-
-@exit:
-		LDA	#$93			;clear screen
-		JSR	krnlOutChr
-		
-		RTS
-
+strText3Load0:		;LOADING TRANSLATION...  $16, 
+			.byte $0C, $0F, $01, $04, $09, $0E, $07
+			.byte $20, $14, $12, $01, $0E, $13, $0C, $01
+			.byte $14, $09, $0F, $0E, $2E, $2E, $2E
 
 REFFILE:
 		.byte	"STRREFSU"
@@ -34230,8 +34606,23 @@ REFFILE_2:
 ;-------------------------------------------------------------------------------
 initCheckStrRefs:
 ;-------------------------------------------------------------------------------
-		LDA	$A3
+		LDA	loadLangSelect
 		BEQ	@exit
+		
+		STA	REFFILE_2 - 1
+		
+		LDA	#<(1024 + 160)
+		STA	$FB
+		LDA	#>(1024 + 160)
+		STA	$FC
+		
+		LDA	#<strText3Load0
+		STA	$FD
+		LDA	#>strText3Load0
+		STA	$FE
+		
+		LDY	#$15
+		JSR	initOutString
 		
 		LDA	#REFFILE_2 - REFFILE
 		STA	$A3
@@ -34244,36 +34635,6 @@ initCheckStrRefs:
 		
 @exit:
 		RTS
-		
-
-
-;===============================================================================
-;HEAP
-;===============================================================================
-heap0:
-	.assert	heap0 <= $CE00, error, "Program too large!"
-	
-
-;===============================================================================
-;DISCARD.S
-;===============================================================================
-
-strText0Load0:		;LOADING RESOURCES...
-			.byte $0C, $0F, $01, $04, $09, $0E, $07
-			.byte $20, $12, $05, $13, $0F, $15, $12, $03
-			.byte $05, $13, $2E, $2E, $2E
-strText0Load1:		;LOADING RULES...
-			.byte $0C, $0F, $01, $04, $09, $0E, $07
-			.byte $20, $12, $15, $0C, $05, $13, $2E, $2E
-			.byte $2E
-
-FILENAME:
-		.byte	"STRINGSU"
-FILENAME_2:
-		.byte	"RULES"
-FILENAME_3:
-		.byte	"SCREEN"
-FILENAME_4:
 
 
 ;-------------------------------------------------------------------------------
@@ -34334,71 +34695,15 @@ initLoadFile:
 ;-------------------------------------------------------------------------------
 initDataLoad:
 ;-------------------------------------------------------------------------------
+		LDA	$FB
+		STA	loadLangSelect
+		
 		LDA	#$8E			;go to uppercase characters
 		JSR	krnlOutChr
 		LDA	#$08			;disable change character case
 		JSR	krnlOutChr
-		LDA	#$93			;clear screen
-		JSR	krnlOutChr
 		
-		JSR	initGetLanguage
-		
-		LDA	#<(1024 + 40)
-		STA	$FB
-		LDA	#>(1024 + 40)
-		STA	$FC
-		
-		LDA	#<strText0Load0
-		STA	$FD
-		LDA	#>strText0Load0
-		STA	$FE
-		
-		LDY	#$13
-		JSR	initOutString
-
 		JSR	initCheckStrRefs
-
-		LDA	#FILENAME_2 - FILENAME
-		STA	$A3
-		LDA	#<FILENAME
-		STA	$A4
-		LDA	#>FILENAME
-		STA	$A5
-		
-		JSR	initLoadFile
-
-		LDA	#FILENAME_4 - FILENAME_3
-		STA	$A3
-		LDA	#<FILENAME_3
-		STA	$A4
-		LDA	#>FILENAME_3
-		STA	$A5
-		
-		JSR	initLoadFile
-
-		JSR	krnlSetNam
-		
-		LDA	#<(1024 + 80)
-		STA	$FB
-		LDA	#>(1024 + 80)
-		STA	$FC
-		
-		LDA	#<strText0Load1
-		STA	$FD
-		LDA	#>strText0Load1
-		STA	$FE
-		
-		LDY	#$0F
-		JSR	initOutString
-
-		LDA	#FILENAME_3 - FILENAME_2
-		STA	$A3
-		LDA	#<FILENAME_2
-		STA	$A4
-		LDA	#>FILENAME_2
-		STA	$A5
-
-		JSR	initLoadFile
 
 		RTS
 

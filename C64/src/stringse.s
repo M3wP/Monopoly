@@ -25,9 +25,9 @@ strText3Titles0:	;ECCLESTIAL
 strText4Titles0:	;SOLUTIONS
 			.byte $09, $93, $8F, $8C, $95, $94, $89, $8F
 			.byte $8E, $93	
-strText8Titles0:	;VERSION 0.02.75B
+strText8Titles0:	;VERSION 0.02.80B
 			.byte $10, $96, $85, $92, $93, $89, $8F, $8E
-			.byte $A0, $B0, $AE, $B0, $B2, $AE, $B7, $B5
+			.byte $A0, $B0, $AE, $B0, $B2, $AE, $B8, $B0
 			.byte $82			
 strText5Titles0:	;(C) 1935, 2016
 			.byte $0E, $A8, $83, $A9, $A0, $B1, $B9, $B3
@@ -442,6 +442,14 @@ strOptn6Mng0:		;D - DONE
 			.byte $8E, $85
 			
 
+strHeaderMngCns0:	;CONSTRUCT IMPRV
+			.byte $0F, $83, $8F, $8E, $93, $94, $92, $95
+			.byte $83, $94, $A0, $89, $8D, $90, $92, $96
+strDescMngCns0:		;CONFIRM GROUP
+			.byte $0D, $83, $8F, $8E, $86, $89, $92, $8D
+			.byte $A0, $87, $92, $8F, $95, $90
+
+
 strHeaderTrade0:	;TRADE INITIATION
 			.byte $10, $94, $92, $81, $84, $85, $A0, $89
 			.byte $8E, $89, $94, $89, $81, $94, $89, $8F
@@ -468,6 +476,9 @@ strHeaderTrade1:	;TRADE APPROVAL
 			.byte $0E, $94, $92, $81, $84, $85, $A0, $81
 			.byte $90, $90, $92, $8F, $96, $81, $8C
 
+strDesc0Trade1:		;CONFIRM TRADE
+			.byte $0D, $83, $8F, $8E, $86, $89, $92, $8D
+			.byte $A0, $94, $92, $81, $84, $85
 
 strHeaderTrade2:	;INVALID TRADE!
 			.byte $0E, $89, $8E, $96, $81, $8C, $89, $84
