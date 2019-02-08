@@ -395,8 +395,7 @@ and match real dice closely enough.
 
 To compile: 
 
-#### !!! Please note that this is entirely out of date and that the build 
-process is far more complex now.
+#### !!! Please note that this is entirely out of date and that the build process is far more complex now.
 
 	ca65 -g -l c64client.lst -o c64client.o c64client.s
 	cl65 -t none c64client.o -Ln c64client.lbl -o c64client.prg

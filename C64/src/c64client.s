@@ -10179,7 +10179,7 @@ menuWindowSetupAP4:
 menuWindowSetupAN4:
 			.word		strText1SetupA
 menuWindowSetupAB5:
-			.byte	$A1, $14, $01, $12, $34, $02, $14
+			.byte	$A1, $14, $01, $12, $35, $02, $14
 menuWindowSetupAP5:
 			.word	     	strOptn4PSel0
 			.byte	$90, $06, $14
@@ -12169,15 +12169,15 @@ menuPageManage0CnsConfKeys:
 		
 		JSR	uiEnqueueAction
 		
-		LDA	#UI_ACT_DELY
-		STA	$68
-		LDA	#$03
-		STA	$69
-		LDA	#$00
-		STA	$6A
-		STA	$6B
-		
-		JSR	uiEnqueueAction
+;		LDA	#UI_ACT_DELY
+;		STA	$68
+;		LDA	#$02
+;		STA	$69
+;		LDA	#$00
+;		STA	$6A
+;		STA	$6B
+;		
+;		JSR	uiEnqueueAction
 
 @next:
 		SEC
@@ -12191,6 +12191,16 @@ menuPageManage0CnsConfKeys:
 
 		LDA	ui + UI::cLstAct	;if check have added actions
 		BEQ	@noactions
+
+		LDA	#UI_ACT_DELY
+		STA	$68
+		LDA	#$02
+		STA	$69
+		LDA	#$00
+		STA	$6A
+		STA	$6B
+		
+		JSR	uiEnqueueAction
 
 		LDA	#UI_ACT_ENDP		;add end of actions action
 		STA	$68
@@ -13301,7 +13311,10 @@ menuPageTrade1DefKeys:
 @keysC:
 		CMP	#'C'
 		BNE	@keysOther
-		
+	
+		LDY	#PLAYER::fCPU
+		BNE	@confcpu
+
 		LDA	#<strHeaderTrade1
 		STA	menuConf0Hdr0
 		
@@ -13324,6 +13337,9 @@ menuPageTrade1DefKeys:
 		LDY	#>menuPageConf0
 
 		JSR	menuSetPage		
+		
+@confcpu:
+		JSR	gameApproveTrade
 		
 @keysDing:
 		LDA	#<SFXDING
@@ -14950,6 +14966,11 @@ gamePerformQuit:
 		AND	#$01
 		BEQ	@next
 		
+;***FIXME:  Is this sufficient?  Does debt need to be recovered for the score?
+		LDA	($FB), Y		;Turn off in debt
+		AND	#$F7			
+		STA	($FB), Y	
+		
 		JSR	gameCalcPlayerScore
 		
 		LDA	game + GAME::varH
@@ -16071,7 +16092,8 @@ gameToggleGaol:
 		LDA	#$00
 		STA	game + GAME::varE
 
-		LDX	game + GAME::pActive
+;		LDX	game + GAME::pActive
+		LDX	#$06
 		JSR	rulesSubCash		
 
 		LDY	#PLAYER::colour
@@ -17840,12 +17862,12 @@ gameCheckChanceShuffle:
 ;===============================================================================
 
 ;-------------------------------------------------------------------------------
+dialogDrawDefDraw:
+			.byte	$00
 dialogKeyHandler:
 			.word	dialogDefKeys
 dialogDrawHandler:
 			.word	dialogDefDraw
-dialogDrawDefDraw:
-			.byte	$00
 			
 			
 ;***	60 bytes
@@ -18257,9 +18279,13 @@ dialogDlgTitles0Draw:
 ;-------------------------------------------------------------------------------
 		JSR	screenBeginButtons
 
+		LDA	ui + UI::fJskEnb
+		BEQ	@skipbtn
+
 		LDA	#$00
 		STA	ui + UI::iSelBtn
-		
+
+@skipbtn:
 		LDA	#<dialogWindowTitles0
 		STA	$FD
 		LDA	#>dialogWindowTitles0
@@ -22946,6 +22972,12 @@ dialogWindowNullP:
 			
 dialogWindowNullA:
 			.byte	$07, $81, $00, $00, $00, $00, $00, $00
+			
+dialogNullStrRefP:
+			.word	dialogWindowNullP
+dialogNullStrRefA:
+			.word	dialogWindowNullA
+
 
 dialogWindowNull0:
 			.byte	$90, $09, $06
@@ -22955,10 +22987,10 @@ dialogWindowNull0:
 			.word		strText0Null0
 
 			.byte	$90, $09, $0D
-			.word		dialogWindowNullP
+			.word		dialogNullStrRefP
 			
 			.byte	$90, $0C, $0D
-			.word		dialogWindowNullA
+			.word		dialogNullStrRefA
 
 			.byte	$00
 

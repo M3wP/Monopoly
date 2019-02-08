@@ -24,8 +24,6 @@ this.  *\*ugh\**
 
 ## TODO
 
-* After starting a new game with keys only input, the menu options flash.
-
 
 * Change "all" dirty to be just board dirty and req. individual flags.
 
@@ -95,7 +93,20 @@ this.  *\*ugh\**
 
 ### Since Version 0.02.80B
 
+* 08FEB2019
+	* Don't use confirmation for CPU player on menuPageTrade1 confirm.
+	* Use string references in dialogDlgNull0.
+
+* 07FEB2019
+	* Bail is now charged to the Bank Taxes account.
+	* After starting a new game with keys only input, the menu options no longer
+	  flash.
+	* Change delay with auto group construction again.
+	* No longer go into Must Pay when a player is in debt and the game is quit.
+
 * 06FEB2019
+	* Change delay with auto group construction.
+	* Fix other than keyboard input error for menuPageSetupA.
 	* Exomizer utilised.
 	* Language select loader.
 
